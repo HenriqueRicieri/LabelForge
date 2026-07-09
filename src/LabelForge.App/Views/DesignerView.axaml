@@ -8,6 +8,95 @@
         x:Class="LabelForge.App.Views.DesignerView"
         x:DataType="vm:DesignerViewModel">
 
+    <UserControl.Styles>
+        <Style Selector="TextBlock.propLabel">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+    </UserControl.Styles>
+
+    <UserControl.DataTemplates>
+
+        <DataTemplate DataType="vm:TextPropertiesViewModel">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="propLabel" Text="Text" />
+                <TextBox Text="{Binding Text}" />
+                <TextBlock Classes="propLabel" Text="Font height (dots)" />
+                <NumericUpDown Value="{Binding FontHeight}" Minimum="6" Maximum="600"
+                               Increment="2" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="Font width (dots, 0 = auto)" />
+                <NumericUpDown Value="{Binding FontWidth}" Minimum="0" Maximum="600"
+                               Increment="2" FormatString="0" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:BarcodePropertiesViewModel">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="propLabel" Text="Data" />
+                <TextBox Text="{Binding Data}" />
+                <TextBlock Classes="propLabel" Text="Symbology" />
+                <ComboBox ItemsSource="{Binding Symbologies}"
+                          SelectedItem="{Binding Symbology}"
+                          HorizontalAlignment="Stretch" />
+                <TextBlock Classes="propLabel" Text="Height (dots)" />
+                <NumericUpDown Value="{Binding Height}" Minimum="10" Maximum="2000"
+                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="Module width (dots, 1-10)" />
+                <NumericUpDown Value="{Binding ModuleWidth}" Minimum="1" Maximum="10"
+                               Increment="1" FormatString="0" />
+                <StackPanel IsVisible="{Binding IsCode39}" Spacing="4">
+                    <TextBlock Classes="propLabel" Text="Wide bar ratio (Code 39)" />
+                    <NumericUpDown Value="{Binding Ratio}" Minimum="2" Maximum="3"
+                                   Increment="0.1" FormatString="0.0" />
+                </StackPanel>
+                <CheckBox Content="Print interpretation line"
+                          IsChecked="{Binding Interpretation}" Margin="0,4,0,0" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:QrPropertiesViewModel">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="propLabel" Text="Data" />
+                <TextBox Text="{Binding Data}" />
+                <TextBlock Classes="propLabel" Text="Magnification (1-10)" />
+                <NumericUpDown Value="{Binding Magnification}" Minimum="1" Maximum="10"
+                               Increment="1" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="Error correction" />
+                <ComboBox ItemsSource="{Binding ErrorCorrections}"
+                          SelectedItem="{Binding ErrorCorrection}"
+                          HorizontalAlignment="Stretch" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:LinePropertiesViewModel">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="propLabel" Text="Length (dots)" />
+                <NumericUpDown Value="{Binding Length}" Minimum="1" Maximum="5000"
+                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="Thickness (dots)" />
+                <NumericUpDown Value="{Binding Thickness}" Minimum="1" Maximum="200"
+                               Increment="1" FormatString="0" />
+                <CheckBox Content="Vertical" IsChecked="{Binding IsVertical}" Margin="0,4,0,0" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:BoxPropertiesViewModel">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="propLabel" Text="Width (dots)" />
+                <NumericUpDown Value="{Binding BoxWidth}" Minimum="4" Maximum="5000"
+                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="Height (dots)" />
+                <NumericUpDown Value="{Binding BoxHeight}" Minimum="4" Maximum="5000"
+                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="Border thickness (dots)" />
+                <NumericUpDown Value="{Binding Thickness}" Minimum="1" Maximum="200"
+                               Increment="1" FormatString="0" />
+            </StackPanel>
+        </DataTemplate>
+
+    </UserControl.DataTemplates>
+
     <DockPanel>
 
         <!-- Toolbox + label setup -->
@@ -40,27 +129,39 @@
         </Border>
 
         <!-- Properties panel -->
-        <Border DockPanel.Dock="Right" Width="250" Background="#11808080" Padding="12">
-            <StackPanel Spacing="8">
-                <TextBlock Text="Properties" FontWeight="SemiBold" />
+        <Border DockPanel.Dock="Right" Width="260" Background="#11808080" Padding="12">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Properties" FontWeight="SemiBold" />
 
-                <TextBlock Text="Nothing selected. Click an element on the canvas."
-                           IsVisible="{Binding !HasSelection}"
-                           TextWrapping="Wrap" Opacity="0.6" FontSize="12" />
+                    <TextBlock Text="Nothing selected. Click an element on the canvas."
+                               IsVisible="{Binding !HasSelection}"
+                               TextWrapping="Wrap" Opacity="0.6" FontSize="12" />
 
-                <StackPanel IsVisible="{Binding HasSelection}" Spacing="8">
-                    <TextBlock Text="X (dots)" FontSize="12" Opacity="0.7" />
-                    <NumericUpDown Value="{Binding SelectedX}" Increment="1" FormatString="0" Minimum="0" />
-                    <TextBlock Text="Y (dots)" FontSize="12" Opacity="0.7" />
-                    <NumericUpDown Value="{Binding SelectedY}" Increment="1" FormatString="0" Minimum="0" />
-                    <TextBlock Text="Content" FontSize="12" Opacity="0.7"
-                               IsVisible="{Binding SelectionHasContent}" />
-                    <TextBox Text="{Binding SelectedContent}" AcceptsReturn="False"
-                             IsVisible="{Binding SelectionHasContent}" />
-                    <TextBlock Text="Drag to move; drag the bottom-right handle to resize (barcodes snap to module steps). Arrow keys nudge by 1 dot (Shift = 10). Delete removes. Ctrl+Z / Ctrl+Y undo and redo."
-                               TextWrapping="Wrap" Opacity="0.5" FontSize="11" Margin="0,8,0,0" />
+                    <StackPanel IsVisible="{Binding HasSelection}" Spacing="4">
+                        <TextBlock Text="{Binding SelectionProperties.TypeName, FallbackValue=''}"
+                                   FontWeight="SemiBold" Opacity="0.8" />
+                        <TextBlock Classes="propLabel" Text="X (dots)" />
+                        <NumericUpDown Value="{Binding SelectionProperties.X, FallbackValue=0}"
+                                       Increment="1" FormatString="0" Minimum="0" />
+                        <TextBlock Classes="propLabel" Text="Y (dots)" />
+                        <NumericUpDown Value="{Binding SelectionProperties.Y, FallbackValue=0}"
+                                       Increment="1" FormatString="0" Minimum="0" />
+                        <TextBlock Classes="propLabel" Text="Rotation" />
+                        <ComboBox ItemsSource="{Binding SelectionProperties.Orientations, FallbackValue={x:Null}}"
+                                  SelectedItem="{Binding SelectionProperties.SelectedOrientation, FallbackValue={x:Null}}"
+                                  HorizontalAlignment="Stretch" />
+
+                        <Rectangle Height="1" Fill="#33808080" Margin="0,8" />
+
+                        <!-- Type-specific editor, picked by DataTemplate -->
+                        <ContentControl Content="{Binding SelectionProperties}" />
+
+                        <TextBlock Text="Drag to move; drag the bottom-right handle to resize (barcodes snap to module steps). Arrow keys nudge by 1 dot (Shift = 10). Delete removes. Ctrl+Z / Ctrl+Y undo and redo."
+                                   TextWrapping="Wrap" Opacity="0.5" FontSize="11" Margin="0,8,0,0" />
+                    </StackPanel>
                 </StackPanel>
-            </StackPanel>
+            </ScrollViewer>
         </Border>
 
         <!-- Generated ZPL -->

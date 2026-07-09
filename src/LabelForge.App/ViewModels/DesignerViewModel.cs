@@ -31,7 +31,6 @@ public partial class DesignerViewModel : ViewModelBase
     private readonly ZplGenerator _generator = new();
     private readonly SnapshotHistory _history = new();
     private CancellationTokenSource? _renderCts;
-    private bool _syncingSelection;
     private bool _restoring;
     private long _lastRecordTicks;
 
@@ -52,17 +51,9 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool HasSelection { get; set; }
 
+    /// <summary>Per-type property editor for the selection; DataTemplates pick the view.</summary>
     [ObservableProperty]
-    public partial bool SelectionHasContent { get; set; }
-
-    [ObservableProperty]
-    public partial decimal SelectedX { get; set; }
-
-    [ObservableProperty]
-    public partial decimal SelectedY { get; set; }
-
-    [ObservableProperty]
-    public partial string SelectedContent { get; set; } = string.Empty;
+    public partial ElementPropertiesViewModel? SelectionProperties { get; set; }
 
     [ObservableProperty]
     public partial decimal WidthMm { get; set; } = 100m;
@@ -101,7 +92,7 @@ public partial class DesignerViewModel : ViewModelBase
     /// <summary>Called by the view when the canvas edits the model (drag, resize, nudge).</summary>
     public void NotifyDocumentEdited()
     {
-        RefreshSelectionEditors();
+        SelectionProperties?.Refresh();
         RecordUndo(coalesce: true);
         ScheduleRender();
     }
@@ -176,52 +167,19 @@ public partial class DesignerViewModel : ViewModelBase
     partial void OnSelectedElementChanged(Element? value)
     {
         HasSelection = value is not null;
-        SelectionHasContent = value is TextElement or BarcodeElement or QrCodeElement;
-        RefreshSelectionEditors();
+        SelectionProperties = value switch
+        {
+            TextElement text => new TextPropertiesViewModel(text, OnPanelEdited),
+            BarcodeElement barcode => new BarcodePropertiesViewModel(barcode, OnPanelEdited),
+            QrCodeElement qr => new QrPropertiesViewModel(qr, OnPanelEdited),
+            LineElement line => new LinePropertiesViewModel(line, OnPanelEdited),
+            BoxElement box => new BoxPropertiesViewModel(box, OnPanelEdited),
+            _ => null,
+        };
     }
 
-    partial void OnSelectedXChanged(decimal value)
+    private void OnPanelEdited()
     {
-        if (!_syncingSelection && !_restoring && SelectedElement is { } selected)
-        {
-            selected.X = (int)value;
-            RecordUndo(coalesce: true);
-            ScheduleRender();
-        }
-    }
-
-    partial void OnSelectedYChanged(decimal value)
-    {
-        if (!_syncingSelection && !_restoring && SelectedElement is { } selected)
-        {
-            selected.Y = (int)value;
-            RecordUndo(coalesce: true);
-            ScheduleRender();
-        }
-    }
-
-    partial void OnSelectedContentChanged(string value)
-    {
-        if (_syncingSelection || _restoring)
-        {
-            return;
-        }
-
-        switch (SelectedElement)
-        {
-            case TextElement text:
-                text.Text = value;
-                break;
-            case BarcodeElement barcode:
-                barcode.Data = value;
-                break;
-            case QrCodeElement qr:
-                qr.Data = value;
-                break;
-            default:
-                return;
-        }
-
         RecordUndo(coalesce: true);
         ScheduleRender();
     }
@@ -298,7 +256,6 @@ public partial class DesignerViewModel : ViewModelBase
             HeightMm = (decimal)document.HeightMm;
             SelectedDensity = Densities.FirstOrDefault(d => d.Dpmm == document.Dpmm) ?? Densities[0];
             SelectedElement = document.Elements.FirstOrDefault(e => e.Id == selectedId);
-            RefreshSelectionEditors();
         }
         finally
         {
@@ -314,21 +271,6 @@ public partial class DesignerViewModel : ViewModelBase
     {
         CanUndo = _history.CanUndo;
         CanRedo = _history.CanRedo;
-    }
-
-    private void RefreshSelectionEditors()
-    {
-        _syncingSelection = true;
-        SelectedX = SelectedElement?.X ?? 0;
-        SelectedY = SelectedElement?.Y ?? 0;
-        SelectedContent = SelectedElement switch
-        {
-            TextElement text => text.Text,
-            BarcodeElement barcode => barcode.Data,
-            QrCodeElement qr => qr.Data,
-            _ => string.Empty,
-        };
-        _syncingSelection = false;
     }
 
     private async void ScheduleRender()
