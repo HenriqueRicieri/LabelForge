@@ -10,9 +10,11 @@ namespace LabelForge.Core.Rendering;
 /// <param name="HeightDots">Label height in printer dots (heightMm * dpmm, rounded).</param>
 /// <param name="UnknownCommands">ZPL commands the engine did not recognize (diagnostics).</param>
 /// <param name="Errors">Errors the engine reported while analyzing the ZPL (diagnostics).</param>
+/// <param name="LabelCount">Number of label blocks (^XA..^XZ) found in the source.</param>
 public sealed record RenderResult(
     byte[] Png,
     int WidthDots,
     int HeightDots,
     IReadOnlyList<string> UnknownCommands,
-    IReadOnlyList<string> Errors);
+    IReadOnlyList<string> Errors,
+    int LabelCount);

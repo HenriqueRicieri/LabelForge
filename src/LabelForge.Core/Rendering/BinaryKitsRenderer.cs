@@ -40,7 +40,7 @@ public sealed class BinaryKitsRenderer : IZplRenderer
         ReplaceUnderscoreWithEnSpace = false,
     };
 
-    public RenderResult Render(string zpl, double widthMm, double heightMm, int dpmm)
+    public RenderResult Render(string zpl, double widthMm, double heightMm, int dpmm, int labelIndex = 0)
     {
         ArgumentNullException.ThrowIfNull(zpl);
 
@@ -52,7 +52,7 @@ public sealed class BinaryKitsRenderer : IZplRenderer
         try
         {
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-            return RenderCore(zpl, widthMm, heightMm, dpmm);
+            return RenderCore(zpl, widthMm, heightMm, dpmm, labelIndex);
         }
         finally
         {
@@ -60,7 +60,7 @@ public sealed class BinaryKitsRenderer : IZplRenderer
         }
     }
 
-    private RenderResult RenderCore(string zpl, double widthMm, double heightMm, int dpmm)
+    private RenderResult RenderCore(string zpl, double widthMm, double heightMm, int dpmm, int labelIndex)
     {
         var storage = new PrinterStorage();
         var analyzer = new ZplAnalyzer(storage);
@@ -69,10 +69,12 @@ public sealed class BinaryKitsRenderer : IZplRenderer
         var unknownCommands = info.UnknownCommands ?? Array.Empty<string>();
         var errors = new List<string>(info.Errors ?? Array.Empty<string>());
 
-        // v1: render the first label block. Multi-block files (setup block + label)
-        // are enumerated by the viewer UI; the renderer stays single-label.
-        ZplElementBase[] elements = info.LabelInfos.Length > 0
-            ? info.LabelInfos[0].ZplElements
+        // Render the requested label block. A file can hold several (^XA..^XZ); the
+        // viewer enumerates them and lets the user pick one. Clamp to a valid index.
+        int labelCount = info.LabelInfos.Length;
+        int index = labelCount > 0 ? Math.Clamp(labelIndex, 0, labelCount - 1) : 0;
+        ZplElementBase[] elements = labelCount > 0
+            ? info.LabelInfos[index].ZplElements
             : Array.Empty<ZplElementBase>();
 
         var drawer = new ZplElementDrawer(storage, _options);
@@ -96,6 +98,6 @@ public sealed class BinaryKitsRenderer : IZplRenderer
         int widthDots = (int)Math.Round(widthMm * dpmm, MidpointRounding.AwayFromZero);
         int heightDots = (int)Math.Round(heightMm * dpmm, MidpointRounding.AwayFromZero);
 
-        return new RenderResult(png, widthDots, heightDots, unknownCommands, errors);
+        return new RenderResult(png, widthDots, heightDots, unknownCommands, errors, labelCount);
     }
 }

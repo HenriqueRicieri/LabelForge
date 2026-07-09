@@ -13,5 +13,6 @@ public interface IZplRenderer
     /// <param name="widthMm">Label width in millimeters.</param>
     /// <param name="heightMm">Label height in millimeters.</param>
     /// <param name="dpmm">Print density in dots per millimeter (203 dpi = 8, 300 = 12, 600 = 24).</param>
-    RenderResult Render(string zpl, double widthMm, double heightMm, int dpmm);
+    /// <param name="labelIndex">Which label block to render when the source has several (0-based).</param>
+    RenderResult Render(string zpl, double widthMm, double heightMm, int dpmm, int labelIndex = 0);
 }
