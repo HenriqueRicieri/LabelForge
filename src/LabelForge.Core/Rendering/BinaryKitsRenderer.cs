@@ -1,3 +1,4 @@
+using System.Globalization;
 using BinaryKits.Zpl.Label.Elements;
 using BinaryKits.Zpl.Viewer;
 using BinaryKits.Zpl.Viewer.ElementDrawers;
@@ -43,6 +44,24 @@ public sealed class BinaryKitsRenderer : IZplRenderer
     {
         ArgumentNullException.ThrowIfNull(zpl);
 
+        // BinaryKits parses ZPL decimals (for example the ^BY wide-bar ratio "3.0")
+        // with the ambient culture. On a locale that uses a comma decimal separator
+        // (e.g. pt-BR) it reads "3.0" as 30, producing wildly oversized barcodes.
+        // ZPL is always culture-invariant, so pin the culture for the whole call.
+        var previousCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+            return RenderCore(zpl, widthMm, heightMm, dpmm);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previousCulture;
+        }
+    }
+
+    private RenderResult RenderCore(string zpl, double widthMm, double heightMm, int dpmm)
+    {
         var storage = new PrinterStorage();
         var analyzer = new ZplAnalyzer(storage);
         AnalyzeInfo info = analyzer.Analyze(zpl);
