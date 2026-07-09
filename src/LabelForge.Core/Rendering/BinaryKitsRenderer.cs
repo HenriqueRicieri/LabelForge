@@ -1,4 +1,5 @@
 using System.Globalization;
+using LabelForge.Core.Model;
 using BinaryKits.Zpl.Label.Elements;
 using BinaryKits.Zpl.Viewer;
 using BinaryKits.Zpl.Viewer.ElementDrawers;
@@ -95,8 +96,8 @@ public sealed class BinaryKitsRenderer : IZplRenderer
             png = Array.Empty<byte>();
         }
 
-        int widthDots = (int)Math.Round(widthMm * dpmm, MidpointRounding.AwayFromZero);
-        int heightDots = (int)Math.Round(heightMm * dpmm, MidpointRounding.AwayFromZero);
+        int widthDots = Units.MmToDots(widthMm, dpmm);
+        int heightDots = Units.MmToDots(heightMm, dpmm);
 
         return new RenderResult(png, widthDots, heightDots, unknownCommands, errors, labelCount);
     }

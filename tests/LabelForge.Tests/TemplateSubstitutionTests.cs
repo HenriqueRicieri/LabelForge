@@ -1,4 +1,3 @@
-using System.Reflection;
 using LabelForge.Core.Rendering;
 using LabelForge.Core.Templating;
 
@@ -66,21 +65,5 @@ public sealed class TemplateSubstitutionTests
             "Files still not rendering after sample substitution:\n" + string.Join("\n", stillFailing));
     }
 
-    private static IEnumerable<string> CorpusFiles()
-    {
-        var dir = new DirectoryInfo(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!);
-        while (dir is not null)
-        {
-            var candidate = Path.Combine(dir.FullName, "exemplos zpl");
-            if (Directory.Exists(candidate))
-            {
-                return Directory.EnumerateFiles(candidate, "*.*")
-                    .Where(p => p.EndsWith(".zpl", StringComparison.OrdinalIgnoreCase));
-            }
-
-            dir = dir.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate the 'exemplos zpl' corpus folder.");
-    }
+    private static IEnumerable<string> CorpusFiles() => TestCorpus.Files();
 }

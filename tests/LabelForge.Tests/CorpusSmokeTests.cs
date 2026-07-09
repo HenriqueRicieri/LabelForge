@@ -1,4 +1,3 @@
-using System.Reflection;
 using LabelForge.Core.Rendering;
 
 namespace LabelForge.Tests;
@@ -17,8 +16,7 @@ public sealed class CorpusSmokeTests
 
     public static IEnumerable<object[]> CorpusFiles()
     {
-        foreach (var path in Directory.EnumerateFiles(CorpusDirectory(), "*.*")
-                     .Where(p => p.EndsWith(".zpl", StringComparison.OrdinalIgnoreCase)))
+        foreach (var path in TestCorpus.Files())
         {
             yield return new object[] { path };
         }
@@ -49,21 +47,4 @@ public sealed class CorpusSmokeTests
         }
     }
 
-    /// <summary>Walks up from the test assembly to locate the "exemplos zpl" corpus folder.</summary>
-    private static string CorpusDirectory()
-    {
-        var dir = new DirectoryInfo(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!);
-        while (dir is not null)
-        {
-            var candidate = Path.Combine(dir.FullName, "exemplos zpl");
-            if (Directory.Exists(candidate))
-            {
-                return candidate;
-            }
-
-            dir = dir.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate the 'exemplos zpl' corpus folder above the test assembly.");
-    }
 }
