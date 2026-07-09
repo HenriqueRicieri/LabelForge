@@ -1,0 +1,78 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LabelForge.App.ViewModels"
+        xmlns:controls="using:LabelForge.App.Controls"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1150" d:DesignHeight="720"
+        x:Class="LabelForge.App.Views.DesignerView"
+        x:DataType="vm:DesignerViewModel">
+
+    <DockPanel>
+
+        <!-- Toolbox + label setup -->
+        <Border DockPanel.Dock="Top" Padding="10,8" Background="#22808080">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="Add:" VerticalAlignment="Center" Opacity="0.7" />
+                <Button Content="Text" Command="{Binding AddTextCommand}" />
+                <Button Content="Box" Command="{Binding AddBoxCommand}" />
+                <Button Content="Line" Command="{Binding AddLineCommand}" />
+                <Button Content="Barcode" Command="{Binding AddBarcodeCommand}" />
+                <Button Content="QR" Command="{Binding AddQrCommand}" />
+                <Rectangle Width="1" Height="22" Fill="#33808080" />
+                <Button Content="Delete" Command="{Binding DeleteSelectedCommand}"
+                        IsEnabled="{Binding HasSelection}" />
+                <Rectangle Width="1" Height="22" Fill="#33808080" />
+                <TextBlock Text="Width (mm)" VerticalAlignment="Center" />
+                <NumericUpDown Value="{Binding WidthMm}" Minimum="5" Maximum="600"
+                               Increment="1" FormatString="0.#" Width="110" />
+                <TextBlock Text="Height (mm)" VerticalAlignment="Center" />
+                <NumericUpDown Value="{Binding HeightMm}" Minimum="5" Maximum="1000"
+                               Increment="1" FormatString="0.#" Width="110" />
+                <TextBlock Text="Density" VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{Binding Densities}"
+                          SelectedItem="{Binding SelectedDensity}" Width="100" />
+                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Opacity="0.6" />
+            </StackPanel>
+        </Border>
+
+        <!-- Properties panel -->
+        <Border DockPanel.Dock="Right" Width="250" Background="#11808080" Padding="12">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Properties" FontWeight="SemiBold" />
+
+                <TextBlock Text="Nothing selected. Click an element on the canvas."
+                           IsVisible="{Binding !HasSelection}"
+                           TextWrapping="Wrap" Opacity="0.6" FontSize="12" />
+
+                <StackPanel IsVisible="{Binding HasSelection}" Spacing="8">
+                    <TextBlock Text="X (dots)" FontSize="12" Opacity="0.7" />
+                    <NumericUpDown Value="{Binding SelectedX}" Increment="1" FormatString="0" Minimum="0" />
+                    <TextBlock Text="Y (dots)" FontSize="12" Opacity="0.7" />
+                    <NumericUpDown Value="{Binding SelectedY}" Increment="1" FormatString="0" Minimum="0" />
+                    <TextBlock Text="Content" FontSize="12" Opacity="0.7"
+                               IsVisible="{Binding SelectionHasContent}" />
+                    <TextBox Text="{Binding SelectedContent}" AcceptsReturn="False"
+                             IsVisible="{Binding SelectionHasContent}" />
+                    <TextBlock Text="Drag to move. Arrow keys nudge by 1 dot (Shift = 10). Delete removes."
+                               TextWrapping="Wrap" Opacity="0.5" FontSize="11" Margin="0,8,0,0" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Generated ZPL -->
+        <Expander DockPanel.Dock="Bottom" Header="Generated ZPL" IsExpanded="False">
+            <TextBox Text="{Binding GeneratedZpl}" IsReadOnly="True"
+                     FontFamily="Consolas,Menlo,Monospace" FontSize="12"
+                     Height="140" TextWrapping="NoWrap" />
+        </Expander>
+
+        <!-- Canvas -->
+        <controls:DesignerCanvas Name="Canvas"
+                                 Underlay="{Binding Underlay}"
+                                 Document="{Binding Document}"
+                                 SelectedElement="{Binding SelectedElement}" />
+
+    </DockPanel>
+
+</UserControl>

@@ -1,0 +1,109 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LabelForge.App.ViewModels"
+        xmlns:aedit="using:AvaloniaEdit"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1150" d:DesignHeight="720"
+        x:Class="LabelForge.App.Views.ViewerView"
+        x:DataType="vm:ViewerViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Border.statusPill">
+            <Setter Property="Background" Value="#2E7D32" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.statusPill.error">
+            <Setter Property="Background" Value="#C62828" />
+        </Style>
+        <Style Selector="Border.statusPill TextBlock">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel>
+
+        <!-- Label setup -->
+        <Border DockPanel.Dock="Top" Padding="10,8" Background="#22808080">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <Button Content="Open..." Click="OnOpenFile" ToolTip.Tip="Open a .zpl file (Ctrl+O)" />
+                <Rectangle Width="1" Height="22" Fill="#33808080" />
+                <CheckBox Content="Auto size" IsChecked="{Binding AutoSize}"
+                          ToolTip.Tip="Read the label size from ^PW / ^LL in the ZPL" />
+                <TextBlock Text="Width (mm)" VerticalAlignment="Center" />
+                <NumericUpDown Value="{Binding WidthMm}" Minimum="5" Maximum="600"
+                               Increment="1" FormatString="0.#" Width="110"
+                               IsEnabled="{Binding !AutoSize}" />
+                <TextBlock Text="Height (mm)" VerticalAlignment="Center" />
+                <NumericUpDown Value="{Binding HeightMm}" Minimum="5" Maximum="1000"
+                               Increment="1" FormatString="0.#" Width="110"
+                               IsEnabled="{Binding !AutoSize}" />
+                <TextBlock Text="Density" VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{Binding Densities}"
+                          SelectedItem="{Binding SelectedDensity}" Width="100" />
+                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Opacity="0.6" />
+            </StackPanel>
+        </Border>
+
+        <!-- Diagnostics strip -->
+        <Border DockPanel.Dock="Bottom" Padding="10,6" Background="#22808080">
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <Border Classes="statusPill" Classes.error="{Binding HasErrors}">
+                    <TextBlock Text="{Binding ErrorText}" />
+                </Border>
+                <TextBlock Text="{Binding InfoText}" VerticalAlignment="Center"
+                           FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- Editor | Preview -->
+        <Grid ColumnDefinitions="*,4,1.4*">
+            <aedit:TextEditor Grid.Column="0"
+                              Name="ZplEditor"
+                              FontFamily="Consolas,Menlo,Monospace" FontSize="13"
+                              ShowLineNumbers="True"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto" />
+
+            <GridSplitter Grid.Column="1" Background="#33808080" ResizeDirection="Columns" />
+
+            <Grid Grid.Column="2" RowDefinitions="Auto,*">
+
+                <!-- Preview toolbar -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6" Margin="6,6,6,4">
+                    <Button Content="Fit" Click="OnFit" ToolTip.Tip="Fit to window (Ctrl+9)" />
+                    <Button Content="100%" Click="OnActual" ToolTip.Tip="Actual size (Ctrl+0)" />
+                    <Button Content="&#8722;" Click="OnZoomOut" ToolTip.Tip="Zoom out (Ctrl+-)" Width="34" />
+                    <Button Content="+" Click="OnZoomIn" ToolTip.Tip="Zoom in (Ctrl++)" Width="34" />
+                    <TextBlock Name="ZoomLabel" Text="100%" VerticalAlignment="Center"
+                               MinWidth="46" Opacity="0.7" />
+                    <ComboBox ItemsSource="{Binding LabelOptions}"
+                              SelectedIndex="{Binding SelectedLabelIndex}"
+                              IsVisible="{Binding HasMultipleLabels}"
+                              MinWidth="100"
+                              ToolTip.Tip="This file has several labels; pick one" />
+                </StackPanel>
+
+                <Border Grid.Row="1" Background="#FFD9D9D9">
+                    <ScrollViewer Name="PreviewScroll"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto"
+                                  PointerWheelChanged="OnPreviewWheel">
+                        <LayoutTransformControl Name="PreviewTransform"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center">
+                            <Image Name="PreviewImageControl"
+                                   Source="{Binding PreviewImage}" Stretch="None" />
+                        </LayoutTransformControl>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Grid>
+
+    </DockPanel>
+
+</UserControl>
