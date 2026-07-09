@@ -19,14 +19,22 @@ public sealed class ElementBoundsCalculator : IElementVisitor
 
     public DotRect GetBounds(Element element)
     {
-        ArgumentNullException.ThrowIfNull(element);
-        element.Accept(this);
+        DotRect bounds = GetUnrotatedBounds(element);
 
         // ZPL rotates fields around the origin; approximating the rotated footprint
         // as a width/height swap at the same origin is close enough for selection.
         return element.Orientation is Orientation.Rotated90 or Orientation.Rotated270
-            ? _result with { Width = _result.Height, Height = _result.Width }
-            : _result;
+            ? bounds with { Width = bounds.Height, Height = bounds.Width }
+            : bounds;
+    }
+
+    /// <summary>The footprint before orientation is applied. Used by resize logic,
+    /// which reasons about the element's intrinsic width (e.g. barcode modules).</summary>
+    public DotRect GetUnrotatedBounds(Element element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        element.Accept(this);
+        return _result;
     }
 
     public void Visit(TextElement element)

@@ -23,6 +23,9 @@
                 <Button Content="Delete" Command="{Binding DeleteSelectedCommand}"
                         IsEnabled="{Binding HasSelection}" />
                 <Rectangle Width="1" Height="22" Fill="#33808080" />
+                <Button Content="Undo" Command="{Binding UndoCommand}" ToolTip.Tip="Undo (Ctrl+Z)" />
+                <Button Content="Redo" Command="{Binding RedoCommand}" ToolTip.Tip="Redo (Ctrl+Y)" />
+                <Rectangle Width="1" Height="22" Fill="#33808080" />
                 <TextBlock Text="Width (mm)" VerticalAlignment="Center" />
                 <NumericUpDown Value="{Binding WidthMm}" Minimum="5" Maximum="600"
                                Increment="1" FormatString="0.#" Width="110" />
@@ -54,7 +57,7 @@
                                IsVisible="{Binding SelectionHasContent}" />
                     <TextBox Text="{Binding SelectedContent}" AcceptsReturn="False"
                              IsVisible="{Binding SelectionHasContent}" />
-                    <TextBlock Text="Drag to move. Arrow keys nudge by 1 dot (Shift = 10). Delete removes."
+                    <TextBlock Text="Drag to move; drag the bottom-right handle to resize (barcodes snap to module steps). Arrow keys nudge by 1 dot (Shift = 10). Delete removes. Ctrl+Z / Ctrl+Y undo and redo."
                                TextWrapping="Wrap" Opacity="0.5" FontSize="11" Margin="0,8,0,0" />
                 </StackPanel>
             </StackPanel>

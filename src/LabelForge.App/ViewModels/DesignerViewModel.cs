@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LabelForge.Core.Editing;
+using LabelForge.Core.Io;
 using LabelForge.Core.Model;
 using LabelForge.Core.Rendering;
 using LabelForge.Core.Zpl;
@@ -18,17 +20,25 @@ namespace LabelForge.App.ViewModels;
 /// properties panel edit it, the ZPL generator turns it into code, and the offline
 /// renderer turns that code into the canvas underlay (WYSIWYG rule). Rendering is
 /// debounced, background, latest-wins, mirroring the viewer pipeline.
+/// Undo/redo is snapshot-based: every committed edit records the serialized document
+/// (the same JSON as the .lfl file format); bursts of small edits coalesce into one step.
 /// </summary>
 public partial class DesignerViewModel : ViewModelBase
 {
+    private const int CoalesceWindowMs = 500;
+
     private readonly IZplRenderer _renderer = new BinaryKitsRenderer();
     private readonly ZplGenerator _generator = new();
+    private readonly SnapshotHistory _history = new();
     private CancellationTokenSource? _renderCts;
     private bool _syncingSelection;
-
-    public LabelDocument Document { get; } = new() { WidthMm = 100, HeightMm = 60, Dpmm = 8 };
+    private bool _restoring;
+    private long _lastRecordTicks;
 
     public IReadOnlyList<DensityOption> Densities => DensityOption.Standard;
+
+    [ObservableProperty]
+    public partial LabelDocument Document { get; set; }
 
     [ObservableProperty]
     public partial Bitmap? Underlay { get; set; }
@@ -66,18 +76,56 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial string StatusText { get; set; } = string.Empty;
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(UndoCommand))]
+    public partial bool CanUndo { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RedoCommand))]
+    public partial bool CanRedo { get; set; }
+
     public DesignerViewModel()
     {
+        // Property setters record undo states; construction must not, or the
+        // history would start with a spurious empty document before the seed.
+        _restoring = true;
+        Document = new LabelDocument { WidthMm = 100, HeightMm = 60, Dpmm = 8 };
         SelectedDensity = Densities[0];
         SeedSampleLabel();
+        _restoring = false;
+
+        RecordUndo(coalesce: false);
         ScheduleRender();
     }
 
-    /// <summary>Called by the view when the canvas edits the model (drag or nudge).</summary>
+    /// <summary>Called by the view when the canvas edits the model (drag, resize, nudge).</summary>
     public void NotifyDocumentEdited()
     {
         RefreshSelectionEditors();
+        RecordUndo(coalesce: true);
         ScheduleRender();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUndo))]
+    private void Undo()
+    {
+        if (_history.Undo() is { } state)
+        {
+            RestoreSnapshot(state);
+        }
+
+        UpdateUndoState();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRedo))]
+    private void Redo()
+    {
+        if (_history.Redo() is { } state)
+        {
+            RestoreSnapshot(state);
+        }
+
+        UpdateUndoState();
     }
 
     [RelayCommand]
@@ -107,6 +155,7 @@ public partial class DesignerViewModel : ViewModelBase
         {
             Document.Elements.Remove(selected);
             SelectedElement = null;
+            RecordUndo(coalesce: false);
             ScheduleRender();
         }
     }
@@ -120,6 +169,7 @@ public partial class DesignerViewModel : ViewModelBase
             : Document.Elements.Max(e => e.ZOrder) + 1;
         Document.Elements.Add(element);
         SelectedElement = element;
+        RecordUndo(coalesce: false);
         ScheduleRender();
     }
 
@@ -132,25 +182,27 @@ public partial class DesignerViewModel : ViewModelBase
 
     partial void OnSelectedXChanged(decimal value)
     {
-        if (!_syncingSelection && SelectedElement is { } selected)
+        if (!_syncingSelection && !_restoring && SelectedElement is { } selected)
         {
             selected.X = (int)value;
+            RecordUndo(coalesce: true);
             ScheduleRender();
         }
     }
 
     partial void OnSelectedYChanged(decimal value)
     {
-        if (!_syncingSelection && SelectedElement is { } selected)
+        if (!_syncingSelection && !_restoring && SelectedElement is { } selected)
         {
             selected.Y = (int)value;
+            RecordUndo(coalesce: true);
             ScheduleRender();
         }
     }
 
     partial void OnSelectedContentChanged(string value)
     {
-        if (_syncingSelection)
+        if (_syncingSelection || _restoring)
         {
             return;
         }
@@ -170,28 +222,98 @@ public partial class DesignerViewModel : ViewModelBase
                 return;
         }
 
+        RecordUndo(coalesce: true);
         ScheduleRender();
     }
 
     partial void OnWidthMmChanged(decimal value)
     {
+        if (_restoring)
+        {
+            return;
+        }
+
         Document.WidthMm = (double)value;
+        RecordUndo(coalesce: true);
         ScheduleRender();
     }
 
     partial void OnHeightMmChanged(decimal value)
     {
+        if (_restoring)
+        {
+            return;
+        }
+
         Document.HeightMm = (double)value;
+        RecordUndo(coalesce: true);
         ScheduleRender();
     }
 
     partial void OnSelectedDensityChanged(DensityOption? value)
     {
-        if (value is not null)
+        if (_restoring || value is null)
         {
-            Document.Dpmm = value.Dpmm;
-            ScheduleRender();
+            return;
         }
+
+        Document.Dpmm = value.Dpmm;
+        RecordUndo(coalesce: true);
+        ScheduleRender();
+    }
+
+    /// <summary>
+    /// Serializes the document into the history. Edits arriving within the coalesce
+    /// window replace the current snapshot instead of pushing a new one, so typing a
+    /// word or holding an arrow key undoes as a single step.
+    /// </summary>
+    private void RecordUndo(bool coalesce)
+    {
+        string snapshot = LabelDocumentJson.Serialize(Document);
+        long now = Environment.TickCount64;
+
+        if (coalesce && now - _lastRecordTicks < CoalesceWindowMs)
+        {
+            _history.ReplaceCurrent(snapshot);
+        }
+        else
+        {
+            _history.Record(snapshot);
+        }
+
+        _lastRecordTicks = now;
+        UpdateUndoState();
+    }
+
+    private void RestoreSnapshot(string snapshot)
+    {
+        Guid? selectedId = SelectedElement?.Id;
+
+        _restoring = true;
+        try
+        {
+            LabelDocument document = LabelDocumentJson.Deserialize(snapshot);
+            Document = document;
+            WidthMm = (decimal)document.WidthMm;
+            HeightMm = (decimal)document.HeightMm;
+            SelectedDensity = Densities.FirstOrDefault(d => d.Dpmm == document.Dpmm) ?? Densities[0];
+            SelectedElement = document.Elements.FirstOrDefault(e => e.Id == selectedId);
+            RefreshSelectionEditors();
+        }
+        finally
+        {
+            _restoring = false;
+        }
+
+        // Restoring must not count as a new edit; a subsequent edit starts fresh.
+        _lastRecordTicks = 0;
+        ScheduleRender();
+    }
+
+    private void UpdateUndoState()
+    {
+        CanUndo = _history.CanUndo;
+        CanRedo = _history.CanRedo;
     }
 
     private void RefreshSelectionEditors()
@@ -219,14 +341,15 @@ public partial class DesignerViewModel : ViewModelBase
         {
             await Task.Delay(150, cts.Token);
 
-            double widthMm = Document.WidthMm;
-            double heightMm = Document.HeightMm;
-            int dpmm = Document.Dpmm;
+            LabelDocument document = Document;
+            double widthMm = document.WidthMm;
+            double heightMm = document.HeightMm;
+            int dpmm = document.Dpmm;
 
             (string zpl, RenderResult result) = await Task.Run(
                 () =>
                 {
-                    string generated = _generator.Generate(Document);
+                    string generated = _generator.Generate(document);
                     return (generated, _renderer.Render(generated, widthMm, heightMm, dpmm));
                 },
                 cts.Token);

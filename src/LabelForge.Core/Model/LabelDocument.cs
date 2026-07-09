@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace LabelForge.Core.Model;
 
 /// <summary>
@@ -16,9 +18,11 @@ public sealed class LabelDocument
     /// <summary>Print density in dots per millimeter (8 = 203 dpi, 12 = 300, 24 = 600).</summary>
     public int Dpmm { get; set; } = 8;
 
-    public IList<Element> Elements { get; } = new List<Element>();
+    public IList<Element> Elements { get; init; } = new List<Element>();
 
+    [JsonIgnore]
     public int WidthDots => Units.MmToDots(WidthMm, Dpmm);
 
+    [JsonIgnore]
     public int HeightDots => Units.MmToDots(HeightMm, Dpmm);
 }

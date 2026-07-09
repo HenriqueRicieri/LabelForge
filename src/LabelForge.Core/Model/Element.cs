@@ -1,10 +1,20 @@
+using System.Text.Json.Serialization;
+
 namespace LabelForge.Core.Model;
 
 /// <summary>
 /// Base type for everything placed on a label. Geometry is stored in printer dots
 /// with a top-left origin, matching ZPL's ^FO field origin, so what you place is what
 /// prints with no generation-time rounding.
+/// The polymorphic JSON attributes drive the .lfl file format and undo snapshots;
+/// new element types must be registered here or they will not round-trip.
 /// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
+[JsonDerivedType(typeof(TextElement), "text")]
+[JsonDerivedType(typeof(BarcodeElement), "barcode")]
+[JsonDerivedType(typeof(QrCodeElement), "qr")]
+[JsonDerivedType(typeof(LineElement), "line")]
+[JsonDerivedType(typeof(BoxElement), "box")]
 public abstract class Element
 {
     /// <summary>Stable identity for selection, undo, and serialization.</summary>

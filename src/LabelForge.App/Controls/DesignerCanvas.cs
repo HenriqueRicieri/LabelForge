@@ -40,13 +40,19 @@ public sealed class DesignerCanvas : Control
     private static readonly Pen GhostPen = new(
         new SolidColorBrush(Color.FromRgb(0x25, 0x63, 0xEB)), 1.5, new DashStyle([4, 4], 0));
 
+    private const double HandleSize = 9;
+
     private readonly ElementBoundsCalculator _bounds = new();
     private bool _dragging;
+    private bool _resizing;
     private Point _dragStartDots;
     private int _elementStartX;
     private int _elementStartY;
     private int _candidateX;
     private int _candidateY;
+    private DotRect _resizeStartBounds;
+    private int _candidateWidth;
+    private int _candidateHeight;
 
     public DesignerCanvas()
     {
@@ -124,29 +130,50 @@ public sealed class DesignerCanvas : Control
             DotRect bounds = _bounds.GetBounds(selected);
             int x = _dragging ? _candidateX : bounds.X;
             int y = _dragging ? _candidateY : bounds.Y;
+            int w = _resizing ? _candidateWidth : bounds.Width;
+            int h = _resizing ? _candidateHeight : bounds.Height;
 
             var rect = new Rect(
                 origin.X + x * scale,
                 origin.Y + y * scale,
-                Math.Max(bounds.Width * scale, 4),
-                Math.Max(bounds.Height * scale, 4));
+                Math.Max(w * scale, 4),
+                Math.Max(h * scale, 4));
 
-            context.DrawRectangle(null, _dragging ? GhostPen : SelectionPen, rect);
+            bool ghost = _dragging || _resizing;
+            context.DrawRectangle(null, ghost ? GhostPen : SelectionPen, rect);
 
-            if (!_dragging)
+            if (!ghost)
             {
-                const double handle = 7;
                 foreach (var corner in new[]
                          {
                              rect.TopLeft, rect.TopRight, rect.BottomLeft, rect.BottomRight,
                          })
                 {
                     var handleRect = new Rect(
-                        corner.X - handle / 2, corner.Y - handle / 2, handle, handle);
+                        corner.X - HandleSize / 2, corner.Y - HandleSize / 2, HandleSize, HandleSize);
                     context.DrawRectangle(Brushes.White, SelectionPen, handleRect);
                 }
             }
         }
+    }
+
+    /// <summary>The bottom-right (resize) handle of the current selection, in screen space.</summary>
+    private Rect? ResizeHandleRect()
+    {
+        if (SelectedElement is not { IsLocked: false } selected ||
+            Document is not { } doc || !doc.Elements.Contains(selected))
+        {
+            return null;
+        }
+
+        var (scale, origin) = GetTransform();
+        DotRect bounds = _bounds.GetBounds(selected);
+        double cornerX = origin.X + (bounds.X + bounds.Width) * scale;
+        double cornerY = origin.Y + (bounds.Y + bounds.Height) * scale;
+
+        // Slightly larger than the drawn handle so it is easy to grab.
+        const double grab = HandleSize + 4;
+        return new Rect(cornerX - grab / 2, cornerY - grab / 2, grab, grab);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -164,6 +191,21 @@ public sealed class DesignerCanvas : Control
         Point p = e.GetPosition(this);
         double dotX = (p.X - origin.X) / scale;
         double dotY = (p.Y - origin.Y) / scale;
+
+        // The resize handle wins over element hit-testing, otherwise grabbing the
+        // corner of a small element would just re-select it.
+        if (ResizeHandleRect() is { } handle && handle.Contains(p) &&
+            SelectedElement is { } sel)
+        {
+            _resizing = true;
+            _dragStartDots = new Point(dotX, dotY);
+            _resizeStartBounds = _bounds.GetBounds(sel);
+            _candidateWidth = _resizeStartBounds.Width;
+            _candidateHeight = _resizeStartBounds.Height;
+            e.Pointer.Capture(this);
+            InvalidateVisual();
+            return;
+        }
 
         Element? hit = doc.Elements
             .Where(el => el.IsVisible)
@@ -189,20 +231,39 @@ public sealed class DesignerCanvas : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        if (!_dragging || Document is not { } doc)
+        Point p = e.GetPosition(this);
+
+        if (!_dragging && !_resizing)
+        {
+            Cursor = ResizeHandleRect() is { } handle && handle.Contains(p)
+                ? new Cursor(StandardCursorType.BottomRightCorner)
+                : Cursor.Default;
+            return;
+        }
+
+        if (Document is not { } doc)
         {
             return;
         }
 
         var (scale, origin) = GetTransform();
-        Point p = e.GetPosition(this);
         double dotX = (p.X - origin.X) / scale;
         double dotY = (p.Y - origin.Y) / scale;
 
-        _candidateX = Math.Clamp(
-            _elementStartX + (int)Math.Round(dotX - _dragStartDots.X), 0, Math.Max(doc.WidthDots - 1, 0));
-        _candidateY = Math.Clamp(
-            _elementStartY + (int)Math.Round(dotY - _dragStartDots.Y), 0, Math.Max(doc.HeightDots - 1, 0));
+        if (_resizing)
+        {
+            _candidateWidth = Math.Max(
+                _resizeStartBounds.Width + (int)Math.Round(dotX - _dragStartDots.X), 4);
+            _candidateHeight = Math.Max(
+                _resizeStartBounds.Height + (int)Math.Round(dotY - _dragStartDots.Y), 4);
+        }
+        else
+        {
+            _candidateX = Math.Clamp(
+                _elementStartX + (int)Math.Round(dotX - _dragStartDots.X), 0, Math.Max(doc.WidthDots - 1, 0));
+            _candidateY = Math.Clamp(
+                _elementStartY + (int)Math.Round(dotY - _dragStartDots.Y), 0, Math.Max(doc.HeightDots - 1, 0));
+        }
 
         InvalidateVisual();
     }
@@ -210,20 +271,34 @@ public sealed class DesignerCanvas : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        if (!_dragging)
+        if (!_dragging && !_resizing)
         {
             return;
         }
 
+        bool wasResizing = _resizing;
         _dragging = false;
+        _resizing = false;
         e.Pointer.Capture(null);
 
-        if (SelectedElement is { } selected &&
-            (selected.X != _candidateX || selected.Y != _candidateY))
+        if (SelectedElement is { } selected)
         {
-            selected.X = _candidateX;
-            selected.Y = _candidateY;
-            DocumentEdited?.Invoke(this, EventArgs.Empty);
+            if (wasResizing)
+            {
+                // The gesture targets the on-screen (rotated) footprint; the resizer
+                // reasons in the element's intrinsic axes, so swap for 90/270.
+                (int w, int h) = selected.Orientation is Orientation.Rotated90 or Orientation.Rotated270
+                    ? (_candidateHeight, _candidateWidth)
+                    : (_candidateWidth, _candidateHeight);
+                ElementResizer.Resize(selected, w, h);
+                DocumentEdited?.Invoke(this, EventArgs.Empty);
+            }
+            else if (selected.X != _candidateX || selected.Y != _candidateY)
+            {
+                selected.X = _candidateX;
+                selected.Y = _candidateY;
+                DocumentEdited?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         InvalidateVisual();
