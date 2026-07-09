@@ -482,3 +482,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# The macOS bundle pattern *.app above would swallow our LabelForge.App project folder
+!**/LabelForge.App/
