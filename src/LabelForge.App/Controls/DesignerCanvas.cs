@@ -32,9 +32,25 @@ public sealed class DesignerCanvas : Control
     public static readonly StyledProperty<SelectionSet?> SelectionProperty =
         AvaloniaProperty.Register<DesignerCanvas, SelectionSet?>(nameof(Selection));
 
+    public static readonly StyledProperty<bool> IsPlacingProperty =
+        AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(IsPlacing));
+
     static DesignerCanvas()
     {
         AffectsRender<DesignerCanvas>(UnderlayProperty, DocumentProperty, SelectionProperty);
+    }
+
+    private enum ResizeHandle
+    {
+        None,
+        TopLeft,
+        Top,
+        TopRight,
+        Right,
+        BottomRight,
+        Bottom,
+        BottomLeft,
+        Left,
     }
 
     private const double HandleSize = 9;
@@ -57,9 +73,19 @@ public sealed class DesignerCanvas : Control
 
     // Resize (single selection only).
     private bool _resizing;
+    private ResizeHandle _activeHandle;
     private DotRect _resizeStartBounds;
+    private int _resizeStartX;
+    private int _resizeStartY;
     private int _candidateWidth;
     private int _candidateHeight;
+
+    // Rotation (single selection only; snaps to the four orientations ZPL supports).
+    private bool _rotating;
+    private Point _rotateCenterDots;
+    private double _rotateStartPointerDeg;
+    private int _rotateStartDeg;
+    private Orientation _rotateGestureStart;
 
     // Marquee selection.
     private bool _marquee;
@@ -101,6 +127,19 @@ public sealed class DesignerCanvas : Control
         get => GetValue(SelectionProperty);
         set => SetValue(SelectionProperty, value);
     }
+
+    /// <summary>True while an insert is armed: the next canvas click places the element.</summary>
+    public bool IsPlacing
+    {
+        get => GetValue(IsPlacingProperty);
+        set => SetValue(IsPlacingProperty, value);
+    }
+
+    /// <summary>Raised when the user clicks the canvas while an insert is armed (dot coordinates).</summary>
+    public event Action<int, int>? PlaceRequested;
+
+    /// <summary>Raised when the user presses Escape (cancels an armed insert).</summary>
+    public event EventHandler? CancelRequested;
 
     /// <summary>Raised after the user commits an edit through the canvas (drag, resize, nudge).</summary>
     public event EventHandler? DocumentEdited;
@@ -233,13 +272,17 @@ public sealed class DesignerCanvas : Control
 
         // Crisp printer dots when at or above 1:1; smooth only when downscaling.
         // (Bilinear upscaling of the 1-bit label is what makes text look blurry.)
+        // Applying render options invalidates the visual, which is illegal inside the
+        // render pass, so the change is posted to run right after it.
         BitmapInterpolationMode interpolation = scale >= 1
             ? BitmapInterpolationMode.None
             : BitmapInterpolationMode.HighQuality;
         if (interpolation != _interpolation)
         {
             _interpolation = interpolation;
-            RenderOptions.SetBitmapInterpolationMode(this, interpolation);
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => RenderOptions.SetBitmapInterpolationMode(this, interpolation),
+                Avalonia.Threading.DispatcherPriority.Background);
         }
 
         context.FillRectangle(Brushes.White, labelRect);
@@ -270,17 +313,20 @@ public sealed class DesignerCanvas : Control
 
                 context.DrawRectangle(null, SelectionPen, rect);
 
-                if (selection.Count == 1 && !_dragging && !_resizing)
+                if (selection.Count == 1 && !_dragging && !_resizing && !_rotating &&
+                    !element.IsLocked)
                 {
-                    foreach (var corner in new[]
-                             {
-                                 rect.TopLeft, rect.TopRight, rect.BottomLeft, rect.BottomRight,
-                             })
+                    foreach ((_, Point center) in HandleCenters(rect))
                     {
                         var handleRect = new Rect(
-                            corner.X - HandleSize / 2, corner.Y - HandleSize / 2, HandleSize, HandleSize);
+                            center.X - HandleSize / 2, center.Y - HandleSize / 2, HandleSize, HandleSize);
                         context.DrawRectangle(Brushes.White, SelectionPen, handleRect);
                     }
+
+                    // Rotation handle: a circle tethered above the selection.
+                    Point rot = RotationHandleCenter(rect);
+                    context.DrawLine(SelectionPen, new Point(rect.Center.X, rect.Top), rot);
+                    context.DrawEllipse(Brushes.White, SelectionPen, rot, HandleSize / 2 + 1, HandleSize / 2 + 1);
                 }
             }
         }
@@ -297,8 +343,8 @@ public sealed class DesignerCanvas : Control
         Math.Abs(_marqueeCurrent.X - _marqueeStart.X),
         Math.Abs(_marqueeCurrent.Y - _marqueeStart.Y));
 
-    /// <summary>The bottom-right (resize) handle, only for a single unlocked selection.</summary>
-    private Rect? ResizeHandleRect()
+    /// <summary>The selection rectangle in screen space, only for a single unlocked selection.</summary>
+    private Rect? SelectionScreenRect()
     {
         if (Selection is not { Count: 1 } selection ||
             selection.Primary is not { IsLocked: false } selected ||
@@ -309,13 +355,47 @@ public sealed class DesignerCanvas : Control
 
         var (scale, origin) = GetTransform();
         DotRect bounds = _bounds.GetBounds(selected);
-        double cornerX = origin.X + (bounds.X + bounds.Width) * scale;
-        double cornerY = origin.Y + (bounds.Y + bounds.Height) * scale;
-
-        // Slightly larger than the drawn handle so it is easy to grab.
-        const double grab = HandleSize + 4;
-        return new Rect(cornerX - grab / 2, cornerY - grab / 2, grab, grab);
+        return new Rect(
+            origin.X + bounds.X * scale,
+            origin.Y + bounds.Y * scale,
+            Math.Max(bounds.Width * scale, 4),
+            Math.Max(bounds.Height * scale, 4));
     }
+
+    /// <summary>Corner handles resize proportionally; edge-midpoint handles resize one axis.</summary>
+    private static IEnumerable<(ResizeHandle Handle, Point Center)> HandleCenters(Rect r)
+    {
+        yield return (ResizeHandle.TopLeft, r.TopLeft);
+        yield return (ResizeHandle.Top, new Point(r.Center.X, r.Top));
+        yield return (ResizeHandle.TopRight, r.TopRight);
+        yield return (ResizeHandle.Right, new Point(r.Right, r.Center.Y));
+        yield return (ResizeHandle.BottomRight, r.BottomRight);
+        yield return (ResizeHandle.Bottom, new Point(r.Center.X, r.Bottom));
+        yield return (ResizeHandle.BottomLeft, r.BottomLeft);
+        yield return (ResizeHandle.Left, new Point(r.Left, r.Center.Y));
+    }
+
+    /// <summary>Slightly larger than the drawn handle so it is easy to grab.</summary>
+    private static Rect GrabRect(Point center)
+    {
+        const double grab = HandleSize + 6;
+        return new Rect(center.X - grab / 2, center.Y - grab / 2, grab, grab);
+    }
+
+    private static Point RotationHandleCenter(Rect r) => new(r.Center.X, r.Top - 22);
+
+    private static StandardCursorType HandleCursor(ResizeHandle handle) => handle switch
+    {
+        ResizeHandle.TopLeft => StandardCursorType.TopLeftCorner,
+        ResizeHandle.Top => StandardCursorType.TopSide,
+        ResizeHandle.TopRight => StandardCursorType.TopRightCorner,
+        ResizeHandle.Right => StandardCursorType.RightSide,
+        ResizeHandle.BottomRight => StandardCursorType.BottomRightCorner,
+        ResizeHandle.Bottom => StandardCursorType.BottomSide,
+        ResizeHandle.BottomLeft => StandardCursorType.BottomLeftCorner,
+        ResizeHandle.Left => StandardCursorType.LeftSide,
+        _ => StandardCursorType.Arrow,
+    };
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
@@ -346,19 +426,51 @@ public sealed class DesignerCanvas : Control
         double dotX = (p.X - origin.X) / scale;
         double dotY = (p.Y - origin.Y) / scale;
 
-        // The resize handle wins over element hit-testing, otherwise grabbing the
-        // corner of a small element would just re-select it.
-        if (ResizeHandleRect() is { } handle && handle.Contains(p) &&
-            selection.Primary is { } primary)
+        // Armed insert: this click places the new element.
+        if (IsPlacing)
         {
-            _resizing = true;
-            _dragStartDots = new Point(dotX, dotY);
-            _resizeStartBounds = _bounds.GetBounds(primary);
-            _candidateWidth = _resizeStartBounds.Width;
-            _candidateHeight = _resizeStartBounds.Height;
-            e.Pointer.Capture(this);
-            InvalidateVisual();
+            PlaceRequested?.Invoke((int)Math.Round(dotX), (int)Math.Round(dotY));
+            e.Handled = true;
             return;
+        }
+
+        // Handles win over element hit-testing, otherwise grabbing the corner of a
+        // small element would just re-select it.
+        if (SelectionScreenRect() is { } selRect && selection.Primary is { } primary)
+        {
+            if (GrabRect(RotationHandleCenter(selRect)).Contains(p))
+            {
+                DotRect b = _bounds.GetBounds(primary);
+                _rotating = true;
+                _rotateCenterDots = new Point(b.X + b.Width / 2.0, b.Y + b.Height / 2.0);
+                _rotateStartPointerDeg = PointerAngleDeg(dotX, dotY);
+                _rotateStartDeg = OrientationDegrees(primary.Orientation);
+                _rotateGestureStart = primary.Orientation;
+                Cursor = new Cursor(StandardCursorType.Hand);
+                e.Pointer.Capture(this);
+                InvalidateVisual();
+                return;
+            }
+
+            foreach ((ResizeHandle kind, Point center) in HandleCenters(selRect))
+            {
+                if (!GrabRect(center).Contains(p))
+                {
+                    continue;
+                }
+
+                _resizing = true;
+                _activeHandle = kind;
+                _dragStartDots = new Point(dotX, dotY);
+                _resizeStartBounds = _bounds.GetBounds(primary);
+                _resizeStartX = primary.X;
+                _resizeStartY = primary.Y;
+                _candidateWidth = _resizeStartBounds.Width;
+                _candidateHeight = _resizeStartBounds.Height;
+                e.Pointer.Capture(this);
+                InvalidateVisual();
+                return;
+            }
         }
 
         bool additive = e.KeyModifiers.HasFlag(KeyModifiers.Control) ||
@@ -437,11 +549,9 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
-        if (!_dragging && !_resizing)
+        if (!_dragging && !_resizing && !_rotating)
         {
-            Cursor = ResizeHandleRect() is { } handle && handle.Contains(p)
-                ? new Cursor(StandardCursorType.BottomRightCorner)
-                : Cursor.Default;
+            UpdateHoverCursor(p);
             return;
         }
 
@@ -454,12 +564,29 @@ public sealed class DesignerCanvas : Control
         double dotX = (p.X - origin.X) / scale;
         double dotY = (p.Y - origin.Y) / scale;
 
+        if (_rotating)
+        {
+            if (Selection?.Primary is { } primary)
+            {
+                double delta = PointerAngleDeg(dotX, dotY) - _rotateStartPointerDeg;
+                double candidate = ((_rotateStartDeg + delta) % 360 + 360) % 360;
+                Orientation snapped = DegreesToOrientation(candidate);
+                if (primary.Orientation != snapped)
+                {
+                    primary.Orientation = snapped;
+                    LiveEdited?.Invoke(this, EventArgs.Empty);
+                }
+            }
+
+            InvalidateVisual();
+            return;
+        }
+
         if (_resizing)
         {
-            _candidateWidth = Math.Max(
-                _resizeStartBounds.Width + (int)Math.Round(dotX - _dragStartDots.X), 4);
-            _candidateHeight = Math.Max(
-                _resizeStartBounds.Height + (int)Math.Round(dotY - _dragStartDots.Y), 4);
+            ComputeResizeCandidates(
+                (int)Math.Round(dotX - _dragStartDots.X),
+                (int)Math.Round(dotY - _dragStartDots.Y));
             ApplyCandidateResize();
         }
         else
@@ -481,6 +608,117 @@ public sealed class DesignerCanvas : Control
         InvalidateVisual();
     }
 
+    private void UpdateHoverCursor(Point p)
+    {
+        if (IsPlacing)
+        {
+            Cursor = new Cursor(StandardCursorType.Cross);
+            return;
+        }
+
+        if (SelectionScreenRect() is { } selRect)
+        {
+            if (GrabRect(RotationHandleCenter(selRect)).Contains(p))
+            {
+                Cursor = new Cursor(StandardCursorType.Hand);
+                return;
+            }
+
+            foreach ((ResizeHandle kind, Point center) in HandleCenters(selRect))
+            {
+                if (GrabRect(center).Contains(p))
+                {
+                    Cursor = new Cursor(HandleCursor(kind));
+                    return;
+                }
+            }
+        }
+
+        Cursor = Cursor.Default;
+    }
+
+    /// <summary>Target width/height for the active handle: edge midpoints move one axis,
+    /// corners scale both proportionally by the dominant axis.</summary>
+    private void ComputeResizeCandidates(int dx, int dy)
+    {
+        int startW = Math.Max(_resizeStartBounds.Width, 1);
+        int startH = Math.Max(_resizeStartBounds.Height, 1);
+        bool left = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Left or ResizeHandle.BottomLeft;
+        bool top = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Top or ResizeHandle.TopRight;
+
+        int w = startW;
+        int h = startH;
+        switch (_activeHandle)
+        {
+            case ResizeHandle.Left or ResizeHandle.Right:
+                w = startW + (left ? -dx : dx);
+                break;
+
+            case ResizeHandle.Top or ResizeHandle.Bottom:
+                h = startH + (top ? -dy : dy);
+                break;
+
+            default:
+            {
+                double fw = (startW + (left ? -dx : dx)) / (double)startW;
+                double fh = (startH + (top ? -dy : dy)) / (double)startH;
+                double factor = Math.Max(Math.Abs(fw - 1) >= Math.Abs(fh - 1) ? fw : fh, 0.02);
+                w = (int)Math.Round(startW * factor);
+                h = (int)Math.Round(startH * factor);
+                break;
+            }
+        }
+
+        _candidateWidth = Math.Max(w, 4);
+        _candidateHeight = Math.Max(h, 4);
+    }
+
+    /// <summary>Keeps the edge/corner opposite the active handle anchored: after the
+    /// type-specific resize (which may snap), the origin is recomputed from the real
+    /// bounds so the anchor does not move.</summary>
+    private void RepositionForAnchor()
+    {
+        if (Selection?.Primary is not { } primary)
+        {
+            return;
+        }
+
+        bool left = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Left or ResizeHandle.BottomLeft;
+        bool top = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Top or ResizeHandle.TopRight;
+
+        DotRect bounds = _bounds.GetBounds(primary);
+        int offX = bounds.X - primary.X;
+        int offY = bounds.Y - primary.Y;
+        int anchorRight = _resizeStartBounds.X + _resizeStartBounds.Width;
+        int anchorBottom = _resizeStartBounds.Y + _resizeStartBounds.Height;
+
+        primary.X = left ? anchorRight - bounds.Width - offX : _resizeStartX;
+        primary.Y = top ? anchorBottom - bounds.Height - offY : _resizeStartY;
+    }
+
+    private double PointerAngleDeg(double dotX, double dotY) =>
+        Math.Atan2(dotY - _rotateCenterDots.Y, dotX - _rotateCenterDots.X) * 180.0 / Math.PI;
+
+    private static int OrientationDegrees(Orientation orientation) => orientation switch
+    {
+        Orientation.Rotated90 => 90,
+        Orientation.Rotated180 => 180,
+        Orientation.Rotated270 => 270,
+        _ => 0,
+    };
+
+    private static Orientation DegreesToOrientation(double degrees)
+    {
+        int quadrant = ((int)Math.Round(degrees / 90.0) % 4 + 4) % 4;
+        return quadrant switch
+        {
+            1 => Orientation.Rotated90,
+            2 => Orientation.Rotated180,
+            3 => Orientation.Rotated270,
+            _ => Orientation.Normal,
+        };
+    }
+
     /// <summary>Applies the resize gesture to the model. Targets derive from the start
     /// bounds plus the pointer delta, so repeated application is idempotent.</summary>
     private void ApplyCandidateResize()
@@ -496,6 +734,7 @@ public sealed class DesignerCanvas : Control
             ? (_candidateHeight, _candidateWidth)
             : (_candidateWidth, _candidateHeight);
         ElementResizer.Resize(primary, w, h);
+        RepositionForAnchor();
     }
 
     /// <summary>Clamps a group-move delta so every dragged element stays on the label,
@@ -537,6 +776,20 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
+        if (_rotating)
+        {
+            _rotating = false;
+            Cursor = Cursor.Default;
+            e.Pointer.Capture(null);
+            if (Selection?.Primary is { } rotated && rotated.Orientation != _rotateGestureStart)
+            {
+                DocumentEdited?.Invoke(this, EventArgs.Empty);
+            }
+
+            InvalidateVisual();
+            return;
+        }
+
         if (!_dragging && !_resizing)
         {
             return;
@@ -545,12 +798,15 @@ public sealed class DesignerCanvas : Control
         bool wasResizing = _resizing;
         _dragging = false;
         _resizing = false;
+        _activeHandle = ResizeHandle.None;
         e.Pointer.Capture(null);
 
         // The model was updated live during the gesture; the release only decides
         // whether an undo step should be recorded.
         bool changed = wasResizing
-            ? _candidateWidth != _resizeStartBounds.Width || _candidateHeight != _resizeStartBounds.Height
+            ? _candidateWidth != _resizeStartBounds.Width ||
+              _candidateHeight != _resizeStartBounds.Height ||
+              Selection?.Primary is { } r && (r.X != _resizeStartX || r.Y != _resizeStartY)
             : _dragDx != 0 || _dragDy != 0;
         if (changed)
         {
@@ -592,6 +848,14 @@ public sealed class DesignerCanvas : Control
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+
+        if (e.Key == Key.Escape && IsPlacing)
+        {
+            CancelRequested?.Invoke(this, EventArgs.Empty);
+            e.Handled = true;
+            return;
+        }
+
         if (Selection is not { Count: > 0 } selection || Document is not { } doc)
         {
             return;

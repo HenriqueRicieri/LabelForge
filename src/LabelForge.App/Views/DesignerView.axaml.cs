@@ -23,6 +23,8 @@ public partial class DesignerView : UserControl
         Canvas.DocumentEdited += (_, _) => ViewModel?.NotifyDocumentEdited();
         Canvas.LiveEdited += (_, _) => ViewModel?.NotifyDocumentPreview();
         Canvas.DeleteRequested += (_, _) => ViewModel?.DeleteSelectedCommand.Execute(null);
+        Canvas.PlaceRequested += (x, y) => ViewModel?.PlaceAt(x, y);
+        Canvas.CancelRequested += (_, _) => ViewModel?.CancelInsert();
     }
 
     private DesignerViewModel? ViewModel => DataContext as DesignerViewModel;
@@ -227,8 +229,19 @@ public partial class DesignerView : UserControl
         // The handler sits on the window; ignore shortcuts while another tab is
         // active. Text boxes handle their own Ctrl+Z and mark the event handled
         // before it bubbles up here.
-        if (!IsEffectivelyVisible || ViewModel is not { } vm ||
-            !e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        if (!IsEffectivelyVisible || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Escape && vm.IsPlacing)
+        {
+            vm.CancelInsert();
+            e.Handled = true;
+            return;
+        }
+
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
             return;
         }

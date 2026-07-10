@@ -317,25 +317,71 @@ public partial class DesignerViewModel : ViewModelBase
         UpdateUndoState();
     }
 
-    [RelayCommand]
-    private void AddText() => AddElement(
-        new TextElement { Text = "New text", FontHeightDots = 40 });
+    /// <summary>True while an insert is armed; the next canvas click places it.</summary>
+    [ObservableProperty]
+    public partial bool IsPlacing { get; set; }
+
+    private Func<Element>? _pendingFactory;
 
     [RelayCommand]
-    private void AddBox() => AddElement(
-        new BoxElement { WidthDots = 240, HeightDots = 140, ThicknessDots = 3 });
+    private void AddText() => ArmInsert(
+        () => new TextElement { Text = "New text", FontHeightDots = 40 });
 
     [RelayCommand]
-    private void AddLine() => AddElement(
-        new LineElement { LengthDots = 240, ThicknessDots = 3 });
+    private void AddBox() => ArmInsert(
+        () => new BoxElement { WidthDots = 240, HeightDots = 140, ThicknessDots = 3 });
 
     [RelayCommand]
-    private void AddBarcode() => AddElement(
-        new BarcodeElement { Data = "123456", HeightDots = 100, ModuleWidthDots = 2 });
+    private void AddLine() => ArmInsert(
+        () => new LineElement { LengthDots = 240, ThicknessDots = 3 });
 
     [RelayCommand]
-    private void AddQr() => AddElement(
-        new QrCodeElement { Data = "https://example.com", Magnification = 5 });
+    private void AddBarcode() => ArmInsert(
+        () => new BarcodeElement { Data = "123456", HeightDots = 100, ModuleWidthDots = 2 });
+
+    [RelayCommand]
+    private void AddQr() => ArmInsert(
+        () => new QrCodeElement { Data = "https://example.com", Magnification = 5 });
+
+    /// <summary>Arms the insert: the mouse becomes a placement tool until a click or Esc.</summary>
+    private void ArmInsert(Func<Element> factory)
+    {
+        _pendingFactory = factory;
+        IsPlacing = true;
+        StatusText = "Click the canvas to place the new element (Esc cancels)";
+    }
+
+    /// <summary>Called by the canvas with the clicked position in dots.</summary>
+    public void PlaceAt(int x, int y)
+    {
+        if (_pendingFactory is null)
+        {
+            IsPlacing = false;
+            return;
+        }
+
+        Element element = _pendingFactory();
+        element.X = Math.Clamp(x, 0, Math.Max(Document.WidthDots - 1, 0));
+        element.Y = Math.Clamp(y, 0, Math.Max(Document.HeightDots - 1, 0));
+        element.ZOrder = Document.Elements.Count == 0
+            ? 0
+            : Document.Elements.Max(e => e.ZOrder) + 1;
+        Document.Elements.Add(element);
+        Selection.Set(element);
+
+        _pendingFactory = null;
+        IsPlacing = false;
+        StatusText = string.Empty;
+        RecordUndo(coalesce: false);
+        ScheduleRender();
+    }
+
+    public void CancelInsert()
+    {
+        _pendingFactory = null;
+        IsPlacing = false;
+        StatusText = string.Empty;
+    }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private void Copy()
@@ -441,19 +487,6 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         Selection.Clear();
-        RecordUndo(coalesce: false);
-        ScheduleRender();
-    }
-
-    private void AddElement(Element element)
-    {
-        element.X = 40;
-        element.Y = 40;
-        element.ZOrder = Document.Elements.Count == 0
-            ? 0
-            : Document.Elements.Max(e => e.ZOrder) + 1;
-        Document.Elements.Add(element);
-        Selection.Set(element);
         RecordUndo(coalesce: false);
         ScheduleRender();
     }

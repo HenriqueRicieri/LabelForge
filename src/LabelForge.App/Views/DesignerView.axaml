@@ -234,7 +234,7 @@
                         <!-- Type-specific editor, picked by DataTemplate -->
                         <ContentControl Content="{Binding SelectionProperties}" />
 
-                        <TextBlock Text="Drag to move; drag the bottom-right handle to resize (barcodes snap to module steps). Arrow keys nudge by 1 dot (Shift = 10). Delete removes. Ctrl+Z / Ctrl+Y undo and redo."
+                        <TextBlock Text="Drag to move. Corner handles resize proportionally; edge handles resize one axis (barcodes snap to module steps). The round handle rotates; ZPL printers only support 0/90/180/270. Arrow keys nudge by 1 dot (Shift = 10). Delete removes. Ctrl+Z / Ctrl+Y undo and redo."
                                    TextWrapping="Wrap" Opacity="0.5" FontSize="11" Margin="0,8,0,0" />
                     </StackPanel>
                 </StackPanel>
@@ -252,7 +252,8 @@
         <controls:DesignerCanvas Name="Canvas"
                                  Underlay="{Binding Underlay}"
                                  Document="{Binding Document}"
-                                 Selection="{Binding Selection}" />
+                                 Selection="{Binding Selection}"
+                                 IsPlacing="{Binding IsPlacing}" />
 
     </DockPanel>
 
