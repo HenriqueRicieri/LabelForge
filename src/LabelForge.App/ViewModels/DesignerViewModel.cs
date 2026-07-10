@@ -67,6 +67,16 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial string StatusText { get; set; } = string.Empty;
 
+    /// <summary>Path of the open .lfl file; null until first save.</summary>
+    [ObservableProperty]
+    public partial string? CurrentFilePath { get; set; }
+
+    [ObservableProperty]
+    public partial string PrinterHost { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial decimal PrinterPort { get; set; } = Core.Printing.RawNetworkPrinter.DefaultPort;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(UndoCommand))]
     public partial bool CanUndo { get; set; }
@@ -87,6 +97,69 @@ public partial class DesignerViewModel : ViewModelBase
 
         RecordUndo(coalesce: false);
         ScheduleRender();
+    }
+
+    /// <summary>Serializes the current document in the .lfl format.</summary>
+    public string SerializeDocument() => LabelDocumentJson.Serialize(Document);
+
+    /// <summary>Renders the current document to PNG bytes (for export).</summary>
+    public Task<byte[]> RenderPngAsync()
+    {
+        LabelDocument document = Document;
+        return Task.Run(() => _renderer
+            .Render(_generator.Generate(document), document.WidthMm, document.HeightMm, document.Dpmm)
+            .Png);
+    }
+
+    /// <summary>Replaces the document (new file or opened .lfl) and resets history.</summary>
+    public void LoadDocument(LabelDocument document, string? path)
+    {
+        _restoring = true;
+        try
+        {
+            Document = document;
+            WidthMm = (decimal)document.WidthMm;
+            HeightMm = (decimal)document.HeightMm;
+            SelectedDensity = Densities.FirstOrDefault(d => d.Dpmm == document.Dpmm) ?? Densities[0];
+            SelectedElement = null;
+        }
+        finally
+        {
+            _restoring = false;
+        }
+
+        CurrentFilePath = path;
+        _history.Clear();
+        _lastRecordTicks = 0;
+        RecordUndo(coalesce: false);
+        ScheduleRender();
+    }
+
+    [RelayCommand]
+    private void NewDocument() =>
+        LoadDocument(new LabelDocument { WidthMm = 100, HeightMm = 60, Dpmm = 8 }, path: null);
+
+    [RelayCommand]
+    private async Task PrintAsync()
+    {
+        string host = PrinterHost.Trim();
+        if (host.Length == 0)
+        {
+            StatusText = "Enter the printer address first";
+            return;
+        }
+
+        try
+        {
+            StatusText = $"Sending to {host}...";
+            string zpl = _generator.Generate(Document);
+            await Core.Printing.RawNetworkPrinter.SendAsync(host, (int)PrinterPort, zpl);
+            StatusText = $"Sent to {host}:{(int)PrinterPort}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Print failed: {ex.Message}";
+        }
     }
 
     /// <summary>Called by the view when the canvas edits the model (drag, resize, nudge).</summary>

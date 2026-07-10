@@ -99,6 +99,37 @@
 
     <DockPanel>
 
+        <!-- File operations -->
+        <Border DockPanel.Dock="Top" Padding="10,6" Background="#18808080">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Content="New" Command="{Binding NewDocumentCommand}" />
+                <Button Content="Open..." Click="OnOpenFile" />
+                <Button Content="Save" Click="OnSaveFile" />
+                <Button Content="Save As..." Click="OnSaveFileAs" />
+                <Rectangle Width="1" Height="22" Fill="#33808080" />
+                <Button Content="Export ZPL..." Click="OnExportZpl" />
+                <Button Content="Export PNG..." Click="OnExportPng" />
+                <Rectangle Width="1" Height="22" Fill="#33808080" />
+                <Button Content="Print...">
+                    <Button.Flyout>
+                        <Flyout Placement="Bottom">
+                            <StackPanel Spacing="6" Width="230">
+                                <TextBlock Text="Printer address (TCP 9100)" FontSize="12" Opacity="0.8" />
+                                <TextBox Text="{Binding PrinterHost}" Watermark="192.168.0.50" />
+                                <TextBlock Text="Port" FontSize="12" Opacity="0.8" />
+                                <NumericUpDown Value="{Binding PrinterPort}" Minimum="1" Maximum="65535"
+                                               Increment="1" FormatString="0" />
+                                <Button Content="Send to printer" Command="{Binding PrintCommand}"
+                                        HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+                <TextBlock Text="{Binding CurrentFilePath}" VerticalAlignment="Center"
+                           Opacity="0.5" FontSize="12" />
+            </StackPanel>
+        </Border>
+
         <!-- Toolbox + label setup -->
         <Border DockPanel.Dock="Top" Padding="10,8" Background="#22808080">
             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">

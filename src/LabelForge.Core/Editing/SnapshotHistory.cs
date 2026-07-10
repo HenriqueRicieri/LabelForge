@@ -65,6 +65,13 @@ public sealed class SnapshotHistory
         _states[_cursor] = state;
     }
 
+    /// <summary>Empties the history (e.g. when a new document is loaded).</summary>
+    public void Clear()
+    {
+        _states.Clear();
+        _cursor = -1;
+    }
+
     /// <summary>Steps back and returns the previous state, or null at the beginning.</summary>
     public string? Undo() => CanUndo ? _states[--_cursor] : null;
 
