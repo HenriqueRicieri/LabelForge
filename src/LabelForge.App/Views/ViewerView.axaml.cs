@@ -172,6 +172,11 @@ public partial class ViewerView : UserControl
         _zoom = Math.Clamp(_zoom, MinZoom, MaxZoom);
         PreviewTransform.LayoutTransform = new ScaleTransform(_zoom, _zoom);
         ZoomLabel.Text = $"{Math.Round(_zoom * 100)}%";
+
+        // Crisp printer dots at or above 1:1; smooth only when downscaling.
+        RenderOptions.SetBitmapInterpolationMode(
+            PreviewImageControl,
+            _zoom >= 1 ? BitmapInterpolationMode.None : BitmapInterpolationMode.HighQuality);
     }
 
     private void FitToWindow()

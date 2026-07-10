@@ -88,7 +88,10 @@ public sealed class ElementBoundsCalculator : IElementVisitor
 
         int modules = 17 + 4 * version;
         int side = modules * Math.Max(element.Magnification, 1);
-        _result = new DotRect(element.X, element.Y, side, side);
+
+        // BinaryKits' QR drawer paints 10 dots below the field origin (a constant,
+        // measured at 8 and 12 dpmm); mirror it so the selection box hugs the ink.
+        _result = new DotRect(element.X, element.Y + 10, side, side);
     }
 
     public void Visit(LineElement element)

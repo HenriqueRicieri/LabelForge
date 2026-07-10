@@ -54,6 +54,14 @@ public sealed class ElementBoundsTests
     }
 
     [Fact]
+    public void Qr_BoundsMirrorBinaryKitsTenDotVerticalOffset()
+    {
+        var qr = new QrCodeElement { X = 100, Y = 100, Data = "HELLO", Magnification = 4 };
+        Assert.Equal(110, _sut.GetBounds(qr).Y);
+        Assert.Equal(100, _sut.GetBounds(qr).X);
+    }
+
+    [Fact]
     public void Rotation_SwapsWidthAndHeight()
     {
         var text = new TextElement { Text = "Hello", FontHeightDots = 40 };

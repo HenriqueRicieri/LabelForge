@@ -105,6 +105,7 @@
                 <Menu DockPanel.Dock="Left" VerticalAlignment="Center">
                     <MenuItem Header="_File">
                         <MenuItem Header="_New" Command="{Binding NewDocumentCommand}" InputGesture="Ctrl+N" />
+                        <MenuItem Header="New from _Sample" Command="{Binding LoadSampleCommand}" />
                         <MenuItem Header="_Open..." Click="OnOpenFile" InputGesture="Ctrl+O" />
                         <Separator />
                         <MenuItem Header="_Save" Click="OnSaveFile" InputGesture="Ctrl+S" />

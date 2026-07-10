@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using LabelForge.Core.Editing;
 using LabelForge.Core.Model;
 
@@ -70,6 +71,7 @@ public sealed class DesignerCanvas : Control
     private Point _viewOrigin;
     private bool _panning;
     private Point _panLast;
+    private BitmapInterpolationMode _interpolation = BitmapInterpolationMode.Unspecified;
 
     public DesignerCanvas()
     {
@@ -102,6 +104,10 @@ public sealed class DesignerCanvas : Control
 
     /// <summary>Raised after the user commits an edit through the canvas (drag, resize, nudge).</summary>
     public event EventHandler? DocumentEdited;
+
+    /// <summary>Raised continuously while a drag or resize is in progress. The model is
+    /// already updated; listeners re-render the preview but must not record undo.</summary>
+    public event EventHandler? LiveEdited;
 
     /// <summary>Raised when the user presses Delete with a selection.</summary>
     public event EventHandler? DeleteRequested;
@@ -225,6 +231,17 @@ public sealed class DesignerCanvas : Control
         var (scale, origin) = GetTransform();
         var labelRect = new Rect(origin.X, origin.Y, doc.WidthDots * scale, doc.HeightDots * scale);
 
+        // Crisp printer dots when at or above 1:1; smooth only when downscaling.
+        // (Bilinear upscaling of the 1-bit label is what makes text look blurry.)
+        BitmapInterpolationMode interpolation = scale >= 1
+            ? BitmapInterpolationMode.None
+            : BitmapInterpolationMode.HighQuality;
+        if (interpolation != _interpolation)
+        {
+            _interpolation = interpolation;
+            RenderOptions.SetBitmapInterpolationMode(this, interpolation);
+        }
+
         context.FillRectangle(Brushes.White, labelRect);
         context.DrawRectangle(null, LabelBorderPen, labelRect.Inflate(0.5));
 
@@ -235,6 +252,8 @@ public sealed class DesignerCanvas : Control
 
         if (Selection is { Count: > 0 } selection)
         {
+            // The model is updated live during drags, so the outline always draws at
+            // the element's real bounds and moves with the pointer.
             foreach (Element element in selection.Items)
             {
                 if (!doc.Elements.Contains(element))
@@ -243,22 +262,15 @@ public sealed class DesignerCanvas : Control
                 }
 
                 DotRect bounds = _bounds.GetBounds(element);
-                bool moving = _dragging && _dragItems.Any(d => d.Element == element);
-                int x = moving ? bounds.X + _dragDx : bounds.X;
-                int y = moving ? bounds.Y + _dragDy : bounds.Y;
-                int w = _resizing && selection.Count == 1 ? _candidateWidth : bounds.Width;
-                int h = _resizing && selection.Count == 1 ? _candidateHeight : bounds.Height;
-
                 var rect = new Rect(
-                    origin.X + x * scale,
-                    origin.Y + y * scale,
-                    Math.Max(w * scale, 4),
-                    Math.Max(h * scale, 4));
+                    origin.X + bounds.X * scale,
+                    origin.Y + bounds.Y * scale,
+                    Math.Max(bounds.Width * scale, 4),
+                    Math.Max(bounds.Height * scale, 4));
 
-                bool ghost = moving || (_resizing && selection.Count == 1);
-                context.DrawRectangle(null, ghost ? GhostPen : SelectionPen, rect);
+                context.DrawRectangle(null, SelectionPen, rect);
 
-                if (!ghost && selection.Count == 1)
+                if (selection.Count == 1 && !_dragging && !_resizing)
                 {
                     foreach (var corner in new[]
                              {
@@ -448,6 +460,7 @@ public sealed class DesignerCanvas : Control
                 _resizeStartBounds.Width + (int)Math.Round(dotX - _dragStartDots.X), 4);
             _candidateHeight = Math.Max(
                 _resizeStartBounds.Height + (int)Math.Round(dotY - _dragStartDots.Y), 4);
+            ApplyCandidateResize();
         }
         else
         {
@@ -455,9 +468,34 @@ public sealed class DesignerCanvas : Control
                 doc,
                 (int)Math.Round(dotX - _dragStartDots.X),
                 (int)Math.Round(dotY - _dragStartDots.Y));
+
+            // Move the model live so the label content follows the pointer.
+            foreach ((Element element, int startX, int startY) in _dragItems)
+            {
+                element.X = startX + _dragDx;
+                element.Y = startY + _dragDy;
+            }
         }
 
+        LiveEdited?.Invoke(this, EventArgs.Empty);
         InvalidateVisual();
+    }
+
+    /// <summary>Applies the resize gesture to the model. Targets derive from the start
+    /// bounds plus the pointer delta, so repeated application is idempotent.</summary>
+    private void ApplyCandidateResize()
+    {
+        if (Selection?.Primary is not { } primary)
+        {
+            return;
+        }
+
+        // The gesture targets the on-screen (rotated) footprint; the resizer
+        // reasons in the element's intrinsic axes, so swap for 90/270.
+        (int w, int h) = primary.Orientation is Orientation.Rotated90 or Orientation.Rotated270
+            ? (_candidateHeight, _candidateWidth)
+            : (_candidateWidth, _candidateHeight);
+        ElementResizer.Resize(primary, w, h);
     }
 
     /// <summary>Clamps a group-move delta so every dragged element stays on the label,
@@ -509,24 +547,13 @@ public sealed class DesignerCanvas : Control
         _resizing = false;
         e.Pointer.Capture(null);
 
-        if (wasResizing && Selection?.Primary is { } primary)
+        // The model was updated live during the gesture; the release only decides
+        // whether an undo step should be recorded.
+        bool changed = wasResizing
+            ? _candidateWidth != _resizeStartBounds.Width || _candidateHeight != _resizeStartBounds.Height
+            : _dragDx != 0 || _dragDy != 0;
+        if (changed)
         {
-            // The gesture targets the on-screen (rotated) footprint; the resizer
-            // reasons in the element's intrinsic axes, so swap for 90/270.
-            (int w, int h) = primary.Orientation is Orientation.Rotated90 or Orientation.Rotated270
-                ? (_candidateHeight, _candidateWidth)
-                : (_candidateWidth, _candidateHeight);
-            ElementResizer.Resize(primary, w, h);
-            DocumentEdited?.Invoke(this, EventArgs.Empty);
-        }
-        else if (_dragDx != 0 || _dragDy != 0)
-        {
-            foreach ((Element element, int startX, int startY) in _dragItems)
-            {
-                element.X = startX + _dragDx;
-                element.Y = startY + _dragDy;
-            }
-
             DocumentEdited?.Invoke(this, EventArgs.Empty);
         }
 

@@ -126,15 +126,22 @@ public partial class DesignerViewModel : ViewModelBase
         Selection.Changed += (_, _) => OnSelectionChanged();
 
         // Property setters record undo states; construction must not, or the
-        // history would start with a spurious empty document before the seed.
+        // history would start with a spurious extra document before the baseline.
         _restoring = true;
         Document = new LabelDocument { WidthMm = 100, HeightMm = 60, Dpmm = 8 };
         SelectedDensity = Densities[0];
         SelectedPrinter = Core.Printers.PrinterProfile.Any;
-        SeedSampleLabel();
         _restoring = false;
 
         RecordUndo(coalesce: false);
+        ScheduleRender();
+    }
+
+    /// <summary>Called continuously while the canvas drags or resizes: the model is
+    /// already updated, so re-render and refresh the panel, but record no undo.</summary>
+    public void NotifyDocumentPreview()
+    {
+        SelectionProperties?.Refresh();
         ScheduleRender();
     }
 
@@ -202,6 +209,15 @@ public partial class DesignerViewModel : ViewModelBase
     [RelayCommand]
     private void NewDocument() =>
         LoadDocument(new LabelDocument { WidthMm = 100, HeightMm = 60, Dpmm = 8 }, path: null);
+
+    /// <summary>A demo label showing each element type; reachable from File.</summary>
+    [RelayCommand]
+    private void LoadSample()
+    {
+        var doc = new LabelDocument { WidthMm = 100, HeightMm = 60, Dpmm = 8 };
+        SeedSampleLabel(doc);
+        LoadDocument(doc, path: null);
+    }
 
     [RelayCommand]
     private async Task PrintAsync()
@@ -623,21 +639,21 @@ public partial class DesignerViewModel : ViewModelBase
         }
     }
 
-    private void SeedSampleLabel()
+    private static void SeedSampleLabel(LabelDocument doc)
     {
-        Document.Elements.Add(new BoxElement
+        doc.Elements.Add(new BoxElement
         {
             Name = "Border", X = 15, Y = 15, WidthDots = 770, HeightDots = 450, ThicknessDots = 3, ZOrder = 0,
         });
-        Document.Elements.Add(new TextElement
+        doc.Elements.Add(new TextElement
         {
             Name = "Title", X = 50, Y = 50, Text = "LabelForge", FontHeightDots = 60, ZOrder = 1,
         });
-        Document.Elements.Add(new BarcodeElement
+        doc.Elements.Add(new BarcodeElement
         {
             Name = "Barcode", X = 50, Y = 170, Data = "LF-000123", HeightDots = 140, ModuleWidthDots = 3, ZOrder = 2,
         });
-        Document.Elements.Add(new QrCodeElement
+        doc.Elements.Add(new QrCodeElement
         {
             Name = "QR", X = 600, Y = 170, Data = "https://labelforge.app", Magnification = 6, ZOrder = 3,
         });

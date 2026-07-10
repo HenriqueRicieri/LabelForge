@@ -21,6 +21,7 @@ public partial class DesignerView : UserControl
         InitializeComponent();
 
         Canvas.DocumentEdited += (_, _) => ViewModel?.NotifyDocumentEdited();
+        Canvas.LiveEdited += (_, _) => ViewModel?.NotifyDocumentPreview();
         Canvas.DeleteRequested += (_, _) => ViewModel?.DeleteSelectedCommand.Execute(null);
     }
 
