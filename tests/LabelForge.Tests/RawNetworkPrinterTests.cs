@@ -39,6 +39,19 @@ public sealed class RawNetworkPrinterTests
     }
 
     [Fact]
+    public void WindowsRawPrinter_EnumeratesQueues_WithoutError()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        // Exercises the EnumPrinters marshaling path; contents vary per machine.
+        var printers = LabelForge.Core.Printing.WindowsRawPrinter.GetInstalledPrinters();
+        Assert.NotNull(printers);
+    }
+
+    [Fact]
     public void SnapshotHistory_Clear_EmptiesEverything()
     {
         var history = new LabelForge.Core.Editing.SnapshotHistory();

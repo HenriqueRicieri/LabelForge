@@ -79,6 +79,12 @@ public partial class DesignerViewModel : ViewModelBase
 
     public IReadOnlyList<Core.Printers.PrinterProfile> Printers => Core.Printers.PrinterCatalog.All;
 
+    /// <summary>Printer queues installed in Windows (USB path); empty elsewhere.</summary>
+    public IReadOnlyList<string> WindowsPrinters { get; } = LoadWindowsPrinters();
+
+    [ObservableProperty]
+    public partial string? SelectedWindowsPrinter { get; set; }
+
     [ObservableProperty]
     public partial Core.Printers.PrinterProfile? SelectedPrinter { get; set; }
 
@@ -166,6 +172,51 @@ public partial class DesignerViewModel : ViewModelBase
             string zpl = _generator.Generate(Document);
             await Core.Printing.RawNetworkPrinter.SendAsync(host, (int)PrinterPort, zpl);
             StatusText = $"Sent to {host}:{(int)PrinterPort}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Print failed: {ex.Message}";
+        }
+    }
+
+    private static IReadOnlyList<string> LoadWindowsPrinters()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return [];
+        }
+
+        try
+        {
+            return Core.Printing.WindowsRawPrinter.GetInstalledPrinters();
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    [RelayCommand]
+    private async Task PrintWindowsAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            StatusText = "Windows printing is only available on Windows";
+            return;
+        }
+
+        if (SelectedWindowsPrinter is not { Length: > 0 } name)
+        {
+            StatusText = "Pick a Windows printer first";
+            return;
+        }
+
+        try
+        {
+            StatusText = $"Spooling to {name}...";
+            string zpl = _generator.Generate(Document);
+            await Task.Run(() => Core.Printing.WindowsRawPrinter.Send(name, zpl));
+            StatusText = $"Sent to {name}";
         }
         catch (Exception ex)
         {

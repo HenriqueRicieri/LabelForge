@@ -99,43 +99,61 @@
 
     <DockPanel>
 
-        <!-- File operations -->
-        <Border DockPanel.Dock="Top" Padding="10,6" Background="#18808080">
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <Button Content="New" Command="{Binding NewDocumentCommand}" />
-                <Button Content="Open..." Click="OnOpenFile" />
-                <Button Content="Save" Click="OnSaveFile" />
-                <Button Content="Save As..." Click="OnSaveFileAs" />
-                <Rectangle Width="1" Height="22" Fill="#33808080" />
-                <Button Content="Export ZPL..." Click="OnExportZpl" />
-                <Button Content="Export PNG..." Click="OnExportPng" />
-                <Rectangle Width="1" Height="22" Fill="#33808080" />
-                <Button Content="Print...">
+        <!-- Menu bar -->
+        <Border DockPanel.Dock="Top" Padding="4,0" Background="#18808080">
+            <DockPanel>
+                <Menu DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <MenuItem Header="_File">
+                        <MenuItem Header="_New" Command="{Binding NewDocumentCommand}" InputGesture="Ctrl+N" />
+                        <MenuItem Header="_Open..." Click="OnOpenFile" InputGesture="Ctrl+O" />
+                        <Separator />
+                        <MenuItem Header="_Save" Click="OnSaveFile" InputGesture="Ctrl+S" />
+                        <MenuItem Header="Save _As..." Click="OnSaveFileAs" />
+                        <Separator />
+                        <MenuItem Header="Export _ZPL..." Click="OnExportZpl" />
+                        <MenuItem Header="Export _PNG..." Click="OnExportPng" />
+                    </MenuItem>
+                    <MenuItem Header="_Edit">
+                        <MenuItem Header="_Undo" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
+                        <MenuItem Header="_Redo" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" />
+                        <Separator />
+                        <MenuItem Header="_Delete" Command="{Binding DeleteSelectedCommand}" InputGesture="Delete" />
+                    </MenuItem>
+                    <MenuItem Header="_Insert">
+                        <MenuItem Header="_Text" Command="{Binding AddTextCommand}" />
+                        <MenuItem Header="_Box" Command="{Binding AddBoxCommand}" />
+                        <MenuItem Header="_Line" Command="{Binding AddLineCommand}" />
+                        <MenuItem Header="Ba_rcode" Command="{Binding AddBarcodeCommand}" />
+                        <MenuItem Header="_QR Code" Command="{Binding AddQrCommand}" />
+                    </MenuItem>
+                </Menu>
+                <Button DockPanel.Dock="Right" Content="Print..." Margin="4,4">
                     <Button.Flyout>
                         <Flyout Placement="Bottom">
-                            <StackPanel Spacing="6" Width="230">
-                                <TextBlock Text="Printer address (TCP 9100)" FontSize="12" Opacity="0.8" />
-                                <TextBox Text="{Binding PrinterHost}" Watermark="192.168.0.50" />
+                            <StackPanel Spacing="6" Width="240">
+                                <TextBlock Text="Network printer (TCP 9100)" FontWeight="SemiBold" FontSize="12" />
+                                <TextBox Text="{Binding PrinterHost}" PlaceholderText="192.168.0.50" />
                                 <TextBlock Text="Port" FontSize="12" Opacity="0.8" />
                                 <NumericUpDown Value="{Binding PrinterPort}" Minimum="1" Maximum="65535"
                                                Increment="1" FormatString="0" />
-                                <Button Content="Send to printer" Command="{Binding PrintCommand}"
+                                <Button Content="Send via network" Command="{Binding PrintCommand}"
+                                        HorizontalAlignment="Stretch" />
+                                <Rectangle Height="1" Fill="#33808080" Margin="0,6" />
+                                <TextBlock Text="Windows printer (USB)" FontWeight="SemiBold" FontSize="12" />
+                                <ComboBox ItemsSource="{Binding WindowsPrinters}"
+                                          SelectedItem="{Binding SelectedWindowsPrinter}"
+                                          HorizontalAlignment="Stretch"
+                                          PlaceholderText="Pick an installed printer" />
+                                <Button Content="Send via Windows spooler" Command="{Binding PrintWindowsCommand}"
                                         HorizontalAlignment="Stretch" />
                             </StackPanel>
                         </Flyout>
                     </Button.Flyout>
                 </Button>
-                <Rectangle Width="1" Height="22" Fill="#33808080" />
-                <TextBlock Text="Printer" VerticalAlignment="Center" />
-                <ComboBox ItemsSource="{Binding Printers}"
-                          SelectedItem="{Binding SelectedPrinter}" MinWidth="170"
-                          ToolTip.Tip="Selecting a printer adopts its density and validates the label against the print head" />
-                <TextBlock Text="{Binding PrinterWarning}" VerticalAlignment="Center"
-                           Foreground="#D97706" FontSize="12" FontWeight="SemiBold"
-                           TextWrapping="Wrap" MaxWidth="380" />
                 <TextBlock Text="{Binding CurrentFilePath}" VerticalAlignment="Center"
+                           HorizontalAlignment="Right" Margin="12,0"
                            Opacity="0.5" FontSize="12" />
-            </StackPanel>
+            </DockPanel>
         </Border>
 
         <!-- Toolbox + label setup -->
@@ -148,12 +166,6 @@
                 <Button Content="Barcode" Command="{Binding AddBarcodeCommand}" />
                 <Button Content="QR" Command="{Binding AddQrCommand}" />
                 <Rectangle Width="1" Height="22" Fill="#33808080" />
-                <Button Content="Delete" Command="{Binding DeleteSelectedCommand}"
-                        IsEnabled="{Binding HasSelection}" />
-                <Rectangle Width="1" Height="22" Fill="#33808080" />
-                <Button Content="Undo" Command="{Binding UndoCommand}" ToolTip.Tip="Undo (Ctrl+Z)" />
-                <Button Content="Redo" Command="{Binding RedoCommand}" ToolTip.Tip="Redo (Ctrl+Y)" />
-                <Rectangle Width="1" Height="22" Fill="#33808080" />
                 <TextBlock Text="Width (mm)" VerticalAlignment="Center" />
                 <NumericUpDown Value="{Binding WidthMm}" Minimum="5" Maximum="600"
                                Increment="1" FormatString="0.#" Width="110" />
@@ -163,6 +175,14 @@
                 <TextBlock Text="Density" VerticalAlignment="Center" />
                 <ComboBox ItemsSource="{Binding Densities}"
                           SelectedItem="{Binding SelectedDensity}" Width="100" />
+                <Rectangle Width="1" Height="22" Fill="#33808080" />
+                <TextBlock Text="Printer" VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{Binding Printers}"
+                          SelectedItem="{Binding SelectedPrinter}" MinWidth="160"
+                          ToolTip.Tip="Selecting a printer adopts its density and validates the label against the print head" />
+                <TextBlock Text="{Binding PrinterWarning}" VerticalAlignment="Center"
+                           Foreground="#D97706" FontSize="12" FontWeight="SemiBold"
+                           TextWrapping="Wrap" MaxWidth="300" />
                 <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Opacity="0.6" />
             </StackPanel>
         </Border>

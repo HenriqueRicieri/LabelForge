@@ -50,7 +50,7 @@
                         <Flyout Placement="Bottom">
                             <StackPanel Spacing="6" Width="230">
                                 <TextBlock Text="Printer address (TCP 9100)" FontSize="12" Opacity="0.8" />
-                                <TextBox Text="{Binding PrinterHost}" Watermark="192.168.0.50" />
+                                <TextBox Text="{Binding PrinterHost}" PlaceholderText="192.168.0.50" />
                                 <TextBlock Text="Port" FontSize="12" Opacity="0.8" />
                                 <NumericUpDown Value="{Binding PrinterPort}" Minimum="1" Maximum="65535"
                                                Increment="1" FormatString="0" />

@@ -190,6 +190,25 @@ public partial class DesignerView : UserControl
 
         switch (e.Key)
         {
+            case Key.N:
+                if (vm.NewDocumentCommand.CanExecute(null))
+                {
+                    vm.NewDocumentCommand.Execute(null);
+                }
+
+                e.Handled = true;
+                break;
+
+            case Key.O:
+                OnOpenFile(sender, new RoutedEventArgs());
+                e.Handled = true;
+                break;
+
+            case Key.S:
+                OnSaveFile(sender, new RoutedEventArgs());
+                e.Handled = true;
+                break;
+
             case Key.Z when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
             case Key.Y:
                 if (vm.RedoCommand.CanExecute(null))
