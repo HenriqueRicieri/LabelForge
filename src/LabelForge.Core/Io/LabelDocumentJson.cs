@@ -27,6 +27,21 @@ public static class LabelDocumentJson
         return JsonSerializer.Serialize(new Envelope(CurrentSchemaVersion, document), Options);
     }
 
+    /// <summary>Serializes a single element (clipboard, cloning).</summary>
+    public static string SerializeElement(Element element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return JsonSerializer.Serialize(element, Options);
+    }
+
+    /// <summary>Deserializes a single element; the caller assigns a new Id when pasting.</summary>
+    public static Element DeserializeElement(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        return JsonSerializer.Deserialize<Element>(json, Options)
+            ?? throw new JsonException("The payload is not a label element.");
+    }
+
     public static LabelDocument Deserialize(string json)
     {
         ArgumentNullException.ThrowIfNull(json);

@@ -117,6 +117,13 @@
                         <MenuItem Header="_Undo" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
                         <MenuItem Header="_Redo" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" />
                         <Separator />
+                        <MenuItem Header="_Copy" Command="{Binding CopyCommand}" InputGesture="Ctrl+C" />
+                        <MenuItem Header="_Paste" Command="{Binding PasteCommand}" InputGesture="Ctrl+V" />
+                        <MenuItem Header="D_uplicate" Command="{Binding DuplicateCommand}" InputGesture="Ctrl+D" />
+                        <Separator />
+                        <MenuItem Header="Bring to _Front" Command="{Binding BringToFrontCommand}" />
+                        <MenuItem Header="Send to _Back" Command="{Binding SendToBackCommand}" />
+                        <Separator />
                         <MenuItem Header="_Delete" Command="{Binding DeleteSelectedCommand}" InputGesture="Delete" />
                     </MenuItem>
                     <MenuItem Header="_Insert">

@@ -33,6 +33,7 @@ public partial class DesignerViewModel : ViewModelBase
     private CancellationTokenSource? _renderCts;
     private bool _restoring;
     private long _lastRecordTicks;
+    private string? _clipboardElement;
 
     public IReadOnlyList<DensityOption> Densities => DensityOption.Standard;
 
@@ -49,7 +50,15 @@ public partial class DesignerViewModel : ViewModelBase
     public partial Element? SelectedElement { get; set; }
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CopyCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DuplicateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BringToFrontCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SendToBackCommand))]
     public partial bool HasSelection { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(PasteCommand))]
+    public partial bool CanPaste { get; set; }
 
     /// <summary>Per-type property editor for the selection; DataTemplates pick the view.</summary>
     [ObservableProperty]
@@ -273,6 +282,70 @@ public partial class DesignerViewModel : ViewModelBase
     [RelayCommand]
     private void AddQr() => AddElement(
         new QrCodeElement { Data = "https://example.com", Magnification = 5 });
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void Copy()
+    {
+        if (SelectedElement is { } selected)
+        {
+            _clipboardElement = LabelDocumentJson.SerializeElement(selected);
+            CanPaste = true;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanPaste))]
+    private void Paste()
+    {
+        if (_clipboardElement is null)
+        {
+            return;
+        }
+
+        Element element = LabelDocumentJson.DeserializeElement(_clipboardElement);
+        element.Id = Guid.NewGuid();
+        element.X += 20;
+        element.Y += 20;
+        element.ZOrder = Document.Elements.Count == 0
+            ? 0
+            : Document.Elements.Max(e => e.ZOrder) + 1;
+        Document.Elements.Add(element);
+        SelectedElement = element;
+
+        // Re-serialize so repeated pastes cascade instead of stacking.
+        _clipboardElement = LabelDocumentJson.SerializeElement(element);
+
+        RecordUndo(coalesce: false);
+        ScheduleRender();
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void Duplicate()
+    {
+        Copy();
+        Paste();
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void BringToFront()
+    {
+        if (SelectedElement is { } selected)
+        {
+            selected.ZOrder = Document.Elements.Max(e => e.ZOrder) + 1;
+            RecordUndo(coalesce: false);
+            ScheduleRender();
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void SendToBack()
+    {
+        if (SelectedElement is { } selected)
+        {
+            selected.ZOrder = Document.Elements.Min(e => e.ZOrder) - 1;
+            RecordUndo(coalesce: false);
+            ScheduleRender();
+        }
+    }
 
     [RelayCommand]
     private void DeleteSelected()

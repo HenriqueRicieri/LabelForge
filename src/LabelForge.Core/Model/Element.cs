@@ -17,8 +17,9 @@ namespace LabelForge.Core.Model;
 [JsonDerivedType(typeof(BoxElement), "box")]
 public abstract class Element
 {
-    /// <summary>Stable identity for selection, undo, and serialization.</summary>
-    public Guid Id { get; init; } = Guid.NewGuid();
+    /// <summary>Stable identity for selection, undo, and serialization. Settable so
+    /// clipboard paste can assign a fresh identity to a deserialized copy.</summary>
+    public Guid Id { get; set; } = Guid.NewGuid();
 
     /// <summary>Human-facing name shown in the layers/objects panel.</summary>
     public string Name { get; set; } = string.Empty;

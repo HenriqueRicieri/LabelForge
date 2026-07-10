@@ -209,6 +209,38 @@ public partial class DesignerView : UserControl
                 e.Handled = true;
                 break;
 
+            case Key.C:
+                if (vm.CopyCommand.CanExecute(null))
+                {
+                    vm.CopyCommand.Execute(null);
+                }
+
+                e.Handled = true;
+                break;
+
+            case Key.V:
+                if (vm.PasteCommand.CanExecute(null))
+                {
+                    vm.PasteCommand.Execute(null);
+                }
+
+                e.Handled = true;
+                break;
+
+            case Key.D:
+                if (vm.DuplicateCommand.CanExecute(null))
+                {
+                    vm.DuplicateCommand.Execute(null);
+                }
+
+                e.Handled = true;
+                break;
+
+            case Key.D0 or Key.NumPad0:
+                Canvas.ResetView();
+                e.Handled = true;
+                break;
+
             case Key.Z when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
             case Key.Y:
                 if (vm.RedoCommand.CanExecute(null))

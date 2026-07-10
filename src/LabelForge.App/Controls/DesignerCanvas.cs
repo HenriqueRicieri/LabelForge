@@ -54,6 +54,12 @@ public sealed class DesignerCanvas : Control
     private int _candidateWidth;
     private int _candidateHeight;
 
+    // Explicit view transform once the user zooms or pans; null means auto-fit.
+    private double? _userScale;
+    private Point _viewOrigin;
+    private bool _panning;
+    private Point _panLast;
+
     public DesignerCanvas()
     {
         Focusable = true;
@@ -85,6 +91,11 @@ public sealed class DesignerCanvas : Control
 
     private (double Scale, Point Origin) GetTransform()
     {
+        if (_userScale is { } explicitScale)
+        {
+            return (explicitScale, _viewOrigin);
+        }
+
         var doc = Document;
         if (doc is null || doc.WidthDots <= 0 || doc.HeightDots <= 0 ||
             Bounds.Width <= 0 || Bounds.Height <= 0)
@@ -102,6 +113,72 @@ public sealed class DesignerCanvas : Control
             (Bounds.Width - doc.WidthDots * scale) / 2,
             (Bounds.Height - doc.HeightDots * scale) / 2);
         return (scale, origin);
+    }
+
+    /// <summary>Returns to the auto-fit view (Ctrl+0).</summary>
+    public void ResetView()
+    {
+        _userScale = null;
+        InvalidateVisual();
+    }
+
+    /// <summary>Captures the current fit transform so zoom/pan can start from it.</summary>
+    private void EnsureExplicitTransform()
+    {
+        if (_userScale is null)
+        {
+            (double scale, Point origin) = GetTransform();
+            _userScale = scale;
+            _viewOrigin = origin;
+        }
+    }
+
+    private void ZoomAt(Point pivot, double factor)
+    {
+        EnsureExplicitTransform();
+        double oldScale = _userScale!.Value;
+        double newScale = Math.Clamp(oldScale * factor, 0.05, 40);
+        double ratio = newScale / oldScale;
+
+        // Keep the point under the cursor stationary while scaling.
+        _viewOrigin = new Point(
+            pivot.X - (pivot.X - _viewOrigin.X) * ratio,
+            pivot.Y - (pivot.Y - _viewOrigin.Y) * ratio);
+        _userScale = newScale;
+        InvalidateVisual();
+    }
+
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+        Point position = e.GetPosition(this);
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            ZoomAt(position, e.Delta.Y > 0 ? 1.15 : 1 / 1.15);
+        }
+        else
+        {
+            EnsureExplicitTransform();
+            const double step = 40;
+            double dx = (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? e.Delta.Y : e.Delta.X) * step;
+            double dy = e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 0 : e.Delta.Y * step;
+            _viewOrigin = new Point(_viewOrigin.X + dx, _viewOrigin.Y + dy);
+            InvalidateVisual();
+        }
+
+        e.Handled = true;
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        // A different document means a different size; go back to auto-fit.
+        if (change.Property == DocumentProperty)
+        {
+            _userScale = null;
+        }
     }
 
     public override void Render(DrawingContext context)
@@ -189,6 +266,18 @@ public sealed class DesignerCanvas : Control
 
         var (scale, origin) = GetTransform();
         Point p = e.GetPosition(this);
+
+        // Middle button pans the view; it never touches the selection.
+        if (e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed)
+        {
+            EnsureExplicitTransform();
+            _panning = true;
+            _panLast = p;
+            Cursor = new Cursor(StandardCursorType.SizeAll);
+            e.Pointer.Capture(this);
+            return;
+        }
+
         double dotX = (p.X - origin.X) / scale;
         double dotY = (p.Y - origin.Y) / scale;
 
@@ -233,6 +322,16 @@ public sealed class DesignerCanvas : Control
         base.OnPointerMoved(e);
         Point p = e.GetPosition(this);
 
+        if (_panning)
+        {
+            _viewOrigin = new Point(
+                _viewOrigin.X + (p.X - _panLast.X),
+                _viewOrigin.Y + (p.Y - _panLast.Y));
+            _panLast = p;
+            InvalidateVisual();
+            return;
+        }
+
         if (!_dragging && !_resizing)
         {
             Cursor = ResizeHandleRect() is { } handle && handle.Contains(p)
@@ -271,6 +370,15 @@ public sealed class DesignerCanvas : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+
+        if (_panning)
+        {
+            _panning = false;
+            Cursor = Cursor.Default;
+            e.Pointer.Capture(null);
+            return;
+        }
+
         if (!_dragging && !_resizing)
         {
             return;

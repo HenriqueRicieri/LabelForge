@@ -55,6 +55,25 @@ public sealed class LabelDocumentJsonTests
     }
 
     [Fact]
+    public void SingleElement_RoundTrips_WithTypeAndProperties()
+    {
+        var original = new BarcodeElement
+        {
+            X = 10, Y = 20, Data = "ABC", Symbology = BarcodeSymbology.Code39,
+            ModuleWidthDots = 4, Orientation = Orientation.Rotated90,
+        };
+
+        Element copy = LabelDocumentJson.DeserializeElement(LabelDocumentJson.SerializeElement(original));
+
+        var barcode = Assert.IsType<BarcodeElement>(copy);
+        Assert.Equal(original.Id, barcode.Id);
+        Assert.Equal("ABC", barcode.Data);
+        Assert.Equal(BarcodeSymbology.Code39, barcode.Symbology);
+        Assert.Equal(4, barcode.ModuleWidthDots);
+        Assert.Equal(Orientation.Rotated90, barcode.Orientation);
+    }
+
+    [Fact]
     public void Deserialize_RejectsNewerSchemaVersions()
     {
         string json = LabelDocumentJson.Serialize(new LabelDocument())
