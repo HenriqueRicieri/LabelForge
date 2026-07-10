@@ -42,6 +42,20 @@ public static class LabelDocumentJson
             ?? throw new JsonException("The payload is not a label element.");
     }
 
+    /// <summary>Serializes a group of elements (multi-select clipboard).</summary>
+    public static string SerializeElements(IEnumerable<Element> elements)
+    {
+        ArgumentNullException.ThrowIfNull(elements);
+        return JsonSerializer.Serialize(elements.ToList(), Options);
+    }
+
+    public static List<Element> DeserializeElements(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        return JsonSerializer.Deserialize<List<Element>>(json, Options)
+            ?? throw new JsonException("The payload is not a list of label elements.");
+    }
+
     public static LabelDocument Deserialize(string json)
     {
         ArgumentNullException.ThrowIfNull(json);

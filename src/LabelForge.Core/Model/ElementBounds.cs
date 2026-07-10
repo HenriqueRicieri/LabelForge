@@ -5,6 +5,10 @@ public readonly record struct DotRect(int X, int Y, int Width, int Height)
 {
     public bool Contains(int x, int y) =>
         x >= X && x < X + Width && y >= Y && y < Y + Height;
+
+    public bool Intersects(DotRect other) =>
+        X < other.X + other.Width && other.X < X + Width &&
+        Y < other.Y + other.Height && other.Y < Y + Height;
 }
 
 /// <summary>

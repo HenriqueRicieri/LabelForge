@@ -46,8 +46,11 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial string GeneratedZpl { get; set; } = string.Empty;
 
-    [ObservableProperty]
-    public partial Element? SelectedElement { get; set; }
+    /// <summary>Shared selection, mutated by the canvas and by commands here.</summary>
+    public SelectionSet Selection { get; } = new();
+
+    /// <summary>The primary selected element (last selected).</summary>
+    public Element? SelectedElement => Selection.Primary;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CopyCommand))]
@@ -55,6 +58,15 @@ public partial class DesignerViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(BringToFrontCommand))]
     [NotifyCanExecuteChangedFor(nameof(SendToBackCommand))]
     public partial bool HasSelection { get; set; }
+
+    [ObservableProperty]
+    public partial int SelectionCount { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsSingleSelection { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasMultiSelection { get; set; }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(PasteCommand))]
@@ -111,6 +123,8 @@ public partial class DesignerViewModel : ViewModelBase
 
     public DesignerViewModel()
     {
+        Selection.Changed += (_, _) => OnSelectionChanged();
+
         // Property setters record undo states; construction must not, or the
         // history would start with a spurious empty document before the seed.
         _restoring = true;
@@ -122,6 +136,17 @@ public partial class DesignerViewModel : ViewModelBase
 
         RecordUndo(coalesce: false);
         ScheduleRender();
+    }
+
+    private void OnSelectionChanged()
+    {
+        HasSelection = Selection.Count > 0;
+        SelectionCount = Selection.Count;
+        IsSingleSelection = Selection.Count == 1;
+        HasMultiSelection = Selection.Count > 1;
+        SelectionProperties = Selection.Count == 1
+            ? CreatePropertiesEditor(Selection.Primary)
+            : null;
     }
 
     /// <summary>Serializes the current document in the .lfl format.</summary>
@@ -146,7 +171,7 @@ public partial class DesignerViewModel : ViewModelBase
             WidthMm = (decimal)document.WidthMm;
             HeightMm = (decimal)document.HeightMm;
             SelectedDensity = Densities.FirstOrDefault(d => d.Dpmm == document.Dpmm) ?? Densities[0];
-            SelectedElement = null;
+            Selection.Clear();
         }
         finally
         {
@@ -286,9 +311,11 @@ public partial class DesignerViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private void Copy()
     {
-        if (SelectedElement is { } selected)
+        if (Selection.Count > 0)
         {
-            _clipboardElement = LabelDocumentJson.SerializeElement(selected);
+            // Preserve draw order so a pasted group stacks like the original.
+            _clipboardElement = LabelDocumentJson.SerializeElements(
+                Selection.Items.OrderBy(e => e.ZOrder));
             CanPaste = true;
         }
     }
@@ -301,18 +328,28 @@ public partial class DesignerViewModel : ViewModelBase
             return;
         }
 
-        Element element = LabelDocumentJson.DeserializeElement(_clipboardElement);
-        element.Id = Guid.NewGuid();
-        element.X += 20;
-        element.Y += 20;
-        element.ZOrder = Document.Elements.Count == 0
+        List<Element> elements = LabelDocumentJson.DeserializeElements(_clipboardElement);
+        if (elements.Count == 0)
+        {
+            return;
+        }
+
+        int nextZ = Document.Elements.Count == 0
             ? 0
             : Document.Elements.Max(e => e.ZOrder) + 1;
-        Document.Elements.Add(element);
-        SelectedElement = element;
+        foreach (Element element in elements)
+        {
+            element.Id = Guid.NewGuid();
+            element.X += 20;
+            element.Y += 20;
+            element.ZOrder = nextZ++;
+            Document.Elements.Add(element);
+        }
+
+        Selection.SetMany(elements);
 
         // Re-serialize so repeated pastes cascade instead of stacking.
-        _clipboardElement = LabelDocumentJson.SerializeElement(element);
+        _clipboardElement = LabelDocumentJson.SerializeElements(elements);
 
         RecordUndo(coalesce: false);
         ScheduleRender();
@@ -328,35 +365,55 @@ public partial class DesignerViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private void BringToFront()
     {
-        if (SelectedElement is { } selected)
+        if (Selection.Count == 0)
         {
-            selected.ZOrder = Document.Elements.Max(e => e.ZOrder) + 1;
-            RecordUndo(coalesce: false);
-            ScheduleRender();
+            return;
         }
+
+        int nextZ = Document.Elements.Max(e => e.ZOrder) + 1;
+        foreach (Element element in Selection.Items.OrderBy(e => e.ZOrder))
+        {
+            element.ZOrder = nextZ++;
+        }
+
+        RecordUndo(coalesce: false);
+        ScheduleRender();
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private void SendToBack()
     {
-        if (SelectedElement is { } selected)
+        if (Selection.Count == 0)
         {
-            selected.ZOrder = Document.Elements.Min(e => e.ZOrder) - 1;
-            RecordUndo(coalesce: false);
-            ScheduleRender();
+            return;
         }
+
+        int nextZ = Document.Elements.Min(e => e.ZOrder) - Selection.Count;
+        foreach (Element element in Selection.Items.OrderBy(e => e.ZOrder))
+        {
+            element.ZOrder = nextZ++;
+        }
+
+        RecordUndo(coalesce: false);
+        ScheduleRender();
     }
 
     [RelayCommand]
     private void DeleteSelected()
     {
-        if (SelectedElement is { } selected)
+        if (Selection.Count == 0)
         {
-            Document.Elements.Remove(selected);
-            SelectedElement = null;
-            RecordUndo(coalesce: false);
-            ScheduleRender();
+            return;
         }
+
+        foreach (Element element in Selection.Items.ToList())
+        {
+            Document.Elements.Remove(element);
+        }
+
+        Selection.Clear();
+        RecordUndo(coalesce: false);
+        ScheduleRender();
     }
 
     private void AddElement(Element element)
@@ -367,24 +424,20 @@ public partial class DesignerViewModel : ViewModelBase
             ? 0
             : Document.Elements.Max(e => e.ZOrder) + 1;
         Document.Elements.Add(element);
-        SelectedElement = element;
+        Selection.Set(element);
         RecordUndo(coalesce: false);
         ScheduleRender();
     }
 
-    partial void OnSelectedElementChanged(Element? value)
+    private ElementPropertiesViewModel? CreatePropertiesEditor(Element? value) => value switch
     {
-        HasSelection = value is not null;
-        SelectionProperties = value switch
-        {
-            TextElement text => new TextPropertiesViewModel(text, OnPanelEdited),
-            BarcodeElement barcode => new BarcodePropertiesViewModel(barcode, OnPanelEdited),
-            QrCodeElement qr => new QrPropertiesViewModel(qr, OnPanelEdited),
-            LineElement line => new LinePropertiesViewModel(line, OnPanelEdited),
-            BoxElement box => new BoxPropertiesViewModel(box, OnPanelEdited),
-            _ => null,
-        };
-    }
+        TextElement text => new TextPropertiesViewModel(text, OnPanelEdited),
+        BarcodeElement barcode => new BarcodePropertiesViewModel(barcode, OnPanelEdited),
+        QrCodeElement qr => new QrPropertiesViewModel(qr, OnPanelEdited),
+        LineElement line => new LinePropertiesViewModel(line, OnPanelEdited),
+        BoxElement box => new BoxPropertiesViewModel(box, OnPanelEdited),
+        _ => null,
+    };
 
     private void OnPanelEdited()
     {
@@ -471,7 +524,7 @@ public partial class DesignerViewModel : ViewModelBase
 
     private void RestoreSnapshot(string snapshot)
     {
-        Guid? selectedId = SelectedElement?.Id;
+        var selectedIds = Selection.Items.Select(e => e.Id).ToHashSet();
 
         _restoring = true;
         try
@@ -481,7 +534,7 @@ public partial class DesignerViewModel : ViewModelBase
             WidthMm = (decimal)document.WidthMm;
             HeightMm = (decimal)document.HeightMm;
             SelectedDensity = Densities.FirstOrDefault(d => d.Dpmm == document.Dpmm) ?? Densities[0];
-            SelectedElement = document.Elements.FirstOrDefault(e => e.Id == selectedId);
+            Selection.SetMany(document.Elements.Where(e => selectedIds.Contains(e.Id)));
         }
         finally
         {

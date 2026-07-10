@@ -200,11 +200,15 @@
                 <StackPanel Spacing="8">
                     <TextBlock Text="Properties" FontWeight="SemiBold" />
 
-                    <TextBlock Text="Nothing selected. Click an element on the canvas."
+                    <TextBlock Text="Nothing selected. Click an element on the canvas. Drag on empty space to select several; Ctrl+click adds or removes."
                                IsVisible="{Binding !HasSelection}"
                                TextWrapping="Wrap" Opacity="0.6" FontSize="12" />
 
-                    <StackPanel IsVisible="{Binding HasSelection}" Spacing="4">
+                    <TextBlock Text="{Binding SelectionCount, StringFormat='{}{0} elements selected. Drag to move them together; Delete removes all; copy and z-order apply to the whole group.'}"
+                               IsVisible="{Binding HasMultiSelection}"
+                               TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+
+                    <StackPanel IsVisible="{Binding IsSingleSelection}" Spacing="4">
                         <TextBlock Text="{Binding SelectionProperties.TypeName, FallbackValue=''}"
                                    FontWeight="SemiBold" Opacity="0.8" />
                         <TextBlock Classes="propLabel" Text="X (dots)" />
@@ -241,7 +245,7 @@
         <controls:DesignerCanvas Name="Canvas"
                                  Underlay="{Binding Underlay}"
                                  Document="{Binding Document}"
-                                 SelectedElement="{Binding SelectedElement}" />
+                                 Selection="{Binding Selection}" />
 
     </DockPanel>
 

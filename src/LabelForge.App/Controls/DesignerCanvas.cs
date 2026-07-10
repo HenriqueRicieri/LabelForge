@@ -1,10 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
+using LabelForge.Core.Editing;
 using LabelForge.Core.Model;
 
 namespace LabelForge.App.Controls;
@@ -13,8 +14,11 @@ namespace LabelForge.App.Controls;
 /// The design surface. Follows the WYSIWYG rule: the rendered label bitmap (from
 /// IZplRenderer, debounced by the view model) is drawn as the underlay and is the
 /// only visual truth; on top the control draws an interaction overlay (selection
-/// outline, handles, drag ghost) computed from model geometry in dot space.
-/// Hit-testing uses ElementBoundsCalculator, never Avalonia visuals.
+/// outlines, handles, drag ghosts, marquee) computed from model geometry in dot
+/// space. Hit-testing uses ElementBoundsCalculator, never Avalonia visuals.
+/// Selection lives in a shared SelectionSet: plain click selects, Ctrl/Shift+click
+/// toggles, dragging on empty space draws a marquee, and dragging a selected
+/// element moves the whole selection.
 /// </summary>
 public sealed class DesignerCanvas : Control
 {
@@ -24,35 +28,41 @@ public sealed class DesignerCanvas : Control
     public static readonly StyledProperty<LabelDocument?> DocumentProperty =
         AvaloniaProperty.Register<DesignerCanvas, LabelDocument?>(nameof(Document));
 
-    public static readonly StyledProperty<Element?> SelectedElementProperty =
-        AvaloniaProperty.Register<DesignerCanvas, Element?>(
-            nameof(SelectedElement), defaultBindingMode: BindingMode.TwoWay);
+    public static readonly StyledProperty<SelectionSet?> SelectionProperty =
+        AvaloniaProperty.Register<DesignerCanvas, SelectionSet?>(nameof(Selection));
 
     static DesignerCanvas()
     {
-        AffectsRender<DesignerCanvas>(UnderlayProperty, DocumentProperty, SelectedElementProperty);
+        AffectsRender<DesignerCanvas>(UnderlayProperty, DocumentProperty, SelectionProperty);
     }
 
+    private const double HandleSize = 9;
+
     private static readonly SolidColorBrush SurfaceBrush = new(Color.FromRgb(0xD9, 0xD9, 0xD9));
-    private static readonly SolidColorBrush AccentBrush = new(Color.FromRgb(0x25, 0x63, 0xEB));
     private static readonly Pen LabelBorderPen = new(Brushes.Gray, 1);
     private static readonly Pen SelectionPen = new(new SolidColorBrush(Color.FromRgb(0x25, 0x63, 0xEB)), 1.5);
     private static readonly Pen GhostPen = new(
         new SolidColorBrush(Color.FromRgb(0x25, 0x63, 0xEB)), 1.5, new DashStyle([4, 4], 0));
 
-    private const double HandleSize = 9;
-
     private readonly ElementBoundsCalculator _bounds = new();
+
+    // Group drag.
     private bool _dragging;
-    private bool _resizing;
     private Point _dragStartDots;
-    private int _elementStartX;
-    private int _elementStartY;
-    private int _candidateX;
-    private int _candidateY;
+    private readonly List<(Element Element, int StartX, int StartY)> _dragItems = [];
+    private int _dragDx;
+    private int _dragDy;
+
+    // Resize (single selection only).
+    private bool _resizing;
     private DotRect _resizeStartBounds;
     private int _candidateWidth;
     private int _candidateHeight;
+
+    // Marquee selection.
+    private bool _marquee;
+    private Point _marqueeStart;
+    private Point _marqueeCurrent;
 
     // Explicit view transform once the user zooms or pans; null means auto-fit.
     private double? _userScale;
@@ -77,17 +87,42 @@ public sealed class DesignerCanvas : Control
         set => SetValue(DocumentProperty, value);
     }
 
-    public Element? SelectedElement
+    public SelectionSet? Selection
     {
-        get => GetValue(SelectedElementProperty);
-        set => SetValue(SelectedElementProperty, value);
+        get => GetValue(SelectionProperty);
+        set => SetValue(SelectionProperty, value);
     }
 
-    /// <summary>Raised after the user commits an edit through the canvas (drag, nudge).</summary>
+    /// <summary>Raised after the user commits an edit through the canvas (drag, resize, nudge).</summary>
     public event EventHandler? DocumentEdited;
 
     /// <summary>Raised when the user presses Delete with a selection.</summary>
     public event EventHandler? DeleteRequested;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == DocumentProperty)
+        {
+            // A different document means a different size; go back to auto-fit.
+            _userScale = null;
+        }
+        else if (change.Property == SelectionProperty)
+        {
+            if (change.OldValue is SelectionSet oldSelection)
+            {
+                oldSelection.Changed -= OnSelectionChanged;
+            }
+
+            if (change.NewValue is SelectionSet newSelection)
+            {
+                newSelection.Changed += OnSelectionChanged;
+            }
+        }
+    }
+
+    private void OnSelectionChanged(object? sender, EventArgs e) => InvalidateVisual();
 
     private (double Scale, Point Origin) GetTransform()
     {
@@ -170,17 +205,6 @@ public sealed class DesignerCanvas : Control
         e.Handled = true;
     }
 
-    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-    {
-        base.OnPropertyChanged(change);
-
-        // A different document means a different size; go back to auto-fit.
-        if (change.Property == DocumentProperty)
-        {
-            _userScale = null;
-        }
-    }
-
     public override void Render(DrawingContext context)
     {
         context.FillRectangle(SurfaceBrush, new Rect(Bounds.Size));
@@ -202,42 +226,63 @@ public sealed class DesignerCanvas : Control
             context.DrawImage(underlay, new Rect(underlay.Size), labelRect);
         }
 
-        if (SelectedElement is { } selected && doc.Elements.Contains(selected))
+        if (Selection is { Count: > 0 } selection)
         {
-            DotRect bounds = _bounds.GetBounds(selected);
-            int x = _dragging ? _candidateX : bounds.X;
-            int y = _dragging ? _candidateY : bounds.Y;
-            int w = _resizing ? _candidateWidth : bounds.Width;
-            int h = _resizing ? _candidateHeight : bounds.Height;
-
-            var rect = new Rect(
-                origin.X + x * scale,
-                origin.Y + y * scale,
-                Math.Max(w * scale, 4),
-                Math.Max(h * scale, 4));
-
-            bool ghost = _dragging || _resizing;
-            context.DrawRectangle(null, ghost ? GhostPen : SelectionPen, rect);
-
-            if (!ghost)
+            foreach (Element element in selection.Items)
             {
-                foreach (var corner in new[]
-                         {
-                             rect.TopLeft, rect.TopRight, rect.BottomLeft, rect.BottomRight,
-                         })
+                if (!doc.Elements.Contains(element))
                 {
-                    var handleRect = new Rect(
-                        corner.X - HandleSize / 2, corner.Y - HandleSize / 2, HandleSize, HandleSize);
-                    context.DrawRectangle(Brushes.White, SelectionPen, handleRect);
+                    continue;
+                }
+
+                DotRect bounds = _bounds.GetBounds(element);
+                bool moving = _dragging && _dragItems.Any(d => d.Element == element);
+                int x = moving ? bounds.X + _dragDx : bounds.X;
+                int y = moving ? bounds.Y + _dragDy : bounds.Y;
+                int w = _resizing && selection.Count == 1 ? _candidateWidth : bounds.Width;
+                int h = _resizing && selection.Count == 1 ? _candidateHeight : bounds.Height;
+
+                var rect = new Rect(
+                    origin.X + x * scale,
+                    origin.Y + y * scale,
+                    Math.Max(w * scale, 4),
+                    Math.Max(h * scale, 4));
+
+                bool ghost = moving || (_resizing && selection.Count == 1);
+                context.DrawRectangle(null, ghost ? GhostPen : SelectionPen, rect);
+
+                if (!ghost && selection.Count == 1)
+                {
+                    foreach (var corner in new[]
+                             {
+                                 rect.TopLeft, rect.TopRight, rect.BottomLeft, rect.BottomRight,
+                             })
+                    {
+                        var handleRect = new Rect(
+                            corner.X - HandleSize / 2, corner.Y - HandleSize / 2, HandleSize, HandleSize);
+                        context.DrawRectangle(Brushes.White, SelectionPen, handleRect);
+                    }
                 }
             }
         }
+
+        if (_marquee)
+        {
+            context.DrawRectangle(null, GhostPen, MarqueeRect());
+        }
     }
 
-    /// <summary>The bottom-right (resize) handle of the current selection, in screen space.</summary>
+    private Rect MarqueeRect() => new(
+        Math.Min(_marqueeStart.X, _marqueeCurrent.X),
+        Math.Min(_marqueeStart.Y, _marqueeCurrent.Y),
+        Math.Abs(_marqueeCurrent.X - _marqueeStart.X),
+        Math.Abs(_marqueeCurrent.Y - _marqueeStart.Y));
+
+    /// <summary>The bottom-right (resize) handle, only for a single unlocked selection.</summary>
     private Rect? ResizeHandleRect()
     {
-        if (SelectedElement is not { IsLocked: false } selected ||
+        if (Selection is not { Count: 1 } selection ||
+            selection.Primary is not { IsLocked: false } selected ||
             Document is not { } doc || !doc.Elements.Contains(selected))
         {
             return null;
@@ -259,7 +304,8 @@ public sealed class DesignerCanvas : Control
         Focus();
 
         var doc = Document;
-        if (doc is null)
+        var selection = Selection;
+        if (doc is null || selection is null)
         {
             return;
         }
@@ -284,11 +330,11 @@ public sealed class DesignerCanvas : Control
         // The resize handle wins over element hit-testing, otherwise grabbing the
         // corner of a small element would just re-select it.
         if (ResizeHandleRect() is { } handle && handle.Contains(p) &&
-            SelectedElement is { } sel)
+            selection.Primary is { } primary)
         {
             _resizing = true;
             _dragStartDots = new Point(dotX, dotY);
-            _resizeStartBounds = _bounds.GetBounds(sel);
+            _resizeStartBounds = _bounds.GetBounds(primary);
             _candidateWidth = _resizeStartBounds.Width;
             _candidateHeight = _resizeStartBounds.Height;
             e.Pointer.Capture(this);
@@ -296,21 +342,54 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
+        bool additive = e.KeyModifiers.HasFlag(KeyModifiers.Control) ||
+                        e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
         Element? hit = doc.Elements
             .Where(el => el.IsVisible)
             .OrderByDescending(el => el.ZOrder)
             .FirstOrDefault(el => _bounds.GetBounds(el).Contains((int)dotX, (int)dotY));
 
-        SelectedElement = hit;
+        if (hit is null)
+        {
+            // Empty space: start a marquee; plain click also clears the selection.
+            if (!additive)
+            {
+                selection.Clear();
+            }
 
-        if (hit is { IsLocked: false })
+            _marquee = true;
+            _marqueeStart = p;
+            _marqueeCurrent = p;
+            e.Pointer.Capture(this);
+            InvalidateVisual();
+            return;
+        }
+
+        if (additive)
+        {
+            selection.Toggle(hit);
+            return;
+        }
+
+        if (!selection.Contains(hit))
+        {
+            selection.Set(hit);
+        }
+
+        // Drag the whole (unlocked part of the) selection together.
+        _dragItems.Clear();
+        foreach (Element element in selection.Items.Where(el => !el.IsLocked))
+        {
+            _dragItems.Add((element, element.X, element.Y));
+        }
+
+        if (_dragItems.Count > 0)
         {
             _dragging = true;
             _dragStartDots = new Point(dotX, dotY);
-            _elementStartX = hit.X;
-            _elementStartY = hit.Y;
-            _candidateX = hit.X;
-            _candidateY = hit.Y;
+            _dragDx = 0;
+            _dragDy = 0;
             e.Pointer.Capture(this);
         }
 
@@ -328,6 +407,13 @@ public sealed class DesignerCanvas : Control
                 _viewOrigin.X + (p.X - _panLast.X),
                 _viewOrigin.Y + (p.Y - _panLast.Y));
             _panLast = p;
+            InvalidateVisual();
+            return;
+        }
+
+        if (_marquee)
+        {
+            _marqueeCurrent = p;
             InvalidateVisual();
             return;
         }
@@ -358,13 +444,31 @@ public sealed class DesignerCanvas : Control
         }
         else
         {
-            _candidateX = Math.Clamp(
-                _elementStartX + (int)Math.Round(dotX - _dragStartDots.X), 0, Math.Max(doc.WidthDots - 1, 0));
-            _candidateY = Math.Clamp(
-                _elementStartY + (int)Math.Round(dotY - _dragStartDots.Y), 0, Math.Max(doc.HeightDots - 1, 0));
+            (_dragDx, _dragDy) = ClampGroupDelta(
+                doc,
+                (int)Math.Round(dotX - _dragStartDots.X),
+                (int)Math.Round(dotY - _dragStartDots.Y));
         }
 
         InvalidateVisual();
+    }
+
+    /// <summary>Clamps a group-move delta so every dragged element stays on the label,
+    /// preserving the elements' relative offsets.</summary>
+    private (int Dx, int Dy) ClampGroupDelta(LabelDocument doc, int dx, int dy)
+    {
+        int dxLow = int.MinValue, dxHigh = int.MaxValue;
+        int dyLow = int.MinValue, dyHigh = int.MaxValue;
+
+        foreach ((Element _, int startX, int startY) in _dragItems)
+        {
+            dxLow = Math.Max(dxLow, -startX);
+            dxHigh = Math.Min(dxHigh, Math.Max(doc.WidthDots - 1, 0) - startX);
+            dyLow = Math.Max(dyLow, -startY);
+            dyHigh = Math.Min(dyHigh, Math.Max(doc.HeightDots - 1, 0) - startY);
+        }
+
+        return (Math.Clamp(dx, dxLow, dxHigh), Math.Clamp(dy, dyLow, dyHigh));
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -379,6 +483,15 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
+        if (_marquee)
+        {
+            _marquee = false;
+            e.Pointer.Capture(null);
+            CommitMarquee();
+            InvalidateVisual();
+            return;
+        }
+
         if (!_dragging && !_resizing)
         {
             return;
@@ -389,33 +502,63 @@ public sealed class DesignerCanvas : Control
         _resizing = false;
         e.Pointer.Capture(null);
 
-        if (SelectedElement is { } selected)
+        if (wasResizing && Selection?.Primary is { } primary)
         {
-            if (wasResizing)
+            // The gesture targets the on-screen (rotated) footprint; the resizer
+            // reasons in the element's intrinsic axes, so swap for 90/270.
+            (int w, int h) = primary.Orientation is Orientation.Rotated90 or Orientation.Rotated270
+                ? (_candidateHeight, _candidateWidth)
+                : (_candidateWidth, _candidateHeight);
+            ElementResizer.Resize(primary, w, h);
+            DocumentEdited?.Invoke(this, EventArgs.Empty);
+        }
+        else if (_dragDx != 0 || _dragDy != 0)
+        {
+            foreach ((Element element, int startX, int startY) in _dragItems)
             {
-                // The gesture targets the on-screen (rotated) footprint; the resizer
-                // reasons in the element's intrinsic axes, so swap for 90/270.
-                (int w, int h) = selected.Orientation is Orientation.Rotated90 or Orientation.Rotated270
-                    ? (_candidateHeight, _candidateWidth)
-                    : (_candidateWidth, _candidateHeight);
-                ElementResizer.Resize(selected, w, h);
-                DocumentEdited?.Invoke(this, EventArgs.Empty);
+                element.X = startX + _dragDx;
+                element.Y = startY + _dragDy;
             }
-            else if (selected.X != _candidateX || selected.Y != _candidateY)
-            {
-                selected.X = _candidateX;
-                selected.Y = _candidateY;
-                DocumentEdited?.Invoke(this, EventArgs.Empty);
-            }
+
+            DocumentEdited?.Invoke(this, EventArgs.Empty);
         }
 
+        _dragItems.Clear();
+        _dragDx = 0;
+        _dragDy = 0;
         InvalidateVisual();
+    }
+
+    private void CommitMarquee()
+    {
+        if (Document is not { } doc || Selection is not { } selection)
+        {
+            return;
+        }
+
+        var (scale, origin) = GetTransform();
+        Rect band = MarqueeRect();
+
+        int x = (int)Math.Floor((band.X - origin.X) / scale);
+        int y = (int)Math.Floor((band.Y - origin.Y) / scale);
+        int w = Math.Max((int)Math.Ceiling(band.Width / scale), 1);
+        int h = Math.Max((int)Math.Ceiling(band.Height / scale), 1);
+        var dotBand = new DotRect(x, y, w, h);
+
+        var hits = doc.Elements
+            .Where(el => el.IsVisible && _bounds.GetBounds(el).Intersects(dotBand))
+            .ToList();
+
+        if (hits.Count > 0)
+        {
+            selection.SetMany(hits);
+        }
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (SelectedElement is not { IsLocked: false } selected || Document is not { } doc)
+        if (Selection is not { Count: > 0 } selection || Document is not { } doc)
         {
             return;
         }
@@ -442,8 +585,26 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
-        selected.X = Math.Clamp(selected.X + dx, 0, Math.Max(doc.WidthDots - 1, 0));
-        selected.Y = Math.Clamp(selected.Y + dy, 0, Math.Max(doc.HeightDots - 1, 0));
+        // Nudge the whole selection with the same clamped delta.
+        _dragItems.Clear();
+        foreach (Element element in selection.Items.Where(el => !el.IsLocked))
+        {
+            _dragItems.Add((element, element.X, element.Y));
+        }
+
+        if (_dragItems.Count == 0)
+        {
+            return;
+        }
+
+        (dx, dy) = ClampGroupDelta(doc, dx, dy);
+        foreach ((Element element, int startX, int startY) in _dragItems)
+        {
+            element.X = startX + dx;
+            element.Y = startY + dy;
+        }
+
+        _dragItems.Clear();
         DocumentEdited?.Invoke(this, EventArgs.Empty);
         InvalidateVisual();
         e.Handled = true;
