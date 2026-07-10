@@ -58,6 +58,7 @@ public sealed class DesignerCanvas : Control
     private static readonly SolidColorBrush SurfaceBrush = new(Color.FromRgb(0xD9, 0xD9, 0xD9));
     private static readonly SolidColorBrush DarkSurfaceBrush = new(Color.FromRgb(0x3C, 0x3C, 0x3C));
     private static readonly Pen LabelBorderPen = new(Brushes.Gray, 1);
+    private static readonly SolidColorBrush AccentBrush = new(Color.FromRgb(0x25, 0x63, 0xEB));
     private static readonly Pen SelectionPen = new(new SolidColorBrush(Color.FromRgb(0x25, 0x63, 0xEB)), 1.5);
     private static readonly Pen GhostPen = new(
         new SolidColorBrush(Color.FromRgb(0x25, 0x63, 0xEB)), 1.5, new DashStyle([4, 4], 0));
@@ -71,7 +72,8 @@ public sealed class DesignerCanvas : Control
     private int _dragDx;
     private int _dragDy;
 
-    // Resize (single selection only).
+    // Resize (single selection only). The gesture rect follows the pointer exactly
+    // (anchored on the opposite side); the model snaps underneath it.
     private bool _resizing;
     private ResizeHandle _activeHandle;
     private DotRect _resizeStartBounds;
@@ -79,12 +81,19 @@ public sealed class DesignerCanvas : Control
     private int _resizeStartY;
     private int _candidateWidth;
     private int _candidateHeight;
+    private double _gestureX;
+    private double _gestureY;
+    private double _gestureW;
+    private double _gestureH;
 
-    // Rotation (single selection only; snaps to the four orientations ZPL supports).
+    // Rotation (single selection only). The outline rotates continuously with the
+    // pointer, with magnetic snapping at the four orientations ZPL supports.
     private bool _rotating;
     private Point _rotateCenterDots;
     private double _rotateStartPointerDeg;
     private int _rotateStartDeg;
+    private double _rotateVisualDeg;
+    private DotRect _rotateStartBounds;
     private Orientation _rotateGestureStart;
 
     // Marquee selection.
@@ -295,12 +304,60 @@ public sealed class DesignerCanvas : Control
 
         if (Selection is { Count: > 0 } selection)
         {
-            // The model is updated live during drags, so the outline always draws at
-            // the element's real bounds and moves with the pointer.
+            bool singleGesture = selection.Count == 1 && (_resizing || _rotating);
+
             foreach (Element element in selection.Items)
             {
                 if (!doc.Elements.Contains(element))
                 {
+                    continue;
+                }
+
+                // During a resize the outline is the pointer-true gesture rect, so the
+                // dragged handle stays under the cursor even while the content snaps.
+                if (singleGesture && _resizing && element == selection.Primary)
+                {
+                    var gesture = new Rect(
+                        origin.X + _gestureX * scale,
+                        origin.Y + _gestureY * scale,
+                        Math.Max(_gestureW * scale, 4),
+                        Math.Max(_gestureH * scale, 4));
+
+                    context.DrawRectangle(null, SelectionPen, gesture);
+                    foreach ((_, Point center) in HandleCenters(gesture))
+                    {
+                        DrawHandle(context, center);
+                    }
+
+                    DrawReadout(context, $"{_candidateWidth} x {_candidateHeight}",
+                        new Point(gesture.Right + 8, gesture.Bottom + 8));
+                    continue;
+                }
+
+                // During a rotation the outline rotates continuously with the pointer.
+                if (singleGesture && _rotating && element == selection.Primary)
+                {
+                    var start = new Rect(
+                        origin.X + _rotateStartBounds.X * scale,
+                        origin.Y + _rotateStartBounds.Y * scale,
+                        Math.Max(_rotateStartBounds.Width * scale, 4),
+                        Math.Max(_rotateStartBounds.Height * scale, 4));
+                    var center = new Point(
+                        origin.X + _rotateCenterDots.X * scale,
+                        origin.Y + _rotateCenterDots.Y * scale);
+
+                    double radians = (_rotateVisualDeg - _rotateStartDeg) * Math.PI / 180.0;
+                    Matrix matrix =
+                        Matrix.CreateTranslation(-center.X, -center.Y) *
+                        Matrix.CreateRotation(radians) *
+                        Matrix.CreateTranslation(center.X, center.Y);
+                    using (context.PushTransform(matrix))
+                    {
+                        context.DrawRectangle(null, SelectionPen, start);
+                    }
+
+                    DrawReadout(context, $"{Math.Round(((_rotateVisualDeg % 360) + 360) % 360)}°",
+                        new Point(center.X + 14, start.Top - 34));
                     continue;
                 }
 
@@ -318,9 +375,7 @@ public sealed class DesignerCanvas : Control
                 {
                     foreach ((_, Point center) in HandleCenters(rect))
                     {
-                        var handleRect = new Rect(
-                            center.X - HandleSize / 2, center.Y - HandleSize / 2, HandleSize, HandleSize);
-                        context.DrawRectangle(Brushes.White, SelectionPen, handleRect);
+                        DrawHandle(context, center);
                     }
 
                     // Rotation handle: a circle tethered above the selection.
@@ -384,6 +439,26 @@ public sealed class DesignerCanvas : Control
 
     private static Point RotationHandleCenter(Rect r) => new(r.Center.X, r.Top - 22);
 
+    private static void DrawHandle(DrawingContext context, Point center)
+    {
+        var rect = new Rect(
+            center.X - HandleSize / 2, center.Y - HandleSize / 2, HandleSize, HandleSize);
+        context.DrawRectangle(Brushes.White, SelectionPen, rect);
+    }
+
+    /// <summary>Small blue readout (size or angle) next to the active gesture.</summary>
+    private static void DrawReadout(DrawingContext context, string text, Point position)
+    {
+        var formatted = new FormattedText(
+            text,
+            System.Globalization.CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            Typeface.Default,
+            13,
+            AccentBrush);
+        context.DrawText(formatted, position);
+    }
+
     private static StandardCursorType HandleCursor(ResizeHandle handle) => handle switch
     {
         ResizeHandle.TopLeft => StandardCursorType.TopLeftCorner,
@@ -445,6 +520,8 @@ public sealed class DesignerCanvas : Control
                 _rotateCenterDots = new Point(b.X + b.Width / 2.0, b.Y + b.Height / 2.0);
                 _rotateStartPointerDeg = PointerAngleDeg(dotX, dotY);
                 _rotateStartDeg = OrientationDegrees(primary.Orientation);
+                _rotateVisualDeg = _rotateStartDeg;
+                _rotateStartBounds = b;
                 _rotateGestureStart = primary.Orientation;
                 Cursor = new Cursor(StandardCursorType.Hand);
                 e.Pointer.Capture(this);
@@ -467,6 +544,10 @@ public sealed class DesignerCanvas : Control
                 _resizeStartY = primary.Y;
                 _candidateWidth = _resizeStartBounds.Width;
                 _candidateHeight = _resizeStartBounds.Height;
+                _gestureX = _resizeStartBounds.X;
+                _gestureY = _resizeStartBounds.Y;
+                _gestureW = _resizeStartBounds.Width;
+                _gestureH = _resizeStartBounds.Height;
                 e.Pointer.Capture(this);
                 InvalidateVisual();
                 return;
@@ -569,8 +650,15 @@ public sealed class DesignerCanvas : Control
             if (Selection?.Primary is { } primary)
             {
                 double delta = PointerAngleDeg(dotX, dotY) - _rotateStartPointerDeg;
-                double candidate = ((_rotateStartDeg + delta) % 360 + 360) % 360;
-                Orientation snapped = DegreesToOrientation(candidate);
+                double raw = ((_rotateStartDeg + delta) % 360 + 360) % 360;
+
+                // Magnetic snap: within 10 degrees of a legal orientation the outline
+                // locks onto it; elsewhere it follows the pointer freely.
+                double nearest = Math.Round(raw / 90.0) * 90 % 360;
+                double distance = raw - Math.Round(raw / 90.0) * 90;
+                _rotateVisualDeg = Math.Abs(distance) <= 10 ? nearest : raw;
+
+                Orientation snapped = DegreesToOrientation(raw);
                 if (primary.Orientation != snapped)
                 {
                     primary.Orientation = snapped;
@@ -584,9 +672,9 @@ public sealed class DesignerCanvas : Control
 
         if (_resizing)
         {
-            ComputeResizeCandidates(
-                (int)Math.Round(dotX - _dragStartDots.X),
-                (int)Math.Round(dotY - _dragStartDots.Y));
+            ComputeGestureRect(dotX, dotY);
+            _candidateWidth = Math.Max((int)Math.Round(_gestureW), 4);
+            _candidateHeight = Math.Max((int)Math.Round(_gestureH), 4);
             ApplyCandidateResize();
         }
         else
@@ -637,61 +725,86 @@ public sealed class DesignerCanvas : Control
         Cursor = Cursor.Default;
     }
 
-    /// <summary>Target width/height for the active handle: edge midpoints move one axis,
-    /// corners scale both proportionally by the dominant axis.</summary>
-    private void ComputeResizeCandidates(int dx, int dy)
+    /// <summary>The pointer-true gesture rect: the dragged edge or corner follows the
+    /// pointer exactly, the opposite side stays anchored, and corners scale both axes
+    /// by the smooth distance ratio from the anchor (no dominant-axis flip-flopping).</summary>
+    private void ComputeGestureRect(double dotX, double dotY)
     {
-        int startW = Math.Max(_resizeStartBounds.Width, 1);
-        int startH = Math.Max(_resizeStartBounds.Height, 1);
+        double startX = _resizeStartBounds.X;
+        double startY = _resizeStartBounds.Y;
+        double startW = Math.Max(_resizeStartBounds.Width, 1);
+        double startH = Math.Max(_resizeStartBounds.Height, 1);
+        double right = startX + startW;
+        double bottom = startY + startH;
+
         bool left = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Left or ResizeHandle.BottomLeft;
         bool top = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Top or ResizeHandle.TopRight;
 
-        int w = startW;
-        int h = startH;
         switch (_activeHandle)
         {
-            case ResizeHandle.Left or ResizeHandle.Right:
-                w = startW + (left ? -dx : dx);
+            case ResizeHandle.Left:
+                _gestureW = Math.Max(right - dotX, 4);
+                _gestureX = right - _gestureW;
                 break;
 
-            case ResizeHandle.Top or ResizeHandle.Bottom:
-                h = startH + (top ? -dy : dy);
+            case ResizeHandle.Right:
+                _gestureW = Math.Max(dotX - startX, 4);
+                break;
+
+            case ResizeHandle.Top:
+                _gestureH = Math.Max(bottom - dotY, 4);
+                _gestureY = bottom - _gestureH;
+                break;
+
+            case ResizeHandle.Bottom:
+                _gestureH = Math.Max(dotY - startY, 4);
                 break;
 
             default:
             {
-                double fw = (startW + (left ? -dx : dx)) / (double)startW;
-                double fh = (startH + (top ? -dy : dy)) / (double)startH;
-                double factor = Math.Max(Math.Abs(fw - 1) >= Math.Abs(fh - 1) ? fw : fh, 0.02);
-                w = (int)Math.Round(startW * factor);
-                h = (int)Math.Round(startH * factor);
+                // Corner: proportional scale by the distance ratio anchor -> pointer
+                // over anchor -> original corner. Smooth and monotonic under the cursor.
+                double anchorX = left ? right : startX;
+                double anchorY = top ? bottom : startY;
+                double cornerX = left ? startX : right;
+                double cornerY = top ? startY : bottom;
+
+                double startDist = Math.Max(
+                    Math.Sqrt(Math.Pow(cornerX - anchorX, 2) + Math.Pow(cornerY - anchorY, 2)), 1);
+                double nowDist = Math.Sqrt(
+                    Math.Pow(dotX - anchorX, 2) + Math.Pow(dotY - anchorY, 2));
+                double factor = Math.Max(nowDist / startDist, 0.02);
+
+                _gestureW = Math.Max(startW * factor, 4);
+                _gestureH = Math.Max(startH * factor, 4);
+                _gestureX = left ? anchorX - _gestureW : anchorX;
+                _gestureY = top ? anchorY - _gestureH : anchorY;
                 break;
             }
         }
-
-        _candidateWidth = Math.Max(w, 4);
-        _candidateHeight = Math.Max(h, 4);
     }
 
-    /// <summary>Keeps the edge/corner opposite the active handle anchored: after the
-    /// type-specific resize (which may snap), the origin is recomputed from the real
-    /// bounds so the anchor does not move.</summary>
-    private void RepositionForAnchor()
+    /// <summary>Puts the element's origin where the gesture rect says, compensating for
+    /// bounds offsets (e.g. the QR vertical offset), so the anchored side never drifts
+    /// even when the type-specific resize snaps.</summary>
+    private void RepositionToGesture()
     {
         if (Selection?.Primary is not { } primary)
         {
             return;
         }
 
-        bool left = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Left or ResizeHandle.BottomLeft;
-        bool top = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Top or ResizeHandle.TopRight;
-
         DotRect bounds = _bounds.GetBounds(primary);
         int offX = bounds.X - primary.X;
         int offY = bounds.Y - primary.Y;
+
+        bool left = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Left or ResizeHandle.BottomLeft;
+        bool top = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Top or ResizeHandle.TopRight;
+
+        // Anchored sides pin the real (possibly snapped) bounds to the anchor edge;
+        // free sides keep the original origin.
         int anchorRight = _resizeStartBounds.X + _resizeStartBounds.Width;
         int anchorBottom = _resizeStartBounds.Y + _resizeStartBounds.Height;
-
         primary.X = left ? anchorRight - bounds.Width - offX : _resizeStartX;
         primary.Y = top ? anchorBottom - bounds.Height - offY : _resizeStartY;
     }
@@ -734,7 +847,7 @@ public sealed class DesignerCanvas : Control
             ? (_candidateHeight, _candidateWidth)
             : (_candidateWidth, _candidateHeight);
         ElementResizer.Resize(primary, w, h);
-        RepositionForAnchor();
+        RepositionToGesture();
     }
 
     /// <summary>Clamps a group-move delta so every dragged element stays on the label,
