@@ -485,3 +485,6 @@ $RECYCLE.BIN/
 
 # The macOS bundle pattern *.app above would swallow our LabelForge.App project folder
 !**/LabelForge.App/
+
+# The *.e2e pattern above would swallow our E2E harness folder
+!**/LabelForge.E2E/
