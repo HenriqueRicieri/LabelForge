@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\labelforge.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <Product>LabelForge</Product>
     <AssemblyTitle>LabelForge</AssemblyTitle>

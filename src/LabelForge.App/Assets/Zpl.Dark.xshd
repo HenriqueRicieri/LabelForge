@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="ZPL-Dark" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+  <Color name="Command" foreground="#7CB8FF" fontWeight="bold" />
+  <Color name="FieldData" foreground="#6EE7A0" />
+  <Color name="Marker" foreground="#FFC94D" fontWeight="bold" />
+  <Color name="Comment" foreground="#8A8F98" fontStyle="italic" />
+
+  <RuleSet ignoreCase="true">
+
+    <!-- Atak line comment -->
+    <Span color="Comment">
+      <Begin>//</Begin>
+    </Span>
+
+    <!-- Field data region: colored green, template markers still stand out inside -->
+    <Span color="FieldData" ruleSet="FieldDataSet">
+      <Begin>\^FD</Begin>
+      <End>\^FS</End>
+    </Span>
+
+    <!-- Atak template markers: ##NAME##, ##@DIRECTIVE##, ##NAME@FUNC()## -->
+    <Rule color="Marker">\#\#[^#]*\#\#</Rule>
+
+    <!-- ZPL commands: ^XX and ~XX -->
+    <Rule color="Command">[\^~][A-Za-z0-9]{1,2}</Rule>
+
+  </RuleSet>
+
+  <RuleSet name="FieldDataSet" ignoreCase="true">
+    <Rule color="Marker">\#\#[^#]*\#\#</Rule>
+  </RuleSet>
+
+</SyntaxDefinition>

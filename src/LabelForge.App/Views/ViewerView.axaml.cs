@@ -30,6 +30,7 @@ public partial class ViewerView : UserControl
     {
         InitializeComponent();
         LoadZplHighlighting();
+        ActualThemeVariantChanged += (_, _) => LoadZplHighlighting();
 
         ZplEditor.TextChanged += OnEditorTextChanged;
         DataContextChanged += OnDataContextChanged;
@@ -69,7 +70,14 @@ public partial class ViewerView : UserControl
 
     private void LoadZplHighlighting()
     {
-        using var stream = AssetLoader.Open(new Uri("avares://LabelForge.App/Assets/Zpl.xshd"));
+        // Two xshd variants because highlighting colors are baked into the
+        // definition; reloaded whenever the theme flips.
+        bool dark = ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
+        var uri = new Uri(dark
+            ? "avares://LabelForge.App/Assets/Zpl.Dark.xshd"
+            : "avares://LabelForge.App/Assets/Zpl.xshd");
+
+        using var stream = AssetLoader.Open(uri);
         using var reader = XmlReader.Create(stream);
         ZplEditor.SyntaxHighlighting = HighlightingLoader.Load(reader, HighlightingManager.Instance);
     }

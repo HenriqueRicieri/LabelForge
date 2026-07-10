@@ -8,6 +8,7 @@
         x:Class="LabelForge.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Width="1200" Height="760"
+        Icon="/Assets/labelforge.ico"
         Title="LabelForge">
 
     <Design.DataContext>
