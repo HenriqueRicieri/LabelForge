@@ -9,6 +9,29 @@
         <local:ViewLocator />
     </Application.DataTemplates>
 
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="AppBarBackground" Color="#F3F3F3" />
+                    <SolidColorBrush x:Key="AppToolbarBackground" Color="#EAEAEA" />
+                    <SolidColorBrush x:Key="AppPanelBackground" Color="#F5F5F5" />
+                    <SolidColorBrush x:Key="AppSeparator" Color="#C9C9C9" />
+                    <SolidColorBrush x:Key="AppCanvasSurface" Color="#D9D9D9" />
+                    <SolidColorBrush x:Key="AppPreviewSurface" Color="#D9D9D9" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="AppBarBackground" Color="#272727" />
+                    <SolidColorBrush x:Key="AppToolbarBackground" Color="#303030" />
+                    <SolidColorBrush x:Key="AppPanelBackground" Color="#2B2B2B" />
+                    <SolidColorBrush x:Key="AppSeparator" Color="#4F4F4F" />
+                    <SolidColorBrush x:Key="AppCanvasSurface" Color="#3C3C3C" />
+                    <SolidColorBrush x:Key="AppPreviewSurface" Color="#3C3C3C" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" />

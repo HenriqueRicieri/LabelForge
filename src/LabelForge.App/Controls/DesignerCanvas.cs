@@ -39,6 +39,7 @@ public sealed class DesignerCanvas : Control
     private const double HandleSize = 9;
 
     private static readonly SolidColorBrush SurfaceBrush = new(Color.FromRgb(0xD9, 0xD9, 0xD9));
+    private static readonly SolidColorBrush DarkSurfaceBrush = new(Color.FromRgb(0x3C, 0x3C, 0x3C));
     private static readonly Pen LabelBorderPen = new(Brushes.Gray, 1);
     private static readonly Pen SelectionPen = new(new SolidColorBrush(Color.FromRgb(0x25, 0x63, 0xEB)), 1.5);
     private static readonly Pen GhostPen = new(
@@ -73,7 +74,13 @@ public sealed class DesignerCanvas : Control
     public DesignerCanvas()
     {
         Focusable = true;
+        ActualThemeVariantChanged += (_, _) => InvalidateVisual();
     }
+
+    /// <summary>The area around the label follows the app theme; the label itself stays
+    /// white because it represents physical label stock (WYSIWYG).</summary>
+    private IBrush SurfaceThemeBrush() =>
+        ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark ? DarkSurfaceBrush : SurfaceBrush;
 
     public IImage? Underlay
     {
@@ -207,7 +214,7 @@ public sealed class DesignerCanvas : Control
 
     public override void Render(DrawingContext context)
     {
-        context.FillRectangle(SurfaceBrush, new Rect(Bounds.Size));
+        context.FillRectangle(SurfaceThemeBrush(), new Rect(Bounds.Size));
 
         var doc = Document;
         if (doc is null)

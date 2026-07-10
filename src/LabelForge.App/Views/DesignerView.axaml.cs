@@ -26,6 +26,20 @@ public partial class DesignerView : UserControl
 
     private DesignerViewModel? ViewModel => DataContext as DesignerViewModel;
 
+    private void OnThemeSystem(object? sender, RoutedEventArgs e) => SetTheme(Avalonia.Styling.ThemeVariant.Default);
+
+    private void OnThemeLight(object? sender, RoutedEventArgs e) => SetTheme(Avalonia.Styling.ThemeVariant.Light);
+
+    private void OnThemeDark(object? sender, RoutedEventArgs e) => SetTheme(Avalonia.Styling.ThemeVariant.Dark);
+
+    private static void SetTheme(Avalonia.Styling.ThemeVariant variant)
+    {
+        if (Application.Current is { } app)
+        {
+            app.RequestedThemeVariant = variant;
+        }
+    }
+
     private static FilePickerFileType LflType { get; } =
         new("LabelForge label") { Patterns = ["*.lfl"] };
 

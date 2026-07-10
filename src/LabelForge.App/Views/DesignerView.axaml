@@ -100,7 +100,7 @@
     <DockPanel>
 
         <!-- Menu bar -->
-        <Border DockPanel.Dock="Top" Padding="4,0" Background="#18808080">
+        <Border DockPanel.Dock="Top" Padding="4,0" Background="{DynamicResource AppBarBackground}">
             <DockPanel>
                 <Menu DockPanel.Dock="Left" VerticalAlignment="Center">
                     <MenuItem Header="_File">
@@ -126,6 +126,11 @@
                         <Separator />
                         <MenuItem Header="_Delete" Command="{Binding DeleteSelectedCommand}" InputGesture="Delete" />
                     </MenuItem>
+                    <MenuItem Header="_View">
+                        <MenuItem Header="Theme: _System" Click="OnThemeSystem" />
+                        <MenuItem Header="Theme: _Light" Click="OnThemeLight" />
+                        <MenuItem Header="Theme: _Dark" Click="OnThemeDark" />
+                    </MenuItem>
                     <MenuItem Header="_Insert">
                         <MenuItem Header="_Text" Command="{Binding AddTextCommand}" />
                         <MenuItem Header="_Box" Command="{Binding AddBoxCommand}" />
@@ -145,7 +150,7 @@
                                                Increment="1" FormatString="0" />
                                 <Button Content="Send via network" Command="{Binding PrintCommand}"
                                         HorizontalAlignment="Stretch" />
-                                <Rectangle Height="1" Fill="#33808080" Margin="0,6" />
+                                <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="0,6" />
                                 <TextBlock Text="Windows printer (USB)" FontWeight="SemiBold" FontSize="12" />
                                 <ComboBox ItemsSource="{Binding WindowsPrinters}"
                                           SelectedItem="{Binding SelectedWindowsPrinter}"
@@ -164,7 +169,7 @@
         </Border>
 
         <!-- Toolbox + label setup -->
-        <Border DockPanel.Dock="Top" Padding="10,8" Background="#22808080">
+        <Border DockPanel.Dock="Top" Padding="10,8" Background="{DynamicResource AppToolbarBackground}">
             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <TextBlock Text="Add:" VerticalAlignment="Center" Opacity="0.7" />
                 <Button Content="Text" Command="{Binding AddTextCommand}" />
@@ -172,7 +177,7 @@
                 <Button Content="Line" Command="{Binding AddLineCommand}" />
                 <Button Content="Barcode" Command="{Binding AddBarcodeCommand}" />
                 <Button Content="QR" Command="{Binding AddQrCommand}" />
-                <Rectangle Width="1" Height="22" Fill="#33808080" />
+                <Rectangle Width="1" Height="22" Fill="{DynamicResource AppSeparator}" />
                 <TextBlock Text="Width (mm)" VerticalAlignment="Center" />
                 <NumericUpDown Value="{Binding WidthMm}" Minimum="5" Maximum="600"
                                Increment="1" FormatString="0.#" Width="110" />
@@ -182,7 +187,7 @@
                 <TextBlock Text="Density" VerticalAlignment="Center" />
                 <ComboBox ItemsSource="{Binding Densities}"
                           SelectedItem="{Binding SelectedDensity}" Width="100" />
-                <Rectangle Width="1" Height="22" Fill="#33808080" />
+                <Rectangle Width="1" Height="22" Fill="{DynamicResource AppSeparator}" />
                 <TextBlock Text="Printer" VerticalAlignment="Center" />
                 <ComboBox ItemsSource="{Binding Printers}"
                           SelectedItem="{Binding SelectedPrinter}" MinWidth="160"
@@ -195,7 +200,7 @@
         </Border>
 
         <!-- Properties panel -->
-        <Border DockPanel.Dock="Right" Width="260" Background="#11808080" Padding="12">
+        <Border DockPanel.Dock="Right" Width="260" Background="{DynamicResource AppPanelBackground}" Padding="12">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="8">
                     <TextBlock Text="Properties" FontWeight="SemiBold" />
@@ -222,7 +227,7 @@
                                   SelectedItem="{Binding SelectionProperties.SelectedOrientation, FallbackValue={x:Null}}"
                                   HorizontalAlignment="Stretch" />
 
-                        <Rectangle Height="1" Fill="#33808080" Margin="0,8" />
+                        <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="0,8" />
 
                         <!-- Type-specific editor, picked by DataTemplate -->
                         <ContentControl Content="{Binding SelectionProperties}" />
