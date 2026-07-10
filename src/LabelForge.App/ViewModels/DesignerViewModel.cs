@@ -77,6 +77,15 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial decimal PrinterPort { get; set; } = Core.Printing.RawNetworkPrinter.DefaultPort;
 
+    public IReadOnlyList<Core.Printers.PrinterProfile> Printers => Core.Printers.PrinterCatalog.All;
+
+    [ObservableProperty]
+    public partial Core.Printers.PrinterProfile? SelectedPrinter { get; set; }
+
+    /// <summary>Head-width/density warnings for the selected printer; empty when fine.</summary>
+    [ObservableProperty]
+    public partial string PrinterWarning { get; set; } = string.Empty;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(UndoCommand))]
     public partial bool CanUndo { get; set; }
@@ -92,6 +101,7 @@ public partial class DesignerViewModel : ViewModelBase
         _restoring = true;
         Document = new LabelDocument { WidthMm = 100, HeightMm = 60, Dpmm = 8 };
         SelectedDensity = Densities[0];
+        SelectedPrinter = Core.Printers.PrinterProfile.Any;
         SeedSampleLabel();
         _restoring = false;
 
@@ -129,6 +139,7 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         CurrentFilePath = path;
+        UpdatePrinterWarning();
         _history.Clear();
         _lastRecordTicks = 0;
         RecordUndo(coalesce: false);
@@ -257,6 +268,22 @@ public partial class DesignerViewModel : ViewModelBase
         ScheduleRender();
     }
 
+    partial void OnSelectedPrinterChanged(Core.Printers.PrinterProfile? value)
+    {
+        if (!_restoring && value is { IsAny: false })
+        {
+            // Adopting a printer pushes its density onto the label.
+            SelectedDensity = Densities.FirstOrDefault(d => d.Dpmm == value.Dpmm) ?? SelectedDensity;
+        }
+
+        UpdatePrinterWarning();
+    }
+
+    private void UpdatePrinterWarning() =>
+        PrinterWarning = SelectedPrinter is { IsAny: false } printer
+            ? string.Join("; ", printer.Validate(Document))
+            : string.Empty;
+
     partial void OnWidthMmChanged(decimal value)
     {
         if (_restoring)
@@ -265,6 +292,7 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         Document.WidthMm = (double)value;
+        UpdatePrinterWarning();
         RecordUndo(coalesce: true);
         ScheduleRender();
     }
@@ -289,6 +317,7 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         Document.Dpmm = value.Dpmm;
+        UpdatePrinterWarning();
         RecordUndo(coalesce: true);
         ScheduleRender();
     }
@@ -337,6 +366,7 @@ public partial class DesignerViewModel : ViewModelBase
 
         // Restoring must not count as a new edit; a subsequent edit starts fresh.
         _lastRecordTicks = 0;
+        UpdatePrinterWarning();
         ScheduleRender();
     }
 

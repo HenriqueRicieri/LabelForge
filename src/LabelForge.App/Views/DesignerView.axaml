@@ -125,6 +125,14 @@
                         </Flyout>
                     </Button.Flyout>
                 </Button>
+                <Rectangle Width="1" Height="22" Fill="#33808080" />
+                <TextBlock Text="Printer" VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{Binding Printers}"
+                          SelectedItem="{Binding SelectedPrinter}" MinWidth="170"
+                          ToolTip.Tip="Selecting a printer adopts its density and validates the label against the print head" />
+                <TextBlock Text="{Binding PrinterWarning}" VerticalAlignment="Center"
+                           Foreground="#D97706" FontSize="12" FontWeight="SemiBold"
+                           TextWrapping="Wrap" MaxWidth="380" />
                 <TextBlock Text="{Binding CurrentFilePath}" VerticalAlignment="Center"
                            Opacity="0.5" FontSize="12" />
             </StackPanel>

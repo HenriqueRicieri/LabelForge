@@ -45,6 +45,21 @@
                 <TextBlock Text="Density" VerticalAlignment="Center" />
                 <ComboBox ItemsSource="{Binding Densities}"
                           SelectedItem="{Binding SelectedDensity}" Width="100" />
+                <Button Content="Print..." ToolTip.Tip="Send to a network printer (sample data is substituted, matching the preview)">
+                    <Button.Flyout>
+                        <Flyout Placement="Bottom">
+                            <StackPanel Spacing="6" Width="230">
+                                <TextBlock Text="Printer address (TCP 9100)" FontSize="12" Opacity="0.8" />
+                                <TextBox Text="{Binding PrinterHost}" Watermark="192.168.0.50" />
+                                <TextBlock Text="Port" FontSize="12" Opacity="0.8" />
+                                <NumericUpDown Value="{Binding PrinterPort}" Minimum="1" Maximum="65535"
+                                               Increment="1" FormatString="0" />
+                                <Button Content="Send to printer" Command="{Binding PrintCommand}"
+                                        HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
                 <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Opacity="0.6" />
             </StackPanel>
         </Border>
