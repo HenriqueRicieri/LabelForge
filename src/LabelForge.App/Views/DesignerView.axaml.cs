@@ -147,6 +147,36 @@ public partial class DesignerView : UserControl
         }
     }
 
+    private async void OnExportPdf(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export PDF",
+            DefaultExtension = "pdf",
+            SuggestedFileName = "label.pdf",
+            FileTypeChoices = [new FilePickerFileType("PDF document") { Patterns = ["*.pdf"] }],
+        });
+
+        if (file?.TryGetLocalPath() is { } path)
+        {
+            try
+            {
+                byte[] pdf = await vm.RenderPdfAsync();
+                await File.WriteAllBytesAsync(path, pdf);
+                vm.StatusText = $"Exported {Path.GetFileName(path)}";
+            }
+            catch (Exception ex)
+            {
+                vm.StatusText = $"Could not export: {ex.Message}";
+            }
+        }
+    }
+
     private async void OnExportPng(object? sender, RoutedEventArgs e)
     {
         if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)

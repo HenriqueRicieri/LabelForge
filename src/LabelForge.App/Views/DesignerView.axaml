@@ -112,6 +112,7 @@
                         <Separator />
                         <MenuItem Header="Export _ZPL..." Click="OnExportZpl" />
                         <MenuItem Header="Export _PNG..." Click="OnExportPng" />
+                        <MenuItem Header="Export P_DF..." Click="OnExportPdf" />
                     </MenuItem>
                     <MenuItem Header="_Edit">
                         <MenuItem Header="_Undo" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />

@@ -161,6 +161,19 @@ public partial class DesignerViewModel : ViewModelBase
             .Png);
     }
 
+    /// <summary>Renders the current document to a PDF page at its physical size.</summary>
+    public Task<byte[]> RenderPdfAsync()
+    {
+        LabelDocument document = Document;
+        return Task.Run(() =>
+        {
+            byte[] png = _renderer
+                .Render(_generator.Generate(document), document.WidthMm, document.HeightMm, document.Dpmm)
+                .Png;
+            return Core.Export.PdfExporter.FromPng(png, document.WidthMm, document.HeightMm);
+        });
+    }
+
     /// <summary>Replaces the document (new file or opened .lfl) and resets history.</summary>
     public void LoadDocument(LabelDocument document, string? path)
     {
