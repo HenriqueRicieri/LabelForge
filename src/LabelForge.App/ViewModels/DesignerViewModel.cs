@@ -138,11 +138,12 @@ public partial class DesignerViewModel : ViewModelBase
     }
 
     /// <summary>Called continuously while the canvas drags or resizes: the model is
-    /// already updated, so re-render and refresh the panel, but record no undo.</summary>
+    /// already updated, so re-render and refresh the panel, but record no undo.
+    /// Uses a much shorter debounce than typing so content tracks the pointer.</summary>
     public void NotifyDocumentPreview()
     {
         SelectionProperties?.Refresh();
-        ScheduleRender();
+        ScheduleRender(delayMs: 40);
     }
 
     private void OnSelectionChanged()
@@ -615,7 +616,7 @@ public partial class DesignerViewModel : ViewModelBase
         CanRedo = _history.CanRedo;
     }
 
-    private async void ScheduleRender()
+    private async void ScheduleRender(int delayMs = 150)
     {
         _renderCts?.Cancel();
         var cts = new CancellationTokenSource();
@@ -623,7 +624,7 @@ public partial class DesignerViewModel : ViewModelBase
 
         try
         {
-            await Task.Delay(150, cts.Token);
+            await Task.Delay(delayMs, cts.Token);
 
             LabelDocument document = Document;
             double widthMm = document.WidthMm;
