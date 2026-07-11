@@ -91,8 +91,14 @@ public partial class ViewerViewModel : ViewModelBase
         try
         {
             StatusText = $"Sending to {host}...";
-            await RawNetworkPrinter.SendAsync(host, (int)PrinterPort, _substitutor.Substitute(ZplText ?? string.Empty));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            await RawNetworkPrinter.SendAsync(
+                host, (int)PrinterPort, _substitutor.Substitute(ZplText ?? string.Empty), cts.Token);
             StatusText = $"Sent to {host}:{(int)PrinterPort}";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = $"Print timed out: could not reach {host}:{(int)PrinterPort}";
         }
         catch (Exception ex)
         {
