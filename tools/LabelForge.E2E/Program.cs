@@ -84,8 +84,13 @@ else
     var barcodeModel = (LabelForge.Core.Model.BarcodeElement)d.Document.Elements[2];
     Console.WriteLine($"panel edits: module={barcodeModel.ModuleWidthDots} (expected 4), interp={barcodeModel.PrintInterpretationLine} (expected False)");
 
+    // Undo is identity-based: two edits to different properties are two undo steps,
+    // so the first undo reverts only the interpretation toggle.
     d.UndoCommand.Execute(null);
-    Console.WriteLine($"undo panel edits: module={((LabelForge.Core.Model.BarcodeElement)d.Document.Elements[2]).ModuleWidthDots} (expected 3)");
+    var afterInterpUndo = (LabelForge.Core.Model.BarcodeElement)d.Document.Elements[2];
+    Console.WriteLine($"undo interp edit: module={afterInterpUndo.ModuleWidthDots} (expected 4), interp={afterInterpUndo.PrintInterpretationLine} (expected True)");
+    d.UndoCommand.Execute(null);
+    Console.WriteLine($"undo module edit: module={((LabelForge.Core.Model.BarcodeElement)d.Document.Elements[2]).ModuleWidthDots} (expected 3)");
 
     // Save/load round trip through the VM (same path the dialogs use).
     string lfl = d.SerializeDocument();

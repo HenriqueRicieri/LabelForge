@@ -35,6 +35,8 @@
             <StackPanel Spacing="4">
                 <TextBlock Classes="propLabel" Text="Data" />
                 <TextBox Text="{Binding Data}" />
+                <TextBlock Text="{Binding Warning}" IsVisible="{Binding HasWarning}"
+                           Foreground="#D97706" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />
                 <TextBlock Classes="propLabel" Text="Symbology" />
                 <ComboBox ItemsSource="{Binding Symbologies}"
                           SelectedItem="{Binding Symbology}"
