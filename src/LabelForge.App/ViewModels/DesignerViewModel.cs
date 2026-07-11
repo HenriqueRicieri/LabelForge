@@ -33,6 +33,7 @@ public partial class DesignerViewModel : ViewModelBase
     private CancellationTokenSource? _renderCts;
     private bool _restoring;
     private long _lastRecordTicks;
+    private string? _lastCoalesceKey;
     private string? _clipboardElement;
 
     public IReadOnlyList<DensityOption> Densities => DensityOption.Standard;
@@ -133,7 +134,7 @@ public partial class DesignerViewModel : ViewModelBase
         SelectedPrinter = Core.Printers.PrinterProfile.Any;
         _restoring = false;
 
-        RecordUndo(coalesce: false);
+        RecordUndo();
         ScheduleRender();
     }
 
@@ -203,7 +204,8 @@ public partial class DesignerViewModel : ViewModelBase
         UpdatePrinterWarning();
         _history.Clear();
         _lastRecordTicks = 0;
-        RecordUndo(coalesce: false);
+        _lastCoalesceKey = null;
+        RecordUndo();
         ScheduleRender();
     }
 
@@ -292,7 +294,10 @@ public partial class DesignerViewModel : ViewModelBase
     public void NotifyDocumentEdited()
     {
         SelectionProperties?.Refresh();
-        RecordUndo(coalesce: true);
+        // Key on the set of moved elements so a continuous drag or a run of nudges of
+        // the same selection coalesces, but editing a different selection does not.
+        string key = "canvas:" + string.Join(",", Selection.Items.Select(e => e.Id));
+        RecordUndo(key);
         ScheduleRender();
     }
 
@@ -373,7 +378,7 @@ public partial class DesignerViewModel : ViewModelBase
         _pendingFactory = null;
         IsPlacing = false;
         StatusText = string.Empty;
-        RecordUndo(coalesce: false);
+        RecordUndo();
         ScheduleRender();
     }
 
@@ -405,37 +410,58 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         List<Element> elements = LabelDocumentJson.DeserializeElements(_clipboardElement);
-        if (elements.Count == 0)
+        if (PlaceClones(elements))
         {
-            return;
+            // Re-serialize the placed (offset, clamped) copies so repeated pastes
+            // cascade from where the last one landed instead of stacking.
+            _clipboardElement = LabelDocumentJson.SerializeElements(elements);
         }
-
-        int nextZ = Document.Elements.Count == 0
-            ? 0
-            : Document.Elements.Max(e => e.ZOrder) + 1;
-        foreach (Element element in elements)
-        {
-            element.Id = Guid.NewGuid();
-            element.X += 20;
-            element.Y += 20;
-            element.ZOrder = nextZ++;
-            Document.Elements.Add(element);
-        }
-
-        Selection.SetMany(elements);
-
-        // Re-serialize so repeated pastes cascade instead of stacking.
-        _clipboardElement = LabelDocumentJson.SerializeElements(elements);
-
-        RecordUndo(coalesce: false);
-        ScheduleRender();
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private void Duplicate()
     {
-        Copy();
-        Paste();
+        if (Selection.Count == 0)
+        {
+            return;
+        }
+
+        // Duplicate is independent of the clipboard: clone the selection directly so it
+        // never overwrites what the user has copied.
+        List<Element> clones = LabelDocumentJson.DeserializeElements(
+            LabelDocumentJson.SerializeElements(Selection.Items.OrderBy(e => e.ZOrder)));
+        PlaceClones(clones);
+    }
+
+    /// <summary>Adds cloned elements to the document with fresh ids, a +20 dot offset
+    /// clamped to the label, and z-order on top; selects them and records one undo
+    /// step. Returns false when there was nothing to add.</summary>
+    private bool PlaceClones(List<Element> clones)
+    {
+        if (clones.Count == 0)
+        {
+            return false;
+        }
+
+        int nextZ = Document.Elements.Count == 0
+            ? 0
+            : Document.Elements.Max(e => e.ZOrder) + 1;
+        int maxX = Math.Max(Document.WidthDots - 1, 0);
+        int maxY = Math.Max(Document.HeightDots - 1, 0);
+
+        foreach (Element element in clones)
+        {
+            element.Id = Guid.NewGuid();
+            element.X = Math.Clamp(element.X + 20, 0, maxX);
+            element.Y = Math.Clamp(element.Y + 20, 0, maxY);
+            element.ZOrder = nextZ++;
+            Document.Elements.Add(element);
+        }
+
+        Selection.SetMany(clones);
+        RecordUndo();
+        ScheduleRender();
+        return true;
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
@@ -452,7 +478,7 @@ public partial class DesignerViewModel : ViewModelBase
             element.ZOrder = nextZ++;
         }
 
-        RecordUndo(coalesce: false);
+        RecordUndo();
         ScheduleRender();
     }
 
@@ -470,7 +496,7 @@ public partial class DesignerViewModel : ViewModelBase
             element.ZOrder = nextZ++;
         }
 
-        RecordUndo(coalesce: false);
+        RecordUndo();
         ScheduleRender();
     }
 
@@ -488,7 +514,7 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         Selection.Clear();
-        RecordUndo(coalesce: false);
+        RecordUndo();
         ScheduleRender();
     }
 
@@ -502,9 +528,11 @@ public partial class DesignerViewModel : ViewModelBase
         _ => null,
     };
 
-    private void OnPanelEdited()
+    private void OnPanelEdited(string property)
     {
-        RecordUndo(coalesce: true);
+        // Key on the edited element and property so typing in one field coalesces, but
+        // moving to another field or another element starts a fresh undo step.
+        RecordUndo($"panel:{Selection.Primary?.Id}:{property}");
         ScheduleRender();
     }
 
@@ -533,7 +561,7 @@ public partial class DesignerViewModel : ViewModelBase
 
         Document.WidthMm = (double)value;
         UpdatePrinterWarning();
-        RecordUndo(coalesce: true);
+        RecordUndo("doc-width");
         ScheduleRender();
     }
 
@@ -545,7 +573,7 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         Document.HeightMm = (double)value;
-        RecordUndo(coalesce: true);
+        RecordUndo("doc-height");
         ScheduleRender();
     }
 
@@ -558,21 +586,29 @@ public partial class DesignerViewModel : ViewModelBase
 
         Document.Dpmm = value.Dpmm;
         UpdatePrinterWarning();
-        RecordUndo(coalesce: true);
+        RecordUndo("density");
         ScheduleRender();
     }
 
     /// <summary>
-    /// Serializes the document into the history. Edits arriving within the coalesce
-    /// window replace the current snapshot instead of pushing a new one, so typing a
-    /// word or holding an arrow key undoes as a single step.
+    /// Serializes the document into the history. A non-null <paramref name="coalesceKey"/>
+    /// identifies the logical action being edited (a selection being dragged, one
+    /// property being typed, the label width being adjusted). Consecutive edits that
+    /// share the same key within the coalesce window replace the current snapshot
+    /// instead of pushing a new one, so typing a word or holding an arrow key undoes as
+    /// a single step; an edit to a different target starts a fresh step. A null key
+    /// never coalesces (discrete actions like add, paste, delete, z-order).
     /// </summary>
-    private void RecordUndo(bool coalesce)
+    private void RecordUndo(string? coalesceKey = null)
     {
         string snapshot = LabelDocumentJson.Serialize(Document);
         long now = Environment.TickCount64;
 
-        if (coalesce && now - _lastRecordTicks < CoalesceWindowMs)
+        bool coalesce = coalesceKey is not null
+            && coalesceKey == _lastCoalesceKey
+            && now - _lastRecordTicks < CoalesceWindowMs;
+
+        if (coalesce)
         {
             _history.ReplaceCurrent(snapshot);
         }
@@ -582,6 +618,7 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         _lastRecordTicks = now;
+        _lastCoalesceKey = coalesceKey;
         UpdateUndoState();
     }
 
@@ -606,6 +643,7 @@ public partial class DesignerViewModel : ViewModelBase
 
         // Restoring must not count as a new edit; a subsequent edit starts fresh.
         _lastRecordTicks = 0;
+        _lastCoalesceKey = null;
         UpdatePrinterWarning();
         ScheduleRender();
     }

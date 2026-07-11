@@ -28,9 +28,9 @@ public sealed record OrientationOption(string Label, Orientation Value)
 /// </summary>
 public abstract class ElementPropertiesViewModel : ObservableObject
 {
-    private readonly Action _edited;
+    private readonly Action<string> _edited;
 
-    protected ElementPropertiesViewModel(Element element, Action edited)
+    protected ElementPropertiesViewModel(Element element, Action<string> edited)
     {
         Element = element;
         _edited = edited;
@@ -75,7 +75,7 @@ public abstract class ElementPropertiesViewModel : ObservableObject
 
         apply(next);
         OnPropertyChanged(propertyName);
-        _edited();
+        _edited(propertyName ?? string.Empty);
     }
 }
 
@@ -83,7 +83,7 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
 {
     private readonly TextElement _text;
 
-    public TextPropertiesViewModel(TextElement element, Action edited)
+    public TextPropertiesViewModel(TextElement element, Action<string> edited)
         : base(element, edited) => _text = element;
 
     public override string TypeName => "Text";
@@ -112,7 +112,7 @@ public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel
 {
     private readonly BarcodeElement _barcode;
 
-    public BarcodePropertiesViewModel(BarcodeElement element, Action edited)
+    public BarcodePropertiesViewModel(BarcodeElement element, Action<string> edited)
         : base(element, edited) => _barcode = element;
 
     public override string TypeName => "Barcode";
@@ -126,6 +126,8 @@ public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel
         {
             Edit(_barcode.Symbology, value, v => _barcode.Symbology = v);
             OnPropertyChanged(nameof(IsCode39));
+            OnPropertyChanged(nameof(Warning));
+            OnPropertyChanged(nameof(HasWarning));
         }
     }
 
@@ -134,8 +136,18 @@ public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel
     public string Data
     {
         get => _barcode.Data;
-        set => Edit(_barcode.Data, value ?? string.Empty, v => _barcode.Data = v);
+        set
+        {
+            Edit(_barcode.Data, value ?? string.Empty, v => _barcode.Data = v);
+            OnPropertyChanged(nameof(Warning));
+            OnPropertyChanged(nameof(HasWarning));
+        }
     }
+
+    /// <summary>A design-time message when the data cannot be encoded, else empty.</summary>
+    public string Warning => Core.Zpl.BarcodeValidator.Validate(_barcode.Symbology, _barcode.Data) ?? string.Empty;
+
+    public bool HasWarning => Warning.Length > 0;
 
     public decimal Height
     {
@@ -167,7 +179,7 @@ public sealed class QrPropertiesViewModel : ElementPropertiesViewModel
 {
     private readonly QrCodeElement _qr;
 
-    public QrPropertiesViewModel(QrCodeElement element, Action edited)
+    public QrPropertiesViewModel(QrCodeElement element, Action<string> edited)
         : base(element, edited) => _qr = element;
 
     public override string TypeName => "QR Code";
@@ -197,7 +209,7 @@ public sealed class LinePropertiesViewModel : ElementPropertiesViewModel
 {
     private readonly LineElement _line;
 
-    public LinePropertiesViewModel(LineElement element, Action edited)
+    public LinePropertiesViewModel(LineElement element, Action<string> edited)
         : base(element, edited) => _line = element;
 
     public override string TypeName => "Line";
@@ -225,7 +237,7 @@ public sealed class BoxPropertiesViewModel : ElementPropertiesViewModel
 {
     private readonly BoxElement _box;
 
-    public BoxPropertiesViewModel(BoxElement element, Action edited)
+    public BoxPropertiesViewModel(BoxElement element, Action<string> edited)
         : base(element, edited) => _box = element;
 
     public override string TypeName => "Box";
