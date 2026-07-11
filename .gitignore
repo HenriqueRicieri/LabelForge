@@ -9,6 +9,10 @@
 # Real Atak label corpus: local-only test fixtures, never published
 exemplos zpl/
 
+# Local development context, not part of the app
+CLAUDE.md
+docs/PLAN.md
+
 # User-specific files
 *.rsuser
 *.suo

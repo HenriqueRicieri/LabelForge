@@ -15,8 +15,7 @@ watch the rendered label update in real time, fully offline.
 
 ## Status
 
-Early development. The rendering stack is proven against a corpus of real labels. See docs/PLAN.md for
-the implementation plan and milestones.
+Early development. The rendering stack is proven against a corpus of real labels.
 
 ## Tech Stack
 
