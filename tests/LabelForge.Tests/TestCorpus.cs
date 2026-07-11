@@ -1,17 +1,27 @@
-using System.Reflection;
-
 namespace LabelForge.Tests;
 
-/// <summary>Locates the real Atak label corpus ("exemplos zpl/") used as test fixtures.</summary>
+/// <summary>
+/// Locates ZPL test fixtures. Two sources feed the corpus tests:
+/// 1. A committed, publishable synthetic set under "Fixtures/" (copied next to the
+///    test assembly). Always present, so a clean clone and CI have real data to run.
+/// 2. The real Atak corpus in "exemplos zpl/", which is local-only (gitignored) and
+///    optional. Included when found so local runs still exercise real input.
+/// Neither source throws when absent; the fixtures guarantee a non-empty corpus.
+/// </summary>
 internal static class TestCorpus
 {
-    public static string Directory()
+    /// <summary>Committed synthetic fixtures, copied beside the test assembly.</summary>
+    public static string FixturesDirectory() =>
+        Path.Combine(AppContext.BaseDirectory, "Fixtures");
+
+    /// <summary>The optional local-only Atak corpus, or null when it is not present.</summary>
+    public static string? LocalCorpusDirectory()
     {
-        var dir = new DirectoryInfo(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!);
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)
         {
             var candidate = Path.Combine(dir.FullName, "exemplos zpl");
-            if (System.IO.Directory.Exists(candidate))
+            if (Directory.Exists(candidate))
             {
                 return candidate;
             }
@@ -19,10 +29,29 @@ internal static class TestCorpus
             dir = dir.Parent;
         }
 
-        throw new DirectoryNotFoundException("Could not locate the 'exemplos zpl' corpus folder above the test assembly.");
+        return null;
     }
 
-    public static IEnumerable<string> Files() =>
-        System.IO.Directory.EnumerateFiles(Directory(), "*.*")
-            .Where(p => p.EndsWith(".zpl", StringComparison.OrdinalIgnoreCase));
+    public static IEnumerable<string> Files()
+    {
+        var directories = new List<string>();
+        if (Directory.Exists(FixturesDirectory()))
+        {
+            directories.Add(FixturesDirectory());
+        }
+
+        if (LocalCorpusDirectory() is { } local)
+        {
+            directories.Add(local);
+        }
+
+        foreach (var directory in directories)
+        {
+            foreach (var path in Directory.EnumerateFiles(directory, "*.*")
+                         .Where(p => p.EndsWith(".zpl", StringComparison.OrdinalIgnoreCase)))
+            {
+                yield return path;
+            }
+        }
+    }
 }

@@ -19,6 +19,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Committed, publishable synthetic ZPL corpus. Copied beside the test assembly
+         so the corpus smoke tests have real data on a clean clone and on CI. -->
+    <None Include="Fixtures\*.zpl" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\LabelForge.Core\LabelForge.Core.csproj" />
   </ItemGroup>
 
