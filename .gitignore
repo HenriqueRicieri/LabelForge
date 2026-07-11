@@ -12,6 +12,7 @@ exemplos zpl/
 # Local development context, not part of the app
 CLAUDE.md
 docs/PLAN.md
+docs/REVIEW.md
 
 # User-specific files
 *.rsuser
