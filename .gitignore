@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Real Atak label corpus: local-only test fixtures, never published
+exemplos zpl/
+
 # User-specific files
 *.rsuser
 *.suo
