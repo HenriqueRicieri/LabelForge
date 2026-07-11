@@ -34,4 +34,5 @@ dotnet test
 
 ## License
 
-To be determined before public release. See THIRD-PARTY-NOTICES.md for bundled dependencies.
+Released under the MIT License. See LICENSE for the full text, and THIRD-PARTY-NOTICES.md for the
+licenses of bundled dependencies.
