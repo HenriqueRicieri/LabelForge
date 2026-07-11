@@ -27,6 +27,10 @@ public partial class DesignerViewModel : ViewModelBase
 {
     private const int CoalesceWindowMs = 500;
 
+    /// <summary>Bound on a network print so a wrong address does not hang the button
+    /// until the operating system's own connect timeout (which can be tens of seconds).</summary>
+    private static readonly TimeSpan PrintTimeout = TimeSpan.FromSeconds(8);
+
     private readonly IZplRenderer _renderer = new BinaryKitsRenderer();
     private readonly ZplGenerator _generator = new();
     private readonly SnapshotHistory _history = new();
@@ -236,8 +240,13 @@ public partial class DesignerViewModel : ViewModelBase
         {
             StatusText = $"Sending to {host}...";
             string zpl = _generator.Generate(Document);
-            await Core.Printing.RawNetworkPrinter.SendAsync(host, (int)PrinterPort, zpl);
+            using var cts = new CancellationTokenSource(PrintTimeout);
+            await Core.Printing.RawNetworkPrinter.SendAsync(host, (int)PrinterPort, zpl, cts.Token);
             StatusText = $"Sent to {host}:{(int)PrinterPort}";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = $"Print timed out: could not reach {host}:{(int)PrinterPort}";
         }
         catch (Exception ex)
         {
@@ -281,7 +290,7 @@ public partial class DesignerViewModel : ViewModelBase
         {
             StatusText = $"Spooling to {name}...";
             string zpl = _generator.Generate(Document);
-            await Task.Run(() => Core.Printing.WindowsRawPrinter.Send(name, zpl));
+            await SendToWindowsPrinterAsync(name, zpl);
             StatusText = $"Sent to {name}";
         }
         catch (Exception ex)
@@ -289,6 +298,12 @@ public partial class DesignerViewModel : ViewModelBase
             StatusText = $"Print failed: {ex.Message}";
         }
     }
+
+    /// <summary>Guarded so the platform-specific spooler call has a Windows-only context;
+    /// callers reach it only after an <see cref="OperatingSystem.IsWindows"/> check.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static Task SendToWindowsPrinterAsync(string name, string zpl) =>
+        Task.Run(() => Core.Printing.WindowsRawPrinter.Send(name, zpl));
 
     /// <summary>Called by the view when the canvas edits the model (drag, resize, nudge).</summary>
     public void NotifyDocumentEdited()
@@ -654,6 +669,22 @@ public partial class DesignerViewModel : ViewModelBase
         CanRedo = _history.CanRedo;
     }
 
+    /// <summary>The first visible barcode whose data cannot be encoded, described for the
+    /// status line, or null when every barcode is fine. Explains a blank preview.</summary>
+    private string? FindBarcodeProblem()
+    {
+        foreach (BarcodeElement barcode in Document.Elements.OfType<BarcodeElement>().Where(b => b.IsVisible))
+        {
+            if (Core.Zpl.BarcodeValidator.Validate(barcode.Symbology, barcode.Data) is { } warning)
+            {
+                string name = string.IsNullOrEmpty(barcode.Name) ? barcode.Symbology.ToString() : barcode.Name;
+                return $"Barcode '{name}': {warning}";
+            }
+        }
+
+        return null;
+    }
+
     private async void ScheduleRender(int delayMs = 150)
     {
         _renderCts?.Cancel();
@@ -697,9 +728,20 @@ public partial class DesignerViewModel : ViewModelBase
 
             previous?.Dispose();
 
-            StatusText = result.Errors.Count > 0
-                ? string.Join("; ", result.Errors.Take(2))
-                : $"{result.WidthDots} x {result.HeightDots} dots";
+            // When the engine reported an error or produced no image, prefer a specific
+            // reason (an un-encodable barcode) over the engine's cryptic message.
+            if ((result.Errors.Count > 0 || result.Png.Length == 0) && FindBarcodeProblem() is { } problem)
+            {
+                StatusText = problem;
+            }
+            else if (result.Errors.Count > 0)
+            {
+                StatusText = string.Join("; ", result.Errors.Take(2));
+            }
+            else
+            {
+                StatusText = $"{result.WidthDots} x {result.HeightDots} dots";
+            }
         }
         catch (OperationCanceledException)
         {
