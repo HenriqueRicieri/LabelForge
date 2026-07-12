@@ -12,14 +12,28 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 
 ## What works today
 
-- Visual designer: a canvas with click-to-place elements, drag, eight-handle resize, continuous
-  rotation snapping to the four ZPL orientations, multi-select with marquee, copy/paste/duplicate,
-  z-order, arrow-key nudge, and zoom/pan.
+- Visual designer: an icon tool bar with click-to-place elements, drag, eight-handle resize,
+  continuous rotation snapping to the four ZPL orientations, multi-select with marquee,
+  copy/paste/duplicate, z-order, arrow-key nudge, and zoom/pan with scrollbars and a floating zoom
+  control (50/100/200% presets, fit; 100% shows real printer dots).
+- A drafting-table workspace: millimeter rulers pinned top and left (tick steps adapt to zoom, all
+  conversion through the label density), and a pasteboard around the label where elements can be
+  parked. Off-label content stays visible, dimmed, with an amber outline and a clear warning; at
+  print time content crossing the edge is clipped like the printer would, and elements whose origin
+  is off the label are skipped from the generated ZPL.
+- Alignment guides: hold the mouse on a ruler for a transient guide with a live mm readout, double
+  click (or right-click menu) for a permanent one. Guides drag to reposition, drop back on the
+  ruler to delete, save with the document, and participate in undo.
+- Snapping while dragging and resizing: to guides, label edges and center, and the edges and
+  centers of other elements (smart guides), with a highlight on the matched line; Alt drags free.
+- Align and distribute tools: left/center/right and top/middle/bottom (one element aligns against
+  the label, several align within their own bounding box) plus horizontal/vertical distribution
+  with equalized gaps.
 - Snapshot-based undo/redo that shares the save format, so a document that undoes correctly is
   guaranteed to save and reopen correctly. Related edits coalesce into one step by identity.
 - Element types: text, linear barcode (Code 128, Code 39, EAN-13, UPC-A), QR code, line, box, with a
-  per-type properties panel. Barcode data is validated against its symbology with a clear warning
-  when it cannot be encoded.
+  per-type properties panel and positions typed in dots or millimeters. Barcode data is validated
+  against its symbology with a clear warning when it cannot be encoded.
 - Live offline preview driven by our own ZPL generator through a swappable renderer, debounced and
   rendered off the UI thread.
 - ZPL viewer: an editable ZPL pane with syntax highlighting, a live preview, auto-sizing from
@@ -61,11 +75,13 @@ dotnet test
 
 ## Testing
 
-The suite covers unit behavior (unit conversion, `^FH` escaping, check digits, barcode validation),
-golden ZPL generation, JSON round-trips, printer validation, and a corpus smoke test that renders a
-committed set of synthetic ZPL fixtures (and, when present, a local private corpus of real labels)
-without crashing. A headless Avalonia harness under `tools/LabelForge.E2E` drives the designer end to
-end and captures a screenshot. CI runs build and test on every push and pull request.
+The suite covers unit behavior (unit conversion, `^FH` escaping, check digits, barcode validation,
+placement classification, snapping, alignment and distribution), golden ZPL generation, JSON
+round-trips, printer validation, and a corpus smoke test that renders a committed set of synthetic
+ZPL fixtures (and, when present, a local private corpus of real labels) without crashing. A headless
+Avalonia harness under `tools/LabelForge.E2E` drives the designer end to end, including simulated
+pointer input on the rulers and snap drags, and captures screenshots in both themes. CI runs build
+and test on every push and pull request.
 
 ## License
 
