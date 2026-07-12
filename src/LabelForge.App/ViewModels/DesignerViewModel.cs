@@ -44,6 +44,12 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial Bitmap? Underlay { get; set; }
 
+    /// <summary>Pasteboard margin baked into the underlay bitmap, in dots. 0 when the
+    /// underlay is the plain label render; positive when something sits off the label
+    /// and the render was expanded so that content stays visible.</summary>
+    [ObservableProperty]
+    public partial int UnderlayMarginDots { get; set; }
+
     [ObservableProperty]
     public partial string GeneratedZpl { get; set; } = string.Empty;
 
@@ -58,9 +64,17 @@ public partial class DesignerViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(DuplicateCommand))]
     [NotifyCanExecuteChangedFor(nameof(BringToFrontCommand))]
     [NotifyCanExecuteChangedFor(nameof(SendToBackCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AlignLeftCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AlignCenterHorizontalCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AlignRightCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AlignTopCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AlignMiddleCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AlignBottomCommand))]
     public partial bool HasSelection { get; set; }
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DistributeHorizontalCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DistributeVerticalCommand))]
     public partial int SelectionCount { get; set; }
 
     [ObservableProperty]
@@ -118,6 +132,11 @@ public partial class DesignerViewModel : ViewModelBase
     /// encodable. Refreshed on each render so it tracks edits without being selected.</summary>
     [ObservableProperty]
     public partial string ValidationWarning { get; set; } = string.Empty;
+
+    /// <summary>Elements off the label or crossing its edge, summarized for display;
+    /// empty when everything sits inside. Refreshed on each render.</summary>
+    [ObservableProperty]
+    public partial string PlacementWarning { get; set; } = string.Empty;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(UndoCommand))]
@@ -341,33 +360,58 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool IsPlacing { get; set; }
 
+    /// <summary>Name of the armed insert tool ("Text", "Box", ...), null when none.
+    /// Drives the highlighted state of the tool buttons in the sidebar.</summary>
+    [ObservableProperty]
+    public partial string? ArmedTool { get; set; }
+
+    partial void OnArmedToolChanged(string? value)
+    {
+        OnPropertyChanged(nameof(IsTextArmed));
+        OnPropertyChanged(nameof(IsBoxArmed));
+        OnPropertyChanged(nameof(IsLineArmed));
+        OnPropertyChanged(nameof(IsBarcodeArmed));
+        OnPropertyChanged(nameof(IsQrArmed));
+    }
+
+    public bool IsTextArmed => ArmedTool == "Text";
+
+    public bool IsBoxArmed => ArmedTool == "Box";
+
+    public bool IsLineArmed => ArmedTool == "Line";
+
+    public bool IsBarcodeArmed => ArmedTool == "Barcode";
+
+    public bool IsQrArmed => ArmedTool == "QR";
+
     private Func<Element>? _pendingFactory;
 
     [RelayCommand]
-    private void AddText() => ArmInsert(
+    private void AddText() => ArmInsert("Text",
         () => new TextElement { Text = "New text", FontHeightDots = 40 });
 
     [RelayCommand]
-    private void AddBox() => ArmInsert(
+    private void AddBox() => ArmInsert("Box",
         () => new BoxElement { WidthDots = 240, HeightDots = 140, ThicknessDots = 3 });
 
     [RelayCommand]
-    private void AddLine() => ArmInsert(
+    private void AddLine() => ArmInsert("Line",
         () => new LineElement { LengthDots = 240, ThicknessDots = 3 });
 
     [RelayCommand]
-    private void AddBarcode() => ArmInsert(
+    private void AddBarcode() => ArmInsert("Barcode",
         () => new BarcodeElement { Data = "123456", HeightDots = 100, ModuleWidthDots = 2 });
 
     [RelayCommand]
-    private void AddQr() => ArmInsert(
+    private void AddQr() => ArmInsert("QR",
         () => new QrCodeElement { Data = "https://example.com", Magnification = 5 });
 
     /// <summary>Arms the insert: the mouse becomes a placement tool until a click or Esc.</summary>
-    private void ArmInsert(Func<Element> factory)
+    private void ArmInsert(string tool, Func<Element> factory)
     {
         _pendingFactory = factory;
         IsPlacing = true;
+        ArmedTool = tool;
         StatusText = "Click the canvas to place the new element (Esc cancels)";
     }
 
@@ -391,6 +435,7 @@ public partial class DesignerViewModel : ViewModelBase
 
         _pendingFactory = null;
         IsPlacing = false;
+        ArmedTool = null;
         StatusText = string.Empty;
         RecordUndo();
         ScheduleRender();
@@ -400,7 +445,56 @@ public partial class DesignerViewModel : ViewModelBase
     {
         _pendingFactory = null;
         IsPlacing = false;
+        ArmedTool = null;
         StatusText = string.Empty;
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void AlignLeft() => ApplyAlign(AlignEdge.Left);
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void AlignCenterHorizontal() => ApplyAlign(AlignEdge.CenterHorizontal);
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void AlignRight() => ApplyAlign(AlignEdge.Right);
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void AlignTop() => ApplyAlign(AlignEdge.Top);
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void AlignMiddle() => ApplyAlign(AlignEdge.Middle);
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void AlignBottom() => ApplyAlign(AlignEdge.Bottom);
+
+    /// <summary>Distribution needs at least three elements; with fewer there is no
+    /// middle gap to equalize.</summary>
+    public bool CanDistribute => SelectionCount >= 3;
+
+    [RelayCommand(CanExecute = nameof(CanDistribute))]
+    private void DistributeHorizontal() => ApplyDistribute(horizontal: true);
+
+    [RelayCommand(CanExecute = nameof(CanDistribute))]
+    private void DistributeVertical() => ApplyDistribute(horizontal: false);
+
+    private void ApplyAlign(AlignEdge edge)
+    {
+        if (Aligner.Align(Selection.Items.ToList(), edge, Document.WidthDots, Document.HeightDots))
+        {
+            SelectionProperties?.Refresh();
+            RecordUndo();
+            ScheduleRender();
+        }
+    }
+
+    private void ApplyDistribute(bool horizontal)
+    {
+        if (Aligner.Distribute(Selection.Items.ToList(), horizontal))
+        {
+            SelectionProperties?.Refresh();
+            RecordUndo();
+            ScheduleRender();
+        }
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
@@ -553,11 +647,11 @@ public partial class DesignerViewModel : ViewModelBase
 
     private ElementPropertiesViewModel? CreatePropertiesEditor(Element? value) => value switch
     {
-        TextElement text => new TextPropertiesViewModel(text, OnPanelEdited),
-        BarcodeElement barcode => new BarcodePropertiesViewModel(barcode, OnPanelEdited),
-        QrCodeElement qr => new QrPropertiesViewModel(qr, OnPanelEdited),
-        LineElement line => new LinePropertiesViewModel(line, OnPanelEdited),
-        BoxElement box => new BoxPropertiesViewModel(box, OnPanelEdited),
+        TextElement text => new TextPropertiesViewModel(text, Document, OnPanelEdited),
+        BarcodeElement barcode => new BarcodePropertiesViewModel(barcode, Document, OnPanelEdited),
+        QrCodeElement qr => new QrPropertiesViewModel(qr, Document, OnPanelEdited),
+        LineElement line => new LinePropertiesViewModel(line, Document, OnPanelEdited),
+        BoxElement box => new BoxPropertiesViewModel(box, Document, OnPanelEdited),
         _ => null,
     };
 
@@ -729,13 +823,34 @@ public partial class DesignerViewModel : ViewModelBase
             double heightMm = document.HeightMm;
             int dpmm = document.Dpmm;
 
-            (string zpl, RenderResult result) = await Task.Run(
-                () =>
-                {
-                    string generated = _generator.Generate(document);
-                    return (generated, _renderer.Render(generated, widthMm, heightMm, dpmm));
-                },
-                cts.Token);
+            (string zpl, RenderResult result, int marginDots, string placementWarning) =
+                await Task.Run(
+                    () =>
+                    {
+                        string generated = _generator.Generate(document);
+
+                        var bounds = new ElementBoundsCalculator();
+                        var offLabel = document.Elements
+                            .Where(e => e.IsVisible)
+                            .Select(e => (Element: e, Status: ElementPlacement.Classify(
+                                e, bounds.GetBounds(e), document.WidthDots, document.HeightDots)))
+                            .Where(t => t.Status != PlacementStatus.Inside)
+                            .ToList();
+
+                        // Only pay for the expanded pasteboard render when something
+                        // actually sits off the label.
+                        int margin = offLabel.Count > 0
+                            ? Units.MmToDots(ElementPlacement.PasteboardMarginMm, dpmm)
+                            : 0;
+                        double marginMm = Units.DotsToMm(margin, dpmm);
+                        string previewZpl = margin > 0
+                            ? _generator.GeneratePreview(document, margin)
+                            : generated;
+                        RenderResult rendered = _renderer.Render(
+                            previewZpl, widthMm + 2 * marginMm, heightMm + 2 * marginMm, dpmm);
+                        return (generated, rendered, margin, DescribePlacement(offLabel));
+                    },
+                    cts.Token);
 
             if (cts.IsCancellationRequested)
             {
@@ -743,6 +858,8 @@ public partial class DesignerViewModel : ViewModelBase
             }
 
             GeneratedZpl = zpl;
+            UnderlayMarginDots = marginDots;
+            PlacementWarning = placementWarning;
 
             Bitmap? previous = Underlay;
             if (result.Png.Length > 0)
@@ -776,9 +893,11 @@ public partial class DesignerViewModel : ViewModelBase
                 diagnosis.Add(string.Join("; ", result.Errors.Take(2)));
             }
 
+            // The rendered bitmap may be pasteboard-expanded; always report the label's
+            // own size.
             StatusText = diagnosis.Count > 0
                 ? string.Join(" | ", diagnosis)
-                : $"{result.WidthDots} x {result.HeightDots} dots";
+                : $"{document.WidthDots} x {document.HeightDots} dots";
         }
         catch (OperationCanceledException)
         {
@@ -789,6 +908,47 @@ public partial class DesignerViewModel : ViewModelBase
             StatusText = ex.Message;
         }
     }
+
+    /// <summary>One line summarizing elements off the label ("will not print") and
+    /// elements crossing its right/bottom edge ("will be clipped"); empty when none.</summary>
+    private static string DescribePlacement(
+        IReadOnlyList<(Element Element, PlacementStatus Status)> offLabel)
+    {
+        var outside = offLabel.Where(t => t.Status == PlacementStatus.NotPrintable).ToList();
+        var clipped = offLabel.Where(t => t.Status == PlacementStatus.Clipped).ToList();
+
+        var parts = new List<string>(2);
+        if (outside.Count == 1)
+        {
+            parts.Add($"'{DisplayName(outside[0].Element)}' is outside the label and will not print");
+        }
+        else if (outside.Count > 1)
+        {
+            parts.Add($"{outside.Count} elements are outside the label and will not print");
+        }
+
+        if (clipped.Count == 1)
+        {
+            parts.Add($"'{DisplayName(clipped[0].Element)}' extends past the label edge and will be clipped");
+        }
+        else if (clipped.Count > 1)
+        {
+            parts.Add($"{clipped.Count} elements extend past the label edge and will be clipped");
+        }
+
+        return string.Join("; ", parts);
+    }
+
+    private static string DisplayName(Element element) =>
+        !string.IsNullOrEmpty(element.Name) ? element.Name : element switch
+        {
+            TextElement => "Text",
+            BarcodeElement => "Barcode",
+            QrCodeElement => "QR code",
+            LineElement => "Line",
+            BoxElement => "Box",
+            _ => "Element",
+        };
 
     private static void SeedSampleLabel(LabelDocument doc)
     {

@@ -145,6 +145,55 @@ public sealed class ZplGeneratorTests
     }
 
     [Fact]
+    public void Generate_SkipsElementsWhoseOriginIsOffTheLabel()
+    {
+        // ZPL cannot express a negative ^FO, and an origin past the edge prints
+        // nothing; the export path drops all three and keeps the label clean.
+        var zpl = new ZplGenerator().Generate(Doc(
+            new TextElement { X = -5, Y = 10, FontHeightDots = 30, Text = "negative" },
+            new TextElement { X = 810, Y = 10, FontHeightDots = 30, Text = "past-right" },
+            new TextElement { X = 10, Y = 1500, FontHeightDots = 30, Text = "past-bottom" },
+            new TextElement { X = 10, Y = 10, FontHeightDots = 30, Text = "inside" }));
+
+        Assert.Equal(Header(800, 1200) + "^FO10,10^A0N,30^FDinside^FS\n^XZ", zpl);
+    }
+
+    [Fact]
+    public void Generate_KeepsElementsThatOverflowTheEdge()
+    {
+        // Origin on the label, footprint past the right edge: emitted as-is, the
+        // printer clips the overflow at the edge.
+        var zpl = new ZplGenerator().Generate(Doc(
+            new BoxElement { X = 700, Y = 10, WidthDots = 300, HeightDots = 50, ThicknessDots = 2 }));
+
+        Assert.Equal(Header(800, 1200) + "^FO700,10^GB300,50,2,B^FS\n^XZ", zpl);
+    }
+
+    [Fact]
+    public void GeneratePreview_OffsetsOriginsAndKeepsOffLabelElements()
+    {
+        var zpl = new ZplGenerator().GeneratePreview(Doc(
+            new TextElement { X = -40, Y = 10, FontHeightDots = 30, Text = "parked" },
+            new TextElement { X = 10, Y = 20, FontHeightDots = 30, Text = "inside" }),
+            offsetDots: 160);
+
+        Assert.Equal(
+            Header(1120, 1520) +
+            "^FO120,170^A0N,30^FDparked^FS\n^FO170,180^A0N,30^FDinside^FS\n^XZ",
+            zpl);
+    }
+
+    [Fact]
+    public void GeneratePreview_SkipsElementsBeyondThePasteboard()
+    {
+        var zpl = new ZplGenerator().GeneratePreview(Doc(
+            new TextElement { X = -200, Y = 0, FontHeightDots = 30, Text = "too far" }),
+            offsetDots: 160);
+
+        Assert.Equal("^XA\n^CI28\n^PW1120\n^LL1520\n^LH0,0\n^XZ", zpl);
+    }
+
+    [Fact]
     public void Density_ChangesPrintWidthAndLength()
     {
         var doc = new LabelDocument { WidthMm = 100, HeightMm = 150, Dpmm = 12 }; // 1200 x 1800

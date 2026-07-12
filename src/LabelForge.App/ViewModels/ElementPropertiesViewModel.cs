@@ -29,11 +29,20 @@ public sealed record OrientationOption(string Label, Orientation Value)
 public abstract class ElementPropertiesViewModel : ObservableObject
 {
     private readonly Action<string> _edited;
+    private readonly LabelDocument _document;
 
-    protected ElementPropertiesViewModel(Element element, Action<string> edited)
+    /// <summary>The unit choice is sticky: it survives selection changes within the
+    /// session, so it lives here rather than on each per-selection editor instance.</summary>
+    private static bool _useMmDefault;
+
+    private bool _useMm;
+
+    protected ElementPropertiesViewModel(Element element, LabelDocument document, Action<string> edited)
     {
         Element = element;
+        _document = document;
         _edited = edited;
+        _useMm = _useMmDefault;
     }
 
     protected Element Element { get; }
@@ -42,17 +51,42 @@ public abstract class ElementPropertiesViewModel : ObservableObject
 
     public IReadOnlyList<OrientationOption> Orientations => OrientationOption.All;
 
+    /// <summary>When set, X and Y display and accept millimeters (converted through
+    /// the document density); the model always stays in dots.</summary>
+    public bool UseMm
+    {
+        get => _useMm;
+        set
+        {
+            if (_useMm == value)
+            {
+                return;
+            }
+
+            _useMm = value;
+            _useMmDefault = value;
+            OnPropertyChanged(string.Empty);
+        }
+    }
+
+    public string UnitSuffix => UseMm ? "mm" : "dots";
+
+    public string PositionFormat => UseMm ? "0.##" : "0";
+
     public decimal X
     {
-        get => Element.X;
-        set => Edit(Element.X, (int)value, v => Element.X = v);
+        get => UseMm ? (decimal)Math.Round(Units.DotsToMm(Element.X, _document.Dpmm), 2) : Element.X;
+        set => Edit(Element.X, ToDots(value), v => Element.X = v);
     }
 
     public decimal Y
     {
-        get => Element.Y;
-        set => Edit(Element.Y, (int)value, v => Element.Y = v);
+        get => UseMm ? (decimal)Math.Round(Units.DotsToMm(Element.Y, _document.Dpmm), 2) : Element.Y;
+        set => Edit(Element.Y, ToDots(value), v => Element.Y = v);
     }
+
+    private int ToDots(decimal value) =>
+        UseMm ? Units.MmToDots((double)value, _document.Dpmm) : (int)value;
 
     public OrientationOption SelectedOrientation
     {
@@ -83,8 +117,8 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
 {
     private readonly TextElement _text;
 
-    public TextPropertiesViewModel(TextElement element, Action<string> edited)
-        : base(element, edited) => _text = element;
+    public TextPropertiesViewModel(TextElement element, LabelDocument document, Action<string> edited)
+        : base(element, document, edited) => _text = element;
 
     public override string TypeName => "Text";
 
@@ -112,8 +146,8 @@ public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel
 {
     private readonly BarcodeElement _barcode;
 
-    public BarcodePropertiesViewModel(BarcodeElement element, Action<string> edited)
-        : base(element, edited) => _barcode = element;
+    public BarcodePropertiesViewModel(BarcodeElement element, LabelDocument document, Action<string> edited)
+        : base(element, document, edited) => _barcode = element;
 
     public override string TypeName => "Barcode";
 
@@ -179,8 +213,8 @@ public sealed class QrPropertiesViewModel : ElementPropertiesViewModel
 {
     private readonly QrCodeElement _qr;
 
-    public QrPropertiesViewModel(QrCodeElement element, Action<string> edited)
-        : base(element, edited) => _qr = element;
+    public QrPropertiesViewModel(QrCodeElement element, LabelDocument document, Action<string> edited)
+        : base(element, document, edited) => _qr = element;
 
     public override string TypeName => "QR Code";
 
@@ -209,8 +243,8 @@ public sealed class LinePropertiesViewModel : ElementPropertiesViewModel
 {
     private readonly LineElement _line;
 
-    public LinePropertiesViewModel(LineElement element, Action<string> edited)
-        : base(element, edited) => _line = element;
+    public LinePropertiesViewModel(LineElement element, LabelDocument document, Action<string> edited)
+        : base(element, document, edited) => _line = element;
 
     public override string TypeName => "Line";
 
@@ -237,8 +271,8 @@ public sealed class BoxPropertiesViewModel : ElementPropertiesViewModel
 {
     private readonly BoxElement _box;
 
-    public BoxPropertiesViewModel(BoxElement element, Action<string> edited)
-        : base(element, edited) => _box = element;
+    public BoxPropertiesViewModel(BoxElement element, LabelDocument document, Action<string> edited)
+        : base(element, document, edited) => _box = element;
 
     public override string TypeName => "Box";
 

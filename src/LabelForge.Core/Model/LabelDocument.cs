@@ -20,6 +20,13 @@ public sealed class LabelDocument
 
     public IList<Element> Elements { get; init; } = new List<Element>();
 
+    /// <summary>Vertical alignment guides: X positions in dots. Design aids only,
+    /// never printed; they ride the undo/save pipeline like any document change.</summary>
+    public IList<int> VerticalGuides { get; init; } = new List<int>();
+
+    /// <summary>Horizontal alignment guides: Y positions in dots.</summary>
+    public IList<int> HorizontalGuides { get; init; } = new List<int>();
+
     [JsonIgnore]
     public int WidthDots => Units.MmToDots(WidthMm, Dpmm);
 

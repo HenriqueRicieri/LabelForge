@@ -8,26 +8,54 @@ namespace LabelForge.Core.Zpl;
 /// Generates ZPL from a <see cref="LabelDocument"/>. This is our own code, kept pure
 /// and deterministic so it can be covered by golden tests. It emits ^FO (top-left)
 /// origins and the scalable font 0 in v1, and always declares UTF-8 (^CI28).
+/// Two modes share the same emission: <see cref="Generate"/> is what prints and
+/// exports (elements whose origin is off the label are skipped, matching what the
+/// printer could do), while <see cref="GeneratePreview"/> feeds the designer underlay
+/// (every visible element is kept and all origins shift by the pasteboard margin so
+/// off-label content still renders).
 /// </summary>
 public sealed class ZplGenerator : IElementVisitor
 {
     private readonly StringBuilder _sb = new();
+    private int _offset;
 
-    public string Generate(LabelDocument document)
+    public string Generate(LabelDocument document) =>
+        Generate(document, offsetDots: 0, includeOffLabel: false);
+
+    /// <summary>Preview-only variant: the whole coordinate space shifts right/down by
+    /// <paramref name="offsetDots"/> so the label sits centered in a canvas expanded by
+    /// that margin on every side, and elements parked off the label stay visible.</summary>
+    public string GeneratePreview(LabelDocument document, int offsetDots) =>
+        Generate(document, offsetDots, includeOffLabel: true);
+
+    private string Generate(LabelDocument document, int offsetDots, bool includeOffLabel)
     {
         ArgumentNullException.ThrowIfNull(document);
 
         _sb.Clear();
+        _offset = offsetDots;
         Line("^XA");
         Line("^CI28");
-        Line($"^PW{document.WidthDots}");
-        Line($"^LL{document.HeightDots}");
+        Line($"^PW{document.WidthDots + 2 * offsetDots}");
+        Line($"^LL{document.HeightDots + 2 * offsetDots}");
         Line("^LH0,0");
 
         foreach (var element in document.Elements
                      .Where(e => e.IsVisible)
                      .OrderBy(e => e.ZOrder))
         {
+            if (!includeOffLabel &&
+                !ElementPlacement.IsPrintable(element, document.WidthDots, document.HeightDots))
+            {
+                continue;
+            }
+
+            // Even the preview cannot express an origin left of / above the pasteboard.
+            if (element.X + offsetDots < 0 || element.Y + offsetDots < 0)
+            {
+                continue;
+            }
+
             element.Accept(this);
         }
 
@@ -35,16 +63,18 @@ public sealed class ZplGenerator : IElementVisitor
         return _sb.ToString();
     }
 
+    private string Fo(Element element) => $"^FO{element.X + _offset},{element.Y + _offset}";
+
     public void Visit(TextElement element)
     {
         string font = element.FontWidthDots > 0
             ? $"^A0{element.Orientation.Letter()},{element.FontHeightDots},{element.FontWidthDots}"
             : $"^A0{element.Orientation.Letter()},{element.FontHeightDots}";
-        Line($"^FO{element.X},{element.Y}{font}{ZplEncoding.FieldData(element.Text)}");
+        Line($"{Fo(element)}{font}{ZplEncoding.FieldData(element.Text)}");
     }
 
     public void Visit(BoxElement element) =>
-        Line($"^FO{element.X},{element.Y}^GB{element.WidthDots},{element.HeightDots},{element.ThicknessDots},B^FS");
+        Line($"{Fo(element)}^GB{element.WidthDots},{element.HeightDots},{element.ThicknessDots},B^FS");
 
     public void Visit(LineElement element)
     {
@@ -53,7 +83,7 @@ public sealed class ZplGenerator : IElementVisitor
         (int w, int h) = element.IsVertical
             ? (element.ThicknessDots, element.LengthDots)
             : (element.LengthDots, element.ThicknessDots);
-        Line($"^FO{element.X},{element.Y}^GB{w},{h},{element.ThicknessDots},B^FS");
+        Line($"{Fo(element)}^GB{w},{h},{element.ThicknessDots},B^FS");
     }
 
     public void Visit(BarcodeElement element)
@@ -73,7 +103,7 @@ public sealed class ZplGenerator : IElementVisitor
             _ => throw new NotSupportedException($"Unsupported symbology: {element.Symbology}"),
         };
 
-        Line($"{by}^FO{element.X},{element.Y}{command}{ZplEncoding.FieldData(element.Data)}");
+        Line($"{by}{Fo(element)}{command}{ZplEncoding.FieldData(element.Data)}");
     }
 
     public void Visit(QrCodeElement element)
@@ -87,7 +117,7 @@ public sealed class ZplGenerator : IElementVisitor
             _ => "M",
         };
         string payload = ZplEncoding.FieldData($"{ec}A,{element.Data}");
-        Line($"^FO{element.X},{element.Y}^BQ{element.Orientation.Letter()},2,{element.Magnification}{payload}");
+        Line($"{Fo(element)}^BQ{element.Orientation.Letter()},2,{element.Magnification}{payload}");
     }
 
     private void Line(string text) => _sb.Append(text).Append('\n');

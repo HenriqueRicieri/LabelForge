@@ -2,7 +2,10 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
+using LabelForge.App.Controls;
 using LabelForge.App.ViewModels;
 using LabelForge.App.Views;
 
@@ -125,25 +128,142 @@ else
     d.PasteCommand.Execute(null);
     Console.WriteLine($"edge paste wrap: first X={firstPasteX} (expected 20), second X={d.SelectedElement!.X} (expected 40, not stacked)");
 
+    // Off-label placement: park the QR past the right edge. The canvas should show
+    // it dimmed on the pasteboard with an amber outline, the toolbar should warn,
+    // and the export ZPL should skip it (checked after the render pump below).
+    d.Document.Elements[3].X = d.Document.WidthDots + 40;
+
+    // Guides: teal lines with ruler markers, saved with the document.
+    d.Document.VerticalGuides.Add(200);
+    d.Document.VerticalGuides.Add(d.Document.WidthDots / 2);
+    d.Document.HorizontalGuides.Add(240);
+    d.NotifyDocumentEdited();
+
     // Single selection for the capture: shows the 8 handles + rotation handle.
     d.Selection.Set(d.Document.Elements[2]);
 }
 
-var sw = Stopwatch.StartNew();
-while (sw.ElapsedMilliseconds < 2500)
+Pump(2500);
+
+if (mode == "designer")
 {
-    Dispatcher.UIThread.RunJobs();
-    AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-    Thread.Sleep(50);
+    var d = vm.Designer;
+    Console.WriteLine($"placement warning: '{d.PlacementWarning}' (expect QR outside, will not print)");
+    Console.WriteLine($"underlay margin: {d.UnderlayMarginDots} dots (expected 160 at 8 dpmm)");
+    Console.WriteLine($"export skips parked QR: {!d.GeneratedZpl.Contains("^BQ")} (expected True)");
+
+    var reloaded = LabelForge.Core.Io.LabelDocumentJson.Deserialize(d.SerializeDocument());
+    Console.WriteLine($"guides round trip: {reloaded.VerticalGuides.Count} vertical / {reloaded.HorizontalGuides.Count} horizontal (expected 2/1)");
+
+    // Input-path checks through the headless window. Holding the left button on the
+    // top ruler shows a transient guide (captured mid-hold); releasing removes it
+    // without adding a permanent one. Right-clicking the ruler opens the guide menu.
+    var canvas = window.GetVisualDescendants().OfType<DesignerCanvas>().First();
+    Avalonia.Point onRuler = canvas.TranslatePoint(new Avalonia.Point(300, 13), window)!.Value;
+    window.MouseDown(onRuler, MouseButton.Left);
+    window.MouseMove(new Avalonia.Point(onRuler.X + 60, onRuler.Y));
+    Pump(300);
+    Capture("designer-ruler-hold.png");
+    window.MouseUp(new Avalonia.Point(onRuler.X + 60, onRuler.Y), MouseButton.Left);
+    Console.WriteLine($"ruler hold released: {d.Document.VerticalGuides.Count} vertical guides (expected 2, transient guide gone)");
+
+    Avalonia.Point menuAt = canvas.TranslatePoint(new Avalonia.Point(500, 13), window)!.Value;
+    window.MouseDown(menuAt, MouseButton.Right);
+    window.MouseUp(menuAt, MouseButton.Right);
+    Pump(400);
+    Capture("designer-ruler-menu.png");
+
+    // Click the "Insert guide at N mm" item (first row of the flyout, just under
+    // the pointer) and confirm a permanent guide lands.
+    var itemAt = new Avalonia.Point(menuAt.X + 60, menuAt.Y + 21);
+    window.MouseDown(itemAt, MouseButton.Left);
+    window.MouseUp(itemAt, MouseButton.Left);
+    Pump(300);
+    Console.WriteLine($"menu insert: {d.Document.VerticalGuides.Count} vertical guides (expected 3)");
+    window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+    Pump(200);
+
+    // Double click on the top ruler inserts a permanent guide without the menu.
+    Avalonia.Point dbl = canvas.TranslatePoint(new Avalonia.Point(700, 13), window)!.Value;
+    window.MouseDown(dbl, MouseButton.Left);
+    window.MouseUp(dbl, MouseButton.Left);
+    window.MouseDown(dbl, MouseButton.Left);
+    window.MouseUp(dbl, MouseButton.Left);
+    Pump(100);
+    Console.WriteLine($"ruler double click: {d.Document.VerticalGuides.Count} vertical guides (expected 4)");
+
+    // Zoom API + floating readout.
+    canvas.SetZoom(2.0);
+    Pump(200);
+    var zoomLabel = window.GetVisualDescendants().OfType<Button>()
+        .First(b => b.Name == "ZoomLevelButton");
+    Console.WriteLine($"zoom: {canvas.GetZoom():0.##}x, label='{zoomLabel.Content}' (expected 2x / 200%)");
+    canvas.ResetView();
+    Pump(100);
+
+    // mm position entry: 25 mm at 8 dpmm lands on 200 dots; the display reads mm.
+    d.Selection.Set(d.Document.Elements[1]);
+    var panel = d.SelectionProperties!;
+    panel.UseMm = true;
+    panel.X = 25;
+    Console.WriteLine($"mm entry: X={d.Document.Elements[1].X} dots (expected 200), shown as {panel.X} mm");
+    panel.UseMm = false;
+    d.Selection.Set(d.Document.Elements[2]);
+    Pump(200);
+
+    // Smart-guide drag: grab the top box copy at (40,55) and move +157 dots right.
+    // Its left edge lands 3 dots short of the vertical guide at 200 (snaps to 200)
+    // and its top edge sits 5 dots below the Title's top at 50 (snaps to 50).
+    var boxCopy = d.Document.Elements[5];
+    Avalonia.Point dragFrom = canvas.TranslatePoint(canvas.DotsToView(600, 450), window)!.Value;
+    Avalonia.Point dragTo = canvas.TranslatePoint(canvas.DotsToView(757, 450), window)!.Value;
+    window.MouseDown(dragFrom, MouseButton.Left);
+    window.MouseMove(dragTo);
+    window.MouseUp(dragTo, MouseButton.Left);
+    Pump(200);
+    Console.WriteLine($"snap drag: box at {boxCopy.X},{boxCopy.Y} (expected 200,50: guide X, Title top Y)");
+
+    // Alignment commands: with two elements, align-left pulls the Title (X=200) to
+    // the Barcode's left edge (X=50); distribution stays disabled below three.
+    d.Selection.SetMany([d.Document.Elements[1], d.Document.Elements[2]]);
+    Console.WriteLine($"distribute gating with 2 selected: {d.DistributeHorizontalCommand.CanExecute(null)} (expected False)");
+    d.AlignLeftCommand.Execute(null);
+    Console.WriteLine($"align left: Title X={d.Document.Elements[1].X} (expected 50)");
+    d.Selection.SetMany([d.Document.Elements[1], d.Document.Elements[2], d.Document.Elements[4]]);
+    Console.WriteLine($"distribute gating with 3 selected: {d.DistributeHorizontalCommand.CanExecute(null)} (expected True)");
+
+    // Armed tool highlight in the left bar, captured while the Box tool is armed.
+    d.AddBoxCommand.Execute(null);
+    Pump(150);
+    Capture("designer-toolbar-armed.png");
+    d.CancelInsert();
+    d.Selection.Set(d.Document.Elements[2]);
+    Pump(150);
 }
 
-string outPath = Path.Combine(AppContext.BaseDirectory, $"{mode}.png");
-var frame = window.CaptureRenderedFrame();
-if (frame is null)
+Capture($"{mode}.png");
+
+void Pump(int ms)
 {
-    Console.WriteLine("CaptureRenderedFrame returned null");
-    return;
+    var sw = Stopwatch.StartNew();
+    while (sw.ElapsedMilliseconds < ms)
+    {
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Thread.Sleep(50);
+    }
 }
 
-frame.Save(outPath, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
-Console.WriteLine(outPath);
+void Capture(string name)
+{
+    var frame = window.CaptureRenderedFrame();
+    if (frame is null)
+    {
+        Console.WriteLine($"{name}: CaptureRenderedFrame returned null");
+        return;
+    }
+
+    string path = Path.Combine(AppContext.BaseDirectory, name);
+    frame.Save(path, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    Console.WriteLine(path);
+}

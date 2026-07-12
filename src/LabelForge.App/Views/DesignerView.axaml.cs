@@ -15,6 +15,7 @@ namespace LabelForge.App.Views;
 public partial class DesignerView : UserControl
 {
     private TopLevel? _topLevel;
+    private bool _syncingScroll;
 
     public DesignerView()
     {
@@ -25,6 +26,54 @@ public partial class DesignerView : UserControl
         Canvas.DeleteRequested += (_, _) => ViewModel?.DeleteSelectedCommand.Execute(null);
         Canvas.PlaceRequested += (x, y) => ViewModel?.PlaceAt(x, y);
         Canvas.CancelRequested += (_, _) => ViewModel?.CancelInsert();
+
+        Canvas.ViewChanged += (_, _) => SyncScrollBars();
+        CanvasHScroll.ValueChanged += (_, _) => OnScrollBarChanged();
+        CanvasVScroll.ValueChanged += (_, _) => OnScrollBarChanged();
+        ZoomOutButton.Click += (_, _) => Canvas.ZoomBy(1 / 1.25);
+        ZoomInButton.Click += (_, _) => Canvas.ZoomBy(1.25);
+    }
+
+    /// <summary>Pushes the canvas view (extent, viewport, offset) into the scrollbars
+    /// and refreshes the zoom readout. Guarded so the resulting ValueChanged does not
+    /// bounce back into the canvas.</summary>
+    private void SyncScrollBars()
+    {
+        var (h, v) = Canvas.GetScrollInfo();
+        _syncingScroll = true;
+        try
+        {
+            CanvasHScroll.Maximum = Math.Max(h.Extent - h.Viewport, 0);
+            CanvasHScroll.ViewportSize = h.Viewport;
+            CanvasHScroll.Value = Math.Clamp(h.Offset, 0, CanvasHScroll.Maximum);
+
+            CanvasVScroll.Maximum = Math.Max(v.Extent - v.Viewport, 0);
+            CanvasVScroll.ViewportSize = v.Viewport;
+            CanvasVScroll.Value = Math.Clamp(v.Offset, 0, CanvasVScroll.Maximum);
+        }
+        finally
+        {
+            _syncingScroll = false;
+        }
+
+        ZoomLevelButton.Content = Math.Round(Canvas.GetZoom() * 100)
+            .ToString(System.Globalization.CultureInfo.InvariantCulture) + "%";
+    }
+
+    private void OnZoom50(object? sender, RoutedEventArgs e) => Canvas.SetZoom(0.5);
+
+    private void OnZoom100(object? sender, RoutedEventArgs e) => Canvas.SetZoom(1);
+
+    private void OnZoom200(object? sender, RoutedEventArgs e) => Canvas.SetZoom(2);
+
+    private void OnZoomFit(object? sender, RoutedEventArgs e) => Canvas.ResetView();
+
+    private void OnScrollBarChanged()
+    {
+        if (!_syncingScroll)
+        {
+            Canvas.SetScrollOffsets(CanvasHScroll.Value, CanvasVScroll.Value);
+        }
     }
 
     private DesignerViewModel? ViewModel => DataContext as DesignerViewModel;

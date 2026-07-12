@@ -55,6 +55,34 @@ public sealed class LabelDocumentJsonTests
     }
 
     [Fact]
+    public void Guides_RoundTrip()
+    {
+        var original = SampleDocument();
+        original.VerticalGuides.Add(160);
+        original.VerticalGuides.Add(400);
+        original.HorizontalGuides.Add(240);
+
+        LabelDocument restored = LabelDocumentJson.Deserialize(LabelDocumentJson.Serialize(original));
+
+        Assert.Equal([160, 400], restored.VerticalGuides);
+        Assert.Equal([240], restored.HorizontalGuides);
+    }
+
+    [Fact]
+    public void FileWithoutGuides_LoadsWithEmptyGuideLists()
+    {
+        // A pre-guides .lfl has no guide properties; loading must default them.
+        string json = LabelDocumentJson.Serialize(SampleDocument())
+            .Replace("\"VerticalGuides\": [],", string.Empty)
+            .Replace("\"HorizontalGuides\": [],", string.Empty);
+
+        LabelDocument restored = LabelDocumentJson.Deserialize(json);
+
+        Assert.Empty(restored.VerticalGuides);
+        Assert.Empty(restored.HorizontalGuides);
+    }
+
+    [Fact]
     public void SingleElement_RoundTrips_WithTypeAndProperties()
     {
         var original = new BarcodeElement
