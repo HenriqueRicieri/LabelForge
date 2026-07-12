@@ -114,6 +114,17 @@ else
     d.UndoCommand.Execute(null);
     Console.WriteLine($"undo group delete: {d.Document.Elements.Count} elements (expected 4)");
 
+    // Edge cascade: pasting near the border wraps back near the origin instead of
+    // clamping, so repeated pastes never pile up on one spot (review finding).
+    var edgeElement = d.Document.Elements[0];
+    edgeElement.X = d.Document.WidthDots - 5;
+    d.Selection.Set(edgeElement);
+    d.CopyCommand.Execute(null);
+    d.PasteCommand.Execute(null);
+    int firstPasteX = d.SelectedElement!.X;
+    d.PasteCommand.Execute(null);
+    Console.WriteLine($"edge paste wrap: first X={firstPasteX} (expected 20), second X={d.SelectedElement!.X} (expected 40, not stacked)");
+
     // Single selection for the capture: shows the 8 handles + rotation handle.
     d.Selection.Set(d.Document.Elements[2]);
 }
