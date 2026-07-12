@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\labelforge.ico</ApplicationIcon>
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
     <Product>LabelForge</Product>
     <AssemblyTitle>LabelForge</AssemblyTitle>
     <!-- Velopack ships a self-contained publish; trimming stays off because SkiaSharp
