@@ -145,5 +145,5 @@ if (frame is null)
     return;
 }
 
-frame.Save(outPath);
+frame.Save(outPath, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
 Console.WriteLine(outPath);

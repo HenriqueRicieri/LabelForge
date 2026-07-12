@@ -114,6 +114,11 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial string PrinterWarning { get; set; } = string.Empty;
 
+    /// <summary>Document-wide barcode validation summary; empty when every barcode is
+    /// encodable. Refreshed on each render so it tracks edits without being selected.</summary>
+    [ObservableProperty]
+    public partial string ValidationWarning { get; set; } = string.Empty;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(UndoCommand))]
     public partial bool CanUndo { get; set; }
@@ -682,21 +687,32 @@ public partial class DesignerViewModel : ViewModelBase
         CanRedo = _history.CanRedo;
     }
 
-    /// <summary>The first visible barcode whose data cannot be encoded, described for the
-    /// status line, or null when every barcode is fine. Explains a blank preview.</summary>
-    private string? FindBarcodeProblem()
+    /// <summary>Every visible barcode whose data cannot be encoded, each described for
+    /// display ("Barcode 'Name': reason"). Empty when all barcodes are fine.</summary>
+    private List<string> CollectBarcodeProblems()
     {
+        var problems = new List<string>();
         foreach (BarcodeElement barcode in Document.Elements.OfType<BarcodeElement>().Where(b => b.IsVisible))
         {
             if (Core.Zpl.BarcodeValidator.Validate(barcode.Symbology, barcode.Data) is { } warning)
             {
                 string name = string.IsNullOrEmpty(barcode.Name) ? barcode.Symbology.ToString() : barcode.Name;
-                return $"Barcode '{name}': {warning}";
+                problems.Add($"Barcode '{name}': {warning}");
             }
         }
 
-        return null;
+        return problems;
     }
+
+    /// <summary>Refreshes the document-wide barcode validation summary shown near the
+    /// canvas, so an un-encodable barcode is visible even when it is not selected.</summary>
+    private void UpdateValidationWarning(IReadOnlyList<string> problems) =>
+        ValidationWarning = problems.Count switch
+        {
+            0 => string.Empty,
+            1 => problems[0],
+            _ => $"{problems.Count} barcodes need attention: {string.Join("; ", problems)}",
+        };
 
     private async void ScheduleRender(int delayMs = 150)
     {
@@ -741,13 +757,18 @@ public partial class DesignerViewModel : ViewModelBase
 
             previous?.Dispose();
 
+            // Document-wide validation summary, shown near the canvas regardless of
+            // what is selected.
+            List<string> barcodeProblems = CollectBarcodeProblems();
+            UpdateValidationWarning(barcodeProblems);
+
             // On a failed or empty render, lead with a specific diagnosis when a
             // barcode cannot be encoded, but keep the engine's own message too: the
             // failure may have a different cause than the barcode we flagged.
             var diagnosis = new List<string>(2);
-            if ((result.Errors.Count > 0 || result.Png.Length == 0) && FindBarcodeProblem() is { } problem)
+            if ((result.Errors.Count > 0 || result.Png.Length == 0) && barcodeProblems.Count > 0)
             {
-                diagnosis.Add(problem);
+                diagnosis.Add(barcodeProblems[0]);
             }
 
             if (result.Errors.Count > 0)

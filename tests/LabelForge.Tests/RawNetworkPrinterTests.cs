@@ -39,6 +39,29 @@ public sealed class RawNetworkPrinterTests
     }
 
     [Fact]
+    public async Task SendAsync_TimesOut_WhenConnectionCannotBeEstablished()
+    {
+        // 192.0.2.1 is TEST-NET-1 (RFC 5737): reserved and not routable, so the SYN is
+        // dropped and the connection never establishes. The short connect timeout must
+        // fire and surface as a TimeoutException instead of hanging on the OS default.
+        await Assert.ThrowsAsync<TimeoutException>(() =>
+            RawNetworkPrinter.SendAsync(
+                "192.0.2.1", 9100, "^XA^XZ", connectTimeout: TimeSpan.FromMilliseconds(400)));
+    }
+
+    [Fact]
+    public async Task SendAsync_SurfacesCallerCancellation_NotAsTimeout()
+    {
+        // A caller-cancelled token must propagate as a cancellation, not be relabeled as
+        // a connect timeout: the timeout mapping is guarded on the caller's own token.
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            RawNetworkPrinter.SendAsync("192.0.2.1", 9100, "^XA^XZ", cts.Token));
+    }
+
+    [Fact]
     public void WindowsRawPrinter_EnumeratesQueues_WithoutError()
     {
         if (!OperatingSystem.IsWindows())

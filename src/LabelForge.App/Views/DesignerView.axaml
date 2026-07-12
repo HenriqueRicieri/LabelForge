@@ -199,6 +199,11 @@
                 <TextBlock Text="{Binding PrinterWarning}" VerticalAlignment="Center"
                            Foreground="#D97706" FontSize="12" FontWeight="SemiBold"
                            TextWrapping="Wrap" MaxWidth="300" />
+                <TextBlock Text="{Binding ValidationWarning}" VerticalAlignment="Center"
+                           IsVisible="{Binding ValidationWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           Foreground="#D97706" FontSize="12" FontWeight="SemiBold"
+                           TextWrapping="Wrap" MaxWidth="300"
+                           ToolTip.Tip="{Binding ValidationWarning}" />
                 <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Opacity="0.6" />
             </StackPanel>
         </Border>
