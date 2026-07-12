@@ -19,9 +19,12 @@ public static class BarcodeValidator
     {
         data ??= string.Empty;
 
-        // Markers are placeholders substituted with sample values before rendering,
-        // so there is nothing to validate at design time.
-        if (data.Contains("##"))
+        // A complete ##...## marker is a placeholder substituted with a sample value
+        // before rendering, so there is nothing to validate at design time. Match what
+        // the substitutor actually replaces: an opening and a closing pair. A lone "##"
+        // is literal data and falls through to normal validation.
+        int open = data.IndexOf("##", StringComparison.Ordinal);
+        if (open >= 0 && data.IndexOf("##", open + 2, StringComparison.Ordinal) >= 0)
         {
             return null;
         }

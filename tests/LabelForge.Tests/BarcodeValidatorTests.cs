@@ -44,4 +44,17 @@ public sealed class BarcodeValidatorTests
         // for a numeric-only symbology that the literal text would otherwise fail.
         Assert.Null(BarcodeValidator.Validate(BarcodeSymbology.Ean13, "##BARCODE_VALUE##"));
     }
+
+    [Fact]
+    public void Validate_TreatsLoneHashPairAsLiteralData()
+    {
+        // A single "##" without a closing pair is not a marker: the substitutor leaves
+        // it untouched, so it must be validated as literal data. '#' is not in the
+        // Code 39 charset and is not a digit, so both warn.
+        Assert.NotNull(BarcodeValidator.Validate(BarcodeSymbology.Code39, "AB##CD"));
+        Assert.NotNull(BarcodeValidator.Validate(BarcodeSymbology.Ean13, "12##34"));
+
+        // Code 128 encodes full ASCII, so the same literal data is fine there.
+        Assert.Null(BarcodeValidator.Validate(BarcodeSymbology.Code128, "AB##CD"));
+    }
 }

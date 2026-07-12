@@ -27,10 +27,6 @@ public partial class DesignerViewModel : ViewModelBase
 {
     private const int CoalesceWindowMs = 500;
 
-    /// <summary>Bound on a network print so a wrong address does not hang the button
-    /// until the operating system's own connect timeout (which can be tens of seconds).</summary>
-    private static readonly TimeSpan PrintTimeout = TimeSpan.FromSeconds(8);
-
     private readonly IZplRenderer _renderer = new BinaryKitsRenderer();
     private readonly ZplGenerator _generator = new();
     private readonly SnapshotHistory _history = new();
@@ -240,13 +236,11 @@ public partial class DesignerViewModel : ViewModelBase
         {
             StatusText = $"Sending to {host}...";
             string zpl = _generator.Generate(Document);
-            using var cts = new CancellationTokenSource(PrintTimeout);
-            await Core.Printing.RawNetworkPrinter.SendAsync(host, (int)PrinterPort, zpl, cts.Token);
+
+            // The connection phase is bounded inside SendAsync; a timeout surfaces as a
+            // TimeoutException whose message already names the unreachable endpoint.
+            await Core.Printing.RawNetworkPrinter.SendAsync(host, (int)PrinterPort, zpl);
             StatusText = $"Sent to {host}:{(int)PrinterPort}";
-        }
-        catch (OperationCanceledException)
-        {
-            StatusText = $"Print timed out: could not reach {host}:{(int)PrinterPort}";
         }
         catch (Exception ex)
         {
@@ -448,9 +442,12 @@ public partial class DesignerViewModel : ViewModelBase
         PlaceClones(clones);
     }
 
-    /// <summary>Adds cloned elements to the document with fresh ids, a +20 dot offset
-    /// clamped to the label, and z-order on top; selects them and records one undo
-    /// step. Returns false when there was nothing to add.</summary>
+    /// <summary>Adds cloned elements to the document with fresh ids, a +20 dot cascade
+    /// offset, and z-order on top; selects them and records one undo step. One delta is
+    /// applied to the whole group so relative offsets are preserved, and when the group
+    /// reaches a label edge the cascade wraps back near the top-left instead of
+    /// clamping, so repeated pastes never pile up on a single spot. Returns false when
+    /// there was nothing to add.</summary>
     private bool PlaceClones(List<Element> clones)
     {
         if (clones.Count == 0)
@@ -461,14 +458,14 @@ public partial class DesignerViewModel : ViewModelBase
         int nextZ = Document.Elements.Count == 0
             ? 0
             : Document.Elements.Max(e => e.ZOrder) + 1;
-        int maxX = Math.Max(Document.WidthDots - 1, 0);
-        int maxY = Math.Max(Document.HeightDots - 1, 0);
+        int dx = CascadeDelta(clones.Min(e => e.X), clones.Max(e => e.X), Math.Max(Document.WidthDots - 1, 0));
+        int dy = CascadeDelta(clones.Min(e => e.Y), clones.Max(e => e.Y), Math.Max(Document.HeightDots - 1, 0));
 
         foreach (Element element in clones)
         {
             element.Id = Guid.NewGuid();
-            element.X = Math.Clamp(element.X + 20, 0, maxX);
-            element.Y = Math.Clamp(element.Y + 20, 0, maxY);
+            element.X += dx;
+            element.Y += dy;
             element.ZOrder = nextZ++;
             Document.Elements.Add(element);
         }
@@ -477,6 +474,22 @@ public partial class DesignerViewModel : ViewModelBase
         RecordUndo();
         ScheduleRender();
         return true;
+    }
+
+    /// <summary>The cascade offset along one axis for a group whose origins span
+    /// [min, max]: +20 while that fits within the label, otherwise wrap the group back
+    /// so its first origin restarts at 20. A group whose origins span the whole axis
+    /// stays put; it cannot cascade without leaving the label.</summary>
+    private static int CascadeDelta(int min, int max, int limit)
+    {
+        const int step = 20;
+        if (max + step <= limit)
+        {
+            return step;
+        }
+
+        int wrap = step - min;
+        return max + wrap <= limit ? wrap : -min;
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
@@ -728,20 +741,23 @@ public partial class DesignerViewModel : ViewModelBase
 
             previous?.Dispose();
 
-            // When the engine reported an error or produced no image, prefer a specific
-            // reason (an un-encodable barcode) over the engine's cryptic message.
+            // On a failed or empty render, lead with a specific diagnosis when a
+            // barcode cannot be encoded, but keep the engine's own message too: the
+            // failure may have a different cause than the barcode we flagged.
+            var diagnosis = new List<string>(2);
             if ((result.Errors.Count > 0 || result.Png.Length == 0) && FindBarcodeProblem() is { } problem)
             {
-                StatusText = problem;
+                diagnosis.Add(problem);
             }
-            else if (result.Errors.Count > 0)
+
+            if (result.Errors.Count > 0)
             {
-                StatusText = string.Join("; ", result.Errors.Take(2));
+                diagnosis.Add(string.Join("; ", result.Errors.Take(2)));
             }
-            else
-            {
-                StatusText = $"{result.WidthDots} x {result.HeightDots} dots";
-            }
+
+            StatusText = diagnosis.Count > 0
+                ? string.Join(" | ", diagnosis)
+                : $"{result.WidthDots} x {result.HeightDots} dots";
         }
         catch (OperationCanceledException)
         {
