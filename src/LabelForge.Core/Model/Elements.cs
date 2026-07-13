@@ -75,6 +75,55 @@ public sealed class QrCodeElement : Element
     public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
 }
 
+/// <summary>A Data Matrix 2D code (^BX, ECC 200). Square, sized by the module size;
+/// the symbol dimension grows with the data like a QR code.</summary>
+public sealed class DataMatrixElement : Element
+{
+    public string Data { get; set; } = string.Empty;
+
+    /// <summary>Module (cell) size in dots, 1-20.</summary>
+    public int ModuleSizeDots { get; set; } = 4;
+
+    public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
+}
+
+/// <summary>How an image's grays become the printer's 1-bit black.</summary>
+public enum DitherMode
+{
+    /// <summary>Plain 50% threshold; crisp for line art and logos.</summary>
+    Threshold,
+
+    /// <summary>Ordered (Bayer 8x8) pattern; stable texture for flat tints.</summary>
+    Ordered,
+
+    /// <summary>Floyd-Steinberg error diffusion; best for photos and gradients.</summary>
+    FloydSteinberg,
+}
+
+/// <summary>An image placed on the label, emitted as an inline ^GF graphic field.
+/// The original file bytes are kept in the document (base64 in the .lfl) so the
+/// label stays self-contained; conversion to 1-bit happens at generation time.</summary>
+public sealed class ImageElement : Element
+{
+    /// <summary>The original encoded image (PNG, JPEG, BMP...).</summary>
+    public byte[] ImageData { get; set; } = [];
+
+    /// <summary>Pixel size of the source image, captured at import so bounds and
+    /// aspect-ratio math never need to decode the image.</summary>
+    public int SourcePixelWidth { get; set; }
+
+    public int SourcePixelHeight { get; set; }
+
+    /// <summary>Rendered size on the label in dots.</summary>
+    public int WidthDots { get; set; } = 200;
+
+    public int HeightDots { get; set; } = 200;
+
+    public DitherMode Dithering { get; set; } = DitherMode.FloydSteinberg;
+
+    public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
+}
+
 /// <summary>A straight line, drawn as a solid ^GB bar so orientation is unambiguous.</summary>
 public sealed class LineElement : Element
 {

@@ -21,6 +21,15 @@ public partial class DesignerView : UserControl
     {
         InitializeComponent();
 
+        // Custom filter so "4000d 50.8" narrows by material and size together;
+        // the rule lives in Core (StockCatalog) and is unit-tested there.
+        MediaBox.ItemFilter = (query, item) =>
+            item is Core.Media.StockMedia media && Core.Media.StockCatalog.IsMatch(media, query);
+
+        // The recent-files submenu is rebuilt in code: a handful of items, and it
+        // sidesteps binding ancestor lookups inside menu popups.
+        DataContextChanged += (_, _) => WireRecentFiles();
+
         Canvas.DocumentEdited += (_, _) => ViewModel?.NotifyDocumentEdited();
         Canvas.LiveEdited += (_, _) => ViewModel?.NotifyDocumentPreview();
         Canvas.DeleteRequested += (_, _) => ViewModel?.DeleteSelectedCommand.Execute(null);
@@ -78,6 +87,70 @@ public partial class DesignerView : UserControl
 
     private DesignerViewModel? ViewModel => DataContext as DesignerViewModel;
 
+    private void WireRecentFiles()
+    {
+        if (ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        vm.RecentFiles.CollectionChanged += (_, _) => RebuildRecentMenu(vm);
+        RebuildRecentMenu(vm);
+    }
+
+    private void RebuildRecentMenu(DesignerViewModel vm)
+    {
+        RecentMenu.Items.Clear();
+        foreach (string path in vm.RecentFiles)
+        {
+            RecentMenu.Items.Add(new MenuItem
+            {
+                Header = path,
+                Command = vm.OpenRecentCommand,
+                CommandParameter = path,
+            });
+        }
+    }
+
+    private async void OnAddImage(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Add image",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Images") { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.webp"] },
+            ],
+        });
+
+        if (files.FirstOrDefault()?.TryGetLocalPath() is not { } path)
+        {
+            return;
+        }
+
+        try
+        {
+            byte[] data = await File.ReadAllBytesAsync(path);
+            if (Core.Imaging.ImageRasterizer.Probe(data) is not { } size)
+            {
+                vm.StatusText = $"Could not read {Path.GetFileName(path)} as an image";
+                return;
+            }
+
+            vm.ArmInsertImage(data, size.Width, size.Height);
+        }
+        catch (Exception ex)
+        {
+            vm.StatusText = $"Could not read the image: {ex.Message}";
+        }
+    }
+
     private void OnThemeSystem(object? sender, RoutedEventArgs e) => SetTheme(Avalonia.Styling.ThemeVariant.Default);
 
     private void OnThemeLight(object? sender, RoutedEventArgs e) => SetTheme(Avalonia.Styling.ThemeVariant.Light);
@@ -118,6 +191,7 @@ public partial class DesignerView : UserControl
         {
             vm.LoadDocument(LabelDocumentJson.Deserialize(await File.ReadAllTextAsync(path)), path);
             vm.StatusText = $"Opened {Path.GetFileName(path)}";
+            vm.RegisterRecentFile(path);
         }
         catch (Exception ex)
         {
@@ -170,6 +244,7 @@ public partial class DesignerView : UserControl
         {
             await File.WriteAllTextAsync(path, vm.SerializeDocument());
             vm.StatusText = $"Saved {Path.GetFileName(path)}";
+            vm.RegisterRecentFile(path);
         }
         catch (Exception ex)
         {

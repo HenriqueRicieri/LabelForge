@@ -122,6 +122,74 @@ public sealed class ZplGeneratorTests
     }
 
     [Fact]
+    public void DataMatrix_EmitsBxWithEcc200()
+    {
+        var zpl = new ZplGenerator().Generate(Doc(
+            new DataMatrixElement { X = 50, Y = 60, Data = "DM-DATA", ModuleSizeDots = 4 }));
+
+        Assert.Equal(Header(800, 1200) + "^FO50,60^BXN,4,200^FDDM-DATA^FS\n^XZ", zpl);
+    }
+
+    [Fact]
+    public void Image_EmitsInlineGraphicField()
+    {
+        var zpl = new ZplGenerator().Generate(Doc(
+            new ImageElement
+            {
+                X = 10, Y = 20, ImageData = TestImages.HalfBlackPng(),
+                WidthDots = 8, HeightDots = 1, Dithering = DitherMode.Threshold,
+            }));
+
+        // 8x1 target, left half black: one byte per row, F0.
+        Assert.Equal(Header(800, 1200) + "^FO10,20^GFA,1,1,1,F0^FS\n^XZ", zpl);
+    }
+
+    [Fact]
+    public void Image_WithUndecodableData_IsSkippedNotThrown()
+    {
+        var zpl = new ZplGenerator().Generate(Doc(
+            new ImageElement { X = 10, Y = 20, ImageData = [1, 2, 3], WidthDots = 8, HeightDots = 8 }));
+
+        Assert.Equal(Header(800, 1200) + "^XZ", zpl);
+    }
+
+    [Fact]
+    public void PrintSettings_EmitOnlyWhenSet()
+    {
+        var doc = Doc(new TextElement { X = 0, Y = 0, FontHeightDots = 30, Text = "A" });
+        doc.Print.Copies = 3;
+        doc.Print.DarknessDelta = -5;
+        doc.Print.SpeedIps = 4;
+
+        Assert.Equal(
+            Header(800, 1200) + "^PR4\n^MD-5\n^FO0,0^A0N,30^FDA^FS\n^PQ3\n^XZ",
+            new ZplGenerator().Generate(doc));
+    }
+
+    [Fact]
+    public void PrintSettings_DefaultDocumentAddsNothing()
+    {
+        var zpl = new ZplGenerator().Generate(Doc());
+
+        Assert.Equal(Header(800, 1200) + "^XZ", zpl);
+    }
+
+    [Fact]
+    public void PrintSettings_NeverReachThePreview()
+    {
+        var doc = Doc(new TextElement { X = 0, Y = 0, FontHeightDots = 30, Text = "A" });
+        doc.Print.Copies = 3;
+        doc.Print.DarknessDelta = -5;
+        doc.Print.SpeedIps = 4;
+
+        string preview = new ZplGenerator().GeneratePreview(doc, offsetDots: 0);
+
+        Assert.DoesNotContain("^PQ", preview);
+        Assert.DoesNotContain("^MD", preview);
+        Assert.DoesNotContain("^PR", preview);
+    }
+
+    [Fact]
     public void FieldData_EscapesControlCharactersWithFieldHex()
     {
         var zpl = new ZplGenerator().Generate(Doc(
@@ -209,7 +277,13 @@ public sealed class ZplGeneratorTests
             new TextElement { X = 40, Y = 40, FontHeightDots = 40, Text = "LabelForge" },
             new BarcodeElement { X = 40, Y = 120, Symbology = BarcodeSymbology.Code128, Data = "ABC123", HeightDots = 120 },
             new BarcodeElement { X = 40, Y = 320, Symbology = BarcodeSymbology.Ean13, Data = "123456789012", HeightDots = 100 },
-            new QrCodeElement { X = 500, Y = 120, Data = "https://labelforge.app", Magnification = 6 });
+            new QrCodeElement { X = 500, Y = 120, Data = "https://labelforge.app", Magnification = 6 },
+            new DataMatrixElement { X = 500, Y = 500, Data = "DM-1", ModuleSizeDots = 5 },
+            new ImageElement
+            {
+                X = 40, Y = 600, ImageData = TestImages.SolidPng(16, 16, 0, 0, 0),
+                WidthDots = 64, HeightDots = 64,
+            });
 
         string zpl = new ZplGenerator().Generate(doc);
         RenderResult result = new BinaryKitsRenderer().Render(zpl, doc.WidthMm, doc.HeightMm, doc.Dpmm);

@@ -31,26 +31,39 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   with equalized gaps.
 - Snapshot-based undo/redo that shares the save format, so a document that undoes correctly is
   guaranteed to save and reopen correctly. Related edits coalesce into one step by identity.
-- Element types: text, linear barcode (Code 128, Code 39, EAN-13, UPC-A), QR code, line, box, with a
-  per-type properties panel and positions typed in dots or millimeters. Barcode data is validated
-  against its symbology with a clear warning when it cannot be encoded.
+- Element types: text, linear barcode (Code 128, Code 39, EAN-13, UPC-A), QR code, Data Matrix,
+  image, line, box, with a per-type properties panel and positions typed in dots or millimeters.
+  Barcode data is validated against its symbology with a clear warning when it cannot be encoded.
+- Images (PNG, JPEG, BMP) are converted to the printer's 1-bit black with a selectable dither
+  (threshold for logos, ordered, Floyd-Steinberg for photos) and embedded in the label as an
+  inline `^GF` graphic field, so the saved file and the exported ZPL are self-contained.
+- Template variables: `##MARKER##` placeholders in text and barcode data are discovered
+  automatically and listed in a Variables panel with editable preview samples. The preview renders
+  the samples; the exported and printed ZPL keeps the literal markers (they belong to the
+  downstream system that fills them).
+- Job settings saved with the label: copies (`^PQ`), darkness adjust (`^MD`), and print speed
+  (`^PR`), where zero means "leave the printer's default" and adds nothing to the ZPL.
 - Live offline preview driven by our own ZPL generator through a swappable renderer, debounced and
   rendered off the UI thread.
 - ZPL viewer: an editable ZPL pane with syntax highlighting, a live preview, auto-sizing from
   `^PW`/`^LL`, a selector for files with multiple `^XA` blocks, and a diagnostics strip for
   unsupported commands and engine errors. It tolerates non-ZPL template markers and comment lines.
 - Printer profiles (203/300/600 dpi Zebra models) with design-time head-width and density warnings.
-- Save and open the native `.lfl` project format; export ZPL, PNG, and PDF at exact physical size.
+- A built-in catalog of 797 official Zebra media specifications: search by part number, material,
+  or size in the label setup bar and the label takes the exact die-cut dimensions of the stock on
+  the roll. Continuous rolls are flagged with a hint instead of a fake fixed height.
+- Save and open the native `.lfl` project format (with a recent-files menu); export ZPL, PNG, and
+  PDF at exact physical size.
 - Printing over the network (TCP 9100) and through the Windows spooler (RAW datatype, the USB path).
 - Light and dark themes, a custom app icon, and Windows packaging via Velopack.
 
 ## Not yet built
 
 - Importing an existing ZPL label back into the visual designer. Real labels can be rendered in the
-  viewer, but the designer edits its own model of the five element types above; embedded graphics
-  (`~DG`/`^XG`), image elements, and full ZPL-to-model import are planned, not present.
-- A template and variable-data system (named variables, sample data, print regions). The viewer
-  substitutes sample values for preview today; a real templating layer is future work.
+  viewer, but the designer edits its own model of the element types above; embedded graphics
+  (`~DG`/`^XG`) and full ZPL-to-model import are planned, not present.
+- The full variable-data system. Variables and preview samples exist today; per-variable prompts,
+  input rules (pick lists, masks, lengths), counters, and date/time sources are future work.
 - User-facing string localization. The app ships English only; strings are currently inline and will
   be extracted to resource files later.
 

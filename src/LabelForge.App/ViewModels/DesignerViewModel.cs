@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -11,6 +12,7 @@ using LabelForge.Core.Editing;
 using LabelForge.Core.Io;
 using LabelForge.Core.Model;
 using LabelForge.Core.Rendering;
+using LabelForge.Core.Templating;
 using LabelForge.Core.Zpl;
 
 namespace LabelForge.App.ViewModels;
@@ -29,7 +31,9 @@ public partial class DesignerViewModel : ViewModelBase
 
     private readonly IZplRenderer _renderer = new BinaryKitsRenderer();
     private readonly ZplGenerator _generator = new();
+    private readonly TemplateSubstitutor _substitutor = new();
     private readonly SnapshotHistory _history = new();
+    private LabelDocument? _variablesDocument;
     private CancellationTokenSource? _renderCts;
     private bool _restoring;
     private long _lastRecordTicks;
@@ -96,6 +100,69 @@ public partial class DesignerViewModel : ViewModelBase
 
     [ObservableProperty]
     public partial decimal HeightMm { get; set; } = 60m;
+
+    /// <summary>Official Zebra media catalog backing the media picker.</summary>
+    public IReadOnlyList<Core.Media.StockMedia> MediaCatalog => Core.Media.StockCatalog.All;
+
+    /// <summary>Template variables found on the label, with editable preview samples.
+    /// Rebuilt only when the variable set or the document instance changes, so typing
+    /// in a sample box never loses focus to a refresh.</summary>
+    public ObservableCollection<VariableSampleViewModel> Variables { get; } = [];
+
+    public bool HasVariables => Variables.Count > 0;
+
+    /// <summary>Recently opened or saved .lfl paths, newest first.</summary>
+    public ObservableCollection<string> RecentFiles { get; } = new(Services.RecentFilesStore.Load());
+
+    public bool HasRecentFiles => RecentFiles.Count > 0;
+
+    /// <summary>Copies to print (^PQ); job settings live on the document.</summary>
+    public decimal PrintCopies
+    {
+        get => Document.Print.Copies;
+        set => EditPrintSetting((int)value, 1, 9999, Document.Print.Copies,
+            v => Document.Print.Copies = v, "print-copies");
+    }
+
+    /// <summary>Darkness adjustment (^MD), -30..30; 0 keeps the printer default.</summary>
+    public decimal PrintDarkness
+    {
+        get => Document.Print.DarknessDelta;
+        set => EditPrintSetting((int)value, -30, 30, Document.Print.DarknessDelta,
+            v => Document.Print.DarknessDelta = v, "print-darkness");
+    }
+
+    /// <summary>Print speed (^PR) in inches per second; 0 keeps the printer default
+    /// (the generator clamps emitted values to the ^PR 2..14 range).</summary>
+    public decimal PrintSpeed
+    {
+        get => Document.Print.SpeedIps;
+        set => EditPrintSetting((int)value, 0, 14, Document.Print.SpeedIps,
+            v => Document.Print.SpeedIps = v, "print-speed");
+    }
+
+    private void EditPrintSetting(int value, int min, int max, int current, Action<int> apply,
+        string undoKey, [System.Runtime.CompilerServices.CallerMemberName] string? property = null)
+    {
+        int next = Math.Clamp(value, min, max);
+        if (next == current)
+        {
+            return;
+        }
+
+        apply(next);
+        OnPropertyChanged(property);
+        if (!_restoring)
+        {
+            RecordUndo(undoKey);
+            ScheduleRender();
+        }
+    }
+
+    /// <summary>Media picked from the catalog; applying it sets the label size.
+    /// Cleared when the size is edited by hand so the field never lies.</summary>
+    [ObservableProperty]
+    public partial Core.Media.StockMedia? SelectedMedia { get; set; }
 
     [ObservableProperty]
     public partial DensityOption? SelectedDensity { get; set; }
@@ -216,6 +283,7 @@ public partial class DesignerViewModel : ViewModelBase
             Document = document;
             WidthMm = (decimal)document.WidthMm;
             HeightMm = (decimal)document.HeightMm;
+            SelectedMedia = null;
             SelectedDensity = Densities.FirstOrDefault(d => d.Dpmm == document.Dpmm) ?? Densities[0];
             Selection.Clear();
         }
@@ -225,12 +293,21 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         CurrentFilePath = path;
+        NotifyPrintSettingsChanged();
+        RefreshVariables();
         UpdatePrinterWarning();
         _history.Clear();
         _lastRecordTicks = 0;
         _lastCoalesceKey = null;
         RecordUndo();
         ScheduleRender();
+    }
+
+    private void NotifyPrintSettingsChanged()
+    {
+        OnPropertyChanged(nameof(PrintCopies));
+        OnPropertyChanged(nameof(PrintDarkness));
+        OnPropertyChanged(nameof(PrintSpeed));
     }
 
     [RelayCommand]
@@ -372,6 +449,8 @@ public partial class DesignerViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsLineArmed));
         OnPropertyChanged(nameof(IsBarcodeArmed));
         OnPropertyChanged(nameof(IsQrArmed));
+        OnPropertyChanged(nameof(IsDataMatrixArmed));
+        OnPropertyChanged(nameof(IsImageArmed));
     }
 
     public bool IsTextArmed => ArmedTool == "Text";
@@ -383,6 +462,10 @@ public partial class DesignerViewModel : ViewModelBase
     public bool IsBarcodeArmed => ArmedTool == "Barcode";
 
     public bool IsQrArmed => ArmedTool == "QR";
+
+    public bool IsDataMatrixArmed => ArmedTool == "DataMatrix";
+
+    public bool IsImageArmed => ArmedTool == "Image";
 
     private Func<Element>? _pendingFactory;
 
@@ -405,6 +488,28 @@ public partial class DesignerViewModel : ViewModelBase
     [RelayCommand]
     private void AddQr() => ArmInsert("QR",
         () => new QrCodeElement { Data = "https://example.com", Magnification = 5 });
+
+    [RelayCommand]
+    private void AddDataMatrix() => ArmInsert("DataMatrix",
+        () => new DataMatrixElement { Data = "LF-000123", ModuleSizeDots = 4 });
+
+    /// <summary>Arms image placement with an already-picked file (the file dialog
+    /// runs in the view). The image scales to fit a 240-dot box, keeping aspect.</summary>
+    public void ArmInsertImage(byte[] imageData, int pixelWidth, int pixelHeight)
+    {
+        const int fitDots = 240;
+        double scale = Math.Min(
+            (double)fitDots / Math.Max(pixelWidth, 1),
+            (double)fitDots / Math.Max(pixelHeight, 1));
+        ArmInsert("Image", () => new ImageElement
+        {
+            ImageData = imageData,
+            SourcePixelWidth = pixelWidth,
+            SourcePixelHeight = pixelHeight,
+            WidthDots = Math.Max((int)Math.Round(pixelWidth * scale), 8),
+            HeightDots = Math.Max((int)Math.Round(pixelHeight * scale), 8),
+        });
+    }
 
     /// <summary>Arms the insert: the mouse becomes a placement tool until a click or Esc.</summary>
     private void ArmInsert(string tool, Func<Element> factory)
@@ -650,6 +755,8 @@ public partial class DesignerViewModel : ViewModelBase
         TextElement text => new TextPropertiesViewModel(text, Document, OnPanelEdited),
         BarcodeElement barcode => new BarcodePropertiesViewModel(barcode, Document, OnPanelEdited),
         QrCodeElement qr => new QrPropertiesViewModel(qr, Document, OnPanelEdited),
+        DataMatrixElement dm => new DataMatrixPropertiesViewModel(dm, Document, OnPanelEdited),
+        ImageElement image => new ImagePropertiesViewModel(image, Document, OnPanelEdited),
         LineElement line => new LinePropertiesViewModel(line, Document, OnPanelEdited),
         BoxElement box => new BoxPropertiesViewModel(box, Document, OnPanelEdited),
         _ => null,
@@ -686,6 +793,7 @@ public partial class DesignerViewModel : ViewModelBase
             return;
         }
 
+        SelectedMedia = null;
         Document.WidthMm = (double)value;
         UpdatePrinterWarning();
         RecordUndo("doc-width");
@@ -699,9 +807,35 @@ public partial class DesignerViewModel : ViewModelBase
             return;
         }
 
+        SelectedMedia = null;
         Document.HeightMm = (double)value;
         RecordUndo("doc-height");
         ScheduleRender();
+    }
+
+    /// <summary>Applies a catalog media to the label: both dimensions in one undo
+    /// step. The width/height setters are bypassed via the restore guard so the
+    /// apply does not clear the selection or record two extra steps.</summary>
+    partial void OnSelectedMediaChanged(Core.Media.StockMedia? value)
+    {
+        if (_restoring || value is null)
+        {
+            return;
+        }
+
+        _restoring = true;
+        WidthMm = (decimal)value.WidthMm;
+        HeightMm = (decimal)value.HeightMm;
+        _restoring = false;
+
+        Document.WidthMm = value.WidthMm;
+        Document.HeightMm = value.HeightMm;
+        UpdatePrinterWarning();
+        RecordUndo();
+        ScheduleRender();
+        StatusText = value.Continuous
+            ? $"Applied media {value.PartNumber}: continuous {value.WidthMm:0.#} mm roll, adjust the height to your content"
+            : $"Applied media {value.PartNumber} ({value.SizeText})";
     }
 
     partial void OnSelectedDensityChanged(DensityOption? value)
@@ -771,6 +905,8 @@ public partial class DesignerViewModel : ViewModelBase
         // Restoring must not count as a new edit; a subsequent edit starts fresh.
         _lastRecordTicks = 0;
         _lastCoalesceKey = null;
+        NotifyPrintSettingsChanged();
+        RefreshVariables();
         UpdatePrinterWarning();
         ScheduleRender();
     }
@@ -779,6 +915,73 @@ public partial class DesignerViewModel : ViewModelBase
     {
         CanUndo = _history.CanUndo;
         CanRedo = _history.CanRedo;
+    }
+
+    /// <summary>Syncs the Variables panel with the markers on the label. Skips the
+    /// rebuild when nothing changed so an open sample TextBox keeps its focus.</summary>
+    private void RefreshVariables()
+    {
+        IReadOnlyList<string> names = TemplateVariables.Discover(Document);
+        bool unchanged = ReferenceEquals(_variablesDocument, Document)
+            && names.Count == Variables.Count
+            && !names.Where((name, i) => Variables[i].Name != name).Any();
+        if (unchanged)
+        {
+            return;
+        }
+
+        _variablesDocument = Document;
+        Variables.Clear();
+        foreach (string name in names)
+        {
+            Variables.Add(new VariableSampleViewModel(name, Document, OnSampleEdited));
+        }
+
+        OnPropertyChanged(nameof(HasVariables));
+    }
+
+    private void OnSampleEdited(string name)
+    {
+        RecordUndo($"sample:{name}");
+        ScheduleRender();
+    }
+
+    /// <summary>Moves (or adds) a path to the top of the recent files list.</summary>
+    public void RegisterRecentFile(string path)
+    {
+        SyncRecentFiles(Services.RecentFilesStore.Add(path));
+    }
+
+    [RelayCommand]
+    private void OpenRecent(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return;
+        }
+
+        try
+        {
+            LoadDocument(LabelDocumentJson.Deserialize(File.ReadAllText(path)), path);
+            StatusText = $"Opened {Path.GetFileName(path)}";
+            RegisterRecentFile(path);
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Could not open: {ex.Message}";
+            SyncRecentFiles(Services.RecentFilesStore.Remove(path));
+        }
+    }
+
+    private void SyncRecentFiles(IReadOnlyList<string> entries)
+    {
+        RecentFiles.Clear();
+        foreach (string entry in entries)
+        {
+            RecentFiles.Add(entry);
+        }
+
+        OnPropertyChanged(nameof(HasRecentFiles));
     }
 
     /// <summary>Every visible barcode whose data cannot be encoded, each described for
@@ -846,6 +1049,16 @@ public partial class DesignerViewModel : ViewModelBase
                         string previewZpl = margin > 0
                             ? _generator.GeneratePreview(document, margin)
                             : generated;
+
+                        // The preview substitutes template markers with the user's
+                        // sample values (falling back to the default); exported and
+                        // printed ZPL keeps the literal markers.
+                        previewZpl = _substitutor.Substitute(previewZpl, inner =>
+                        {
+                            string name = TemplateVariables.NameOf(inner);
+                            return document.SampleValues.TryGetValue(name, out string? sample)
+                                && sample.Length > 0 ? sample : null;
+                        });
                         RenderResult rendered = _renderer.Render(
                             previewZpl, widthMm + 2 * marginMm, heightMm + 2 * marginMm, dpmm);
                         return (generated, rendered, margin, DescribePlacement(offLabel));
@@ -860,6 +1073,7 @@ public partial class DesignerViewModel : ViewModelBase
             GeneratedZpl = zpl;
             UnderlayMarginDots = marginDots;
             PlacementWarning = placementWarning;
+            RefreshVariables();
 
             Bitmap? previous = Underlay;
             if (result.Png.Length > 0)
@@ -945,6 +1159,8 @@ public partial class DesignerViewModel : ViewModelBase
             TextElement => "Text",
             BarcodeElement => "Barcode",
             QrCodeElement => "QR code",
+            DataMatrixElement => "Data Matrix",
+            ImageElement => "Image",
             LineElement => "Line",
             BoxElement => "Box",
             _ => "Element",

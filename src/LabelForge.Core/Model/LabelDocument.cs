@@ -20,6 +20,16 @@ public sealed class LabelDocument
 
     public IList<Element> Elements { get; init; } = new List<Element>();
 
+    /// <summary>Job-level print settings emitted with the label (quantity, darkness,
+    /// speed). Part of the document so a label prints the same from any machine.</summary>
+    public PrintSettings Print { get; init; } = new();
+
+    /// <summary>Preview sample values per template variable name (##NAME## markers).
+    /// Preview-only: exported and printed ZPL keeps the literal markers. Variables
+    /// without an entry fall back to the default sample.</summary>
+    public IDictionary<string, string> SampleValues { get; init; } =
+        new Dictionary<string, string>();
+
     /// <summary>Vertical alignment guides: X positions in dots. Design aids only,
     /// never printed; they ride the undo/save pipeline like any document change.</summary>
     public IList<int> VerticalGuides { get; init; } = new List<int>();

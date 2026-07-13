@@ -40,6 +40,21 @@ public sealed class ZplGenerator : IElementVisitor
         Line($"^LL{document.HeightDots + 2 * offsetDots}");
         Line("^LH0,0");
 
+        // Job settings ride only the printable output; the preview renderer would
+        // just flag them as unknown commands.
+        if (!includeOffLabel)
+        {
+            if (document.Print.SpeedIps > 0)
+            {
+                Line($"^PR{Math.Clamp(document.Print.SpeedIps, 2, 14)}");
+            }
+
+            if (document.Print.DarknessDelta != 0)
+            {
+                Line($"^MD{Math.Clamp(document.Print.DarknessDelta, -30, 30)}");
+            }
+        }
+
         foreach (var element in document.Elements
                      .Where(e => e.IsVisible)
                      .OrderBy(e => e.ZOrder))
@@ -57,6 +72,11 @@ public sealed class ZplGenerator : IElementVisitor
             }
 
             element.Accept(this);
+        }
+
+        if (!includeOffLabel && document.Print.Copies > 1)
+        {
+            Line($"^PQ{document.Print.Copies}");
         }
 
         _sb.Append("^XZ");
@@ -104,6 +124,28 @@ public sealed class ZplGenerator : IElementVisitor
         };
 
         Line($"{by}{Fo(element)}{command}{ZplEncoding.FieldData(element.Data)}");
+    }
+
+    public void Visit(DataMatrixElement element) =>
+        Line($"{Fo(element)}^BX{element.Orientation.Letter()},{element.ModuleSizeDots},200"
+             + ZplEncoding.FieldData(element.Data));
+
+    public void Visit(ImageElement element)
+    {
+        // Undecodable or empty image data degrades to an omitted field, mirroring
+        // the renderer's never-throw rule; the designer still shows the placeholder.
+        byte[]? gray = element.ImageData.Length > 0
+            ? Imaging.ImageRasterizer.ToGrayscale(element.ImageData, element.WidthDots, element.HeightDots)
+            : null;
+        if (gray is null)
+        {
+            return;
+        }
+
+        bool[] black = Imaging.ImageDitherer.Dither(
+            gray, element.WidthDots, element.HeightDots, element.Dithering);
+        Line(Fo(element) + Imaging.ZplImageEncoder.EncodeGfa(
+            black, element.WidthDots, element.HeightDots));
     }
 
     public void Visit(QrCodeElement element)

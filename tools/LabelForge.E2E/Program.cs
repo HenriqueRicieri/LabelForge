@@ -109,6 +109,20 @@ else
     d.WidthMm = 100;
     Console.WriteLine($"warning @100mm: '{d.PrinterWarning}' (expect empty)");
 
+    // Media catalog: applying a stock sets both dimensions as ONE undo step, and a
+    // manual size edit clears the picked media so the field never lies.
+    var media = LabelForge.Core.Media.StockCatalog.Search("3007301-T")[0];
+    d.SelectedMedia = media;
+    Console.WriteLine(FormattableString.Invariant(
+        $"media apply: {d.WidthMm}x{d.HeightMm} mm (expected 75.4x101.6)"));
+    d.UndoCommand.Execute(null);
+    Console.WriteLine(FormattableString.Invariant(
+        $"media undo: {d.WidthMm}x{d.HeightMm} mm (expected 100x60, one step)"));
+    d.SelectedMedia = media;
+    d.WidthMm = 80;
+    Console.WriteLine($"manual edit clears media: {(d.SelectedMedia is null ? "null" : "still set")} (expected null)");
+    d.WidthMm = 100;
+
     // Multi-select: group delete + undo, then leave two selected for the capture.
     d.Selection.SetMany([d.Document.Elements[1], d.Document.Elements[2]]);
     Console.WriteLine($"multi: count={d.SelectionCount}, multi={d.HasMultiSelection}, single={d.IsSingleSelection} (expected 2/True/False)");
@@ -154,6 +168,27 @@ if (mode == "designer")
 
     var reloaded = LabelForge.Core.Io.LabelDocumentJson.Deserialize(d.SerializeDocument());
     Console.WriteLine($"guides round trip: {reloaded.VerticalGuides.Count} vertical / {reloaded.HorizontalGuides.Count} horizontal (expected 2/1)");
+
+    // Newer features: Data Matrix insert, template variables, job settings.
+    int beforeDm = d.Document.Elements.Count;
+    d.AddDataMatrixCommand.Execute(null);
+    d.PlaceAt(100, 300);
+    Console.WriteLine(
+        $"datamatrix add: {d.Document.Elements.Count - beforeDm} added, "
+        + $"selected type ok={d.SelectedElement is LabelForge.Core.Model.DataMatrixElement} (expected 1/True)");
+
+    d.Document.Elements.Add(new LabelForge.Core.Model.TextElement
+    {
+        X = 20, Y = 20, Text = "Lot ##LOTE##", FontHeightDots = 30,
+    });
+    d.PrintCopies = 3;
+    d.NotifyDocumentEdited();
+    Pump(700);
+    Console.WriteLine(
+        $"variables panel: {d.Variables.Count} found, "
+        + $"first='{(d.Variables.Count > 0 ? d.Variables[0].Name : "none")}' (expected 1/LOTE)");
+    Console.WriteLine($"job settings in ZPL: {d.GeneratedZpl.Contains("^PQ3")} (expected True)");
+    Console.WriteLine($"markers stay in export: {d.GeneratedZpl.Contains("##LOTE##")} (expected True)");
 
     // Input-path checks through the headless window. Holding the left button on the
     // top ruler shows a transient guide (captured mid-hold); releasing removes it

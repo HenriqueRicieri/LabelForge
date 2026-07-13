@@ -94,6 +94,33 @@ public sealed class ElementBoundsCalculator : IElementVisitor
         _result = new DotRect(element.X, element.Y + 10, side, side);
     }
 
+    public void Visit(DataMatrixElement element)
+    {
+        // Square ECC 200 symbol sizes by ASCII capacity (10x10 through 52x52); an
+        // estimate in the same spirit as the QR table above.
+        ReadOnlySpan<(int Modules, int Capacity)> sizes =
+        [
+            (10, 3), (12, 5), (14, 8), (16, 12), (18, 18), (20, 22), (22, 30),
+            (24, 36), (26, 44), (32, 62), (36, 86), (40, 114), (44, 144), (48, 174), (52, 204),
+        ];
+
+        int modules = 52;
+        foreach ((int m, int capacity) in sizes)
+        {
+            if (element.Data.Length <= capacity)
+            {
+                modules = m;
+                break;
+            }
+        }
+
+        int side = modules * Math.Max(element.ModuleSizeDots, 1);
+        _result = new DotRect(element.X, element.Y, side, side);
+    }
+
+    public void Visit(ImageElement element) =>
+        _result = new DotRect(element.X, element.Y, element.WidthDots, element.HeightDots);
+
     public void Visit(LineElement element)
     {
         (int w, int h) = element.IsVertical

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using LabelForge.Core.Model;
 
 namespace LabelForge.App.ViewModels;
@@ -236,6 +237,81 @@ public sealed class QrPropertiesViewModel : ElementPropertiesViewModel
     {
         get => _qr.ErrorCorrection;
         set => Edit(_qr.ErrorCorrection, value, v => _qr.ErrorCorrection = v);
+    }
+}
+
+public sealed class DataMatrixPropertiesViewModel : ElementPropertiesViewModel
+{
+    private readonly DataMatrixElement _dm;
+
+    public DataMatrixPropertiesViewModel(DataMatrixElement element, LabelDocument document, Action<string> edited)
+        : base(element, document, edited) => _dm = element;
+
+    public override string TypeName => "Data Matrix";
+
+    public string Data
+    {
+        get => _dm.Data;
+        set => Edit(_dm.Data, value ?? string.Empty, v => _dm.Data = v);
+    }
+
+    public decimal ModuleSize
+    {
+        get => _dm.ModuleSizeDots;
+        set => Edit(_dm.ModuleSizeDots, Math.Clamp((int)value, 1, 20), v => _dm.ModuleSizeDots = v);
+    }
+}
+
+public sealed class ImagePropertiesViewModel : ElementPropertiesViewModel
+{
+    private readonly ImageElement _image;
+
+    public ImagePropertiesViewModel(ImageElement element, LabelDocument document, Action<string> edited)
+        : base(element, document, edited)
+    {
+        _image = element;
+        RestoreAspectCommand = new RelayCommand(RestoreAspect);
+    }
+
+    public override string TypeName => "Image";
+
+    public IRelayCommand RestoreAspectCommand { get; }
+
+    public string SourceInfo => _image.SourcePixelWidth > 0
+        ? $"Source: {_image.SourcePixelWidth} x {_image.SourcePixelHeight} px"
+        : "Source size unknown";
+
+    public IReadOnlyList<DitherMode> DitherModes { get; } = Enum.GetValues<DitherMode>();
+
+    public DitherMode Dithering
+    {
+        get => _image.Dithering;
+        set => Edit(_image.Dithering, value, v => _image.Dithering = v);
+    }
+
+    public decimal ImageWidth
+    {
+        get => _image.WidthDots;
+        set => Edit(_image.WidthDots, Math.Max((int)value, 8), v => _image.WidthDots = v);
+    }
+
+    public decimal ImageHeight
+    {
+        get => _image.HeightDots;
+        set => Edit(_image.HeightDots, Math.Max((int)value, 8), v => _image.HeightDots = v);
+    }
+
+    /// <summary>Re-derives the height from the width using the source pixel aspect.</summary>
+    private void RestoreAspect()
+    {
+        if (_image.SourcePixelWidth <= 0 || _image.SourcePixelHeight <= 0)
+        {
+            return;
+        }
+
+        int height = Math.Max((int)Math.Round(
+            (double)_image.WidthDots * _image.SourcePixelHeight / _image.SourcePixelWidth), 8);
+        Edit(_image.HeightDots, height, v => _image.HeightDots = v, nameof(ImageHeight));
     }
 }
 

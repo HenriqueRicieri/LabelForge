@@ -66,6 +66,24 @@ public static class ElementResizer
 
                 break;
             }
+
+            case DataMatrixElement dm:
+            {
+                int modules = Bounds.GetUnrotatedBounds(dm).Width / Math.Max(dm.ModuleSizeDots, 1);
+                if (modules > 0)
+                {
+                    int target = Math.Max(targetWidth, targetHeight);
+                    dm.ModuleSizeDots = Math.Clamp(
+                        (int)Math.Round((double)target / modules), 1, 20);
+                }
+
+                break;
+            }
+
+            case ImageElement image:
+                image.WidthDots = Math.Max(targetWidth, 8);
+                image.HeightDots = Math.Max(targetHeight, 8);
+                break;
         }
     }
 }
