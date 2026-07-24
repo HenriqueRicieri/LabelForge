@@ -18,6 +18,16 @@ public sealed class LabelDocument
     /// <summary>Print density in dots per millimeter (8 = 203 dpi, 12 = 300, 24 = 600).</summary>
     public int Dpmm { get; set; } = 8;
 
+    /// <summary>
+    /// Die-cut corner radius in millimeters; 0 is a square-cornered label. Set from the
+    /// media catalog or a saved preset, and editable by hand.
+    ///
+    /// This describes the physical stock, not the print. It shapes the canvas and the
+    /// PDF so the design is checked against the label that actually exists, and it never
+    /// reaches the ZPL, which has no notion of the label's outline.
+    /// </summary>
+    public double CornerRadiusMm { get; set; }
+
     public IList<Element> Elements { get; init; } = new List<Element>();
 
     /// <summary>Job-level print settings emitted with the label (quantity, darkness,
@@ -48,4 +58,14 @@ public sealed class LabelDocument
 
     [JsonIgnore]
     public int HeightDots => Units.MmToDots(HeightMm, Dpmm);
+
+    /// <summary>The radius that can actually be drawn. Past half the shorter side the
+    /// corners would overlap, which is not a shape any die cuts, so the clamp lives here
+    /// and every drawing surface reads it rather than repeating the rule.</summary>
+    [JsonIgnore]
+    public double EffectiveCornerRadiusMm =>
+        Math.Clamp(CornerRadiusMm, 0, Math.Min(WidthMm, HeightMm) / 2);
+
+    [JsonIgnore]
+    public int CornerRadiusDots => Units.MmToDots(EffectiveCornerRadiusMm, Dpmm);
 }

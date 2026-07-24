@@ -68,6 +68,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   size under a name (with an optional material, corner radius, and continuous flag) and the same
   search box finds it alongside the catalog, listed first and tagged so it is never mistaken for a
   Zebra part number.
+- Die-cut corner radius, taken from the picked media or set by hand. The canvas draws the label's
+  real shape and shades the cut-away corners without hiding what sits in them, and the exported PDF
+  is clipped to the same shape. It describes the stock, so it never changes the generated ZPL.
 - Save and open the native `.lfl` project format (with a recent-files menu); export ZPL, PNG, and
   PDF at exact physical size.
 - Printing over the network (TCP 9100) and through the Windows spooler (RAW datatype, the USB path).

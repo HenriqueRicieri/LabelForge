@@ -147,6 +147,29 @@ public partial class DesignerViewModel : ViewModelBase
 
     public bool HasRecentFiles => RecentFiles.Count > 0;
 
+    /// <summary>Die-cut corner radius in mm. Describes the physical stock: it shapes the
+    /// canvas and the PDF, never the ZPL.</summary>
+    public decimal CornerRadiusMm
+    {
+        get => (decimal)Document.CornerRadiusMm;
+        set
+        {
+            double next = Math.Clamp((double)value, 0, 50);
+            if (Math.Abs(next - Document.CornerRadiusMm) < 0.0001)
+            {
+                return;
+            }
+
+            Document.CornerRadiusMm = next;
+            OnPropertyChanged();
+            if (!_restoring)
+            {
+                RecordUndo("doc-radius");
+                ScheduleRender();
+            }
+        }
+    }
+
     /// <summary>Copies to print (^PQ); job settings live on the document.</summary>
     public decimal PrintCopies
     {
@@ -313,7 +336,8 @@ public partial class DesignerViewModel : ViewModelBase
             byte[] png = _renderer
                 .Render(new ZplGenerator().Generate(document), document.WidthMm, document.HeightMm, document.Dpmm)
                 .Png;
-            return Core.Export.PdfExporter.FromPng(png, document.WidthMm, document.HeightMm);
+            return Core.Export.PdfExporter.FromPng(
+                png, document.WidthMm, document.HeightMm, document.EffectiveCornerRadiusMm);
         });
     }
 
@@ -346,11 +370,14 @@ public partial class DesignerViewModel : ViewModelBase
         ScheduleRender();
     }
 
+    /// <summary>Re-reads the document-backed fields after the document is replaced
+    /// (open, new, undo), since they have no observable property of their own.</summary>
     private void NotifyPrintSettingsChanged()
     {
         OnPropertyChanged(nameof(PrintCopies));
         OnPropertyChanged(nameof(PrintDarkness));
         OnPropertyChanged(nameof(PrintSpeed));
+        OnPropertyChanged(nameof(CornerRadiusMm));
     }
 
     [RelayCommand]
@@ -885,10 +912,15 @@ public partial class DesignerViewModel : ViewModelBase
         _restoring = true;
         WidthMm = (decimal)value.WidthMm;
         HeightMm = (decimal)value.HeightMm;
+        CornerRadiusMm = (decimal)value.RadiusMm;
         _restoring = false;
 
         Document.WidthMm = value.WidthMm;
         Document.HeightMm = value.HeightMm;
+
+        // The stock's own die-cut shape comes with it, so the canvas shows the label
+        // that will actually come off the roll.
+        Document.CornerRadiusMm = value.RadiusMm;
         UpdatePrinterWarning();
         RecordUndo();
         ScheduleRender();

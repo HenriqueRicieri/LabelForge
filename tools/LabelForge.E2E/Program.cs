@@ -168,6 +168,16 @@ else
     d.WidthMm = 100m;
     d.HeightMm = 60m;
 
+    // Corner radius: a picked media brings its own die-cut radius onto the document.
+    var roundedMedia = LabelForge.Core.Media.StockCatalog.Search("02D102102400K")[0];
+    d.SelectedMedia = roundedMedia;
+    Console.WriteLine(FormattableString.Invariant(
+        $"media brings its die-cut radius: {d.CornerRadiusMm} mm (catalog says {roundedMedia.RadiusMm}), {d.Document.CornerRadiusDots} dots"));
+    d.SelectedMedia = null;
+    d.WidthMm = 100m;
+    d.HeightMm = 60m;
+    d.CornerRadiusMm = 0m;
+
     // Multi-select: group delete + undo, then leave two selected for the capture.
     d.Selection.SetMany([d.Document.Elements[1], d.Document.Elements[2]]);
     Console.WriteLine($"multi: count={d.SelectionCount}, multi={d.HasMultiSelection}, single={d.IsSingleSelection} (expected 2/True/False)");
@@ -368,6 +378,21 @@ if (mode == "designer")
     Console.WriteLine($"align left: Title X={d.Document.Elements[1].X} (expected 50)");
     d.Selection.SetMany([d.Document.Elements[1], d.Document.Elements[2], d.Document.Elements[4]]);
     Console.WriteLine($"distribute gating with 3 selected: {d.DistributeHorizontalCommand.CanExecute(null)} (expected True)");
+
+    // A rounded label: the canvas shows the die-cut shape while the ZPL, which has no
+    // notion of the label outline, stays exactly as it was.
+    // Let the pending render from the alignment above land first, or the comparison
+    // would be against a stale ZPL and blame the radius for someone else's edit.
+    Pump(600);
+    string zplBeforeRadius = d.GeneratedZpl;
+    d.CornerRadiusMm = 6m;
+    Pump(600);
+    Console.WriteLine(
+        $"radius on the canvas: {d.Document.CornerRadiusDots} dots (expected 48 at 8 dpmm), "
+        + $"ZPL unchanged={d.GeneratedZpl == zplBeforeRadius} (expected True)");
+    Capture("designer-rounded.png");
+    d.CornerRadiusMm = 0m;
+    Pump(300);
 
     // My media flyout, captured with a preset saved so the list is not empty.
     d.NewMediaName = "Etiqueta Filial";

@@ -259,6 +259,10 @@
                 <TextBlock Text="Height (mm)" VerticalAlignment="Center" />
                 <NumericUpDown Value="{Binding HeightMm}" Minimum="5" Maximum="1000"
                                Increment="1" FormatString="0.#" Width="110" />
+                <TextBlock Text="Corner (mm)" VerticalAlignment="Center"
+                           ToolTip.Tip="Die-cut corner radius. Shapes the canvas and the exported PDF so the design is checked against the real label; it never changes the ZPL." />
+                <NumericUpDown Value="{Binding CornerRadiusMm}" Minimum="0" Maximum="50"
+                               Increment="0.5" FormatString="0.##" Width="105" />
                 <TextBlock Text="Media" VerticalAlignment="Center"
                            ToolTip.Tip="Set the label size from a Zebra part number or one of your own saved media" />
                 <AutoCompleteBox x:Name="MediaBox" Width="230"

@@ -82,6 +82,12 @@ public sealed class DesignerCanvas : Control
     private static readonly SolidColorBrush DimBrush = new(Color.FromArgb(0xBE, 0xD9, 0xD9, 0xD9));
     private static readonly SolidColorBrush DarkDimBrush = new(Color.FromArgb(0xBE, 0x3C, 0x3C, 0x3C));
 
+    // The four corner slivers a die cut removes, rebuilt only when the shape changes:
+    // Render runs on every pointer move, and this is geometry, not a rectangle.
+    private Geometry? _cornerCut;
+    private Rect _cornerCutRect;
+    private double _cornerCutRadius;
+
     // Ruler chrome, one set per theme.
     private static readonly SolidColorBrush RulerBrush = new(Color.FromRgb(0xEC, 0xEC, 0xEC));
     private static readonly SolidColorBrush DarkRulerBrush = new(Color.FromRgb(0x2E, 0x2E, 0x2E));
@@ -491,7 +497,21 @@ public sealed class DesignerCanvas : Control
             }
         }
 
-        context.DrawRectangle(null, LabelBorderPen, labelRect.Inflate(0.5));
+        // Die-cut corners. The removed material gets the same translucent wash as the
+        // pasteboard, deliberately veiling rather than erasing: content that landed in a
+        // cut corner is exactly what the radius exists to reveal, so hiding it would
+        // defeat the feature.
+        double cornerPx = doc.CornerRadiusDots * scale;
+        if (cornerPx > 0.5)
+        {
+            context.DrawGeometry(
+                IsDark ? DarkDimBrush : DimBrush, null, CornerCutGeometry(labelRect, cornerPx));
+            context.DrawRectangle(null, LabelBorderPen, labelRect.Inflate(0.5), cornerPx, cornerPx);
+        }
+        else
+        {
+            context.DrawRectangle(null, LabelBorderPen, labelRect.Inflate(0.5));
+        }
 
         // Amber dashed outline on anything that will not print exactly as drawn.
         foreach (Element element in doc.Elements.Where(el => el.IsVisible))
@@ -808,6 +828,24 @@ public sealed class DesignerCanvas : Control
                     : new Point(2, px + 1));
             }
         }
+    }
+
+    /// <summary>The area a die cut removes: the label rectangle minus its rounded form,
+    /// which leaves the four corner slivers.</summary>
+    private Geometry CornerCutGeometry(Rect rect, double radius)
+    {
+        if (_cornerCut is not null && _cornerCutRect == rect && _cornerCutRadius == radius)
+        {
+            return _cornerCut;
+        }
+
+        _cornerCut = new CombinedGeometry(
+            GeometryCombineMode.Exclude,
+            new RectangleGeometry(rect),
+            new RectangleGeometry(rect) { RadiusX = radius, RadiusY = radius });
+        _cornerCutRect = rect;
+        _cornerCutRadius = radius;
+        return _cornerCut;
     }
 
     private Rect MarqueeRect() => new(
