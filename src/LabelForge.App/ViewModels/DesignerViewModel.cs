@@ -30,7 +30,6 @@ public partial class DesignerViewModel : ViewModelBase
     private const int CoalesceWindowMs = 500;
 
     private readonly IZplRenderer _renderer = new BinaryKitsRenderer();
-    private readonly ZplGenerator _generator = new();
     private readonly TemplateSubstitutor _substitutor = new();
     private readonly SnapshotHistory _history = new();
     private LabelDocument? _variablesDocument;
@@ -205,6 +204,12 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial string PlacementWarning { get; set; } = string.Empty;
 
+    /// <summary>Why a printer-side counter or clock the document asked for is not being
+    /// used. Empty when everything the label requested is expressible in ZPL, which is
+    /// the normal case; a fallback still prints correctly, just more slowly.</summary>
+    [ObservableProperty]
+    public partial string VariableWarning { get; set; } = string.Empty;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(UndoCommand))]
     public partial bool CanUndo { get; set; }
@@ -257,7 +262,7 @@ public partial class DesignerViewModel : ViewModelBase
     {
         LabelDocument document = Document;
         return Task.Run(() => _renderer
-            .Render(_generator.Generate(document), document.WidthMm, document.HeightMm, document.Dpmm)
+            .Render(new ZplGenerator().Generate(document), document.WidthMm, document.HeightMm, document.Dpmm)
             .Png);
     }
 
@@ -268,7 +273,7 @@ public partial class DesignerViewModel : ViewModelBase
         return Task.Run(() =>
         {
             byte[] png = _renderer
-                .Render(_generator.Generate(document), document.WidthMm, document.HeightMm, document.Dpmm)
+                .Render(new ZplGenerator().Generate(document), document.WidthMm, document.HeightMm, document.Dpmm)
                 .Png;
             return Core.Export.PdfExporter.FromPng(png, document.WidthMm, document.HeightMm);
         });
@@ -336,12 +341,12 @@ public partial class DesignerViewModel : ViewModelBase
         try
         {
             StatusText = $"Sending to {host}...";
-            string zpl = _generator.Generate(Document);
+            PrintJobResult job = PrintJob.Build(Document, DateTime.Now);
 
             // The connection phase is bounded inside SendAsync; a timeout surfaces as a
             // TimeoutException whose message already names the unreachable endpoint.
-            await Core.Printing.RawNetworkPrinter.SendAsync(host, (int)PrinterPort, zpl);
-            StatusText = $"Sent to {host}:{(int)PrinterPort}";
+            await Core.Printing.RawNetworkPrinter.SendAsync(host, (int)PrinterPort, job.Zpl);
+            StatusText = $"Sent to {host}:{(int)PrinterPort}{DescribeRun(job)}";
         }
         catch (Exception ex)
         {
@@ -384,14 +389,30 @@ public partial class DesignerViewModel : ViewModelBase
         try
         {
             StatusText = $"Spooling to {name}...";
-            string zpl = _generator.Generate(Document);
-            await SendToWindowsPrinterAsync(name, zpl);
-            StatusText = $"Sent to {name}";
+            PrintJobResult job = PrintJob.Build(Document, DateTime.Now);
+            await SendToWindowsPrinterAsync(name, job.Zpl);
+            StatusText = $"Sent to {name}{DescribeRun(job)}";
         }
         catch (Exception ex)
         {
             StatusText = $"Print failed: {ex.Message}";
         }
+    }
+
+    /// <summary>Trailing summary of what a run produced, so "sent" also says how many
+    /// labels went out and whether the printer or this PC numbered them.</summary>
+    private string DescribeRun(PrintJobResult job)
+    {
+        if (job.Labels <= 1)
+        {
+            return string.Empty;
+        }
+
+        string capped = job.Labels < Document.Print.Copies
+            ? $", capped from {Document.Print.Copies}"
+            : string.Empty;
+        string numbering = job.CountedByPrinter ? ", serialized by the printer" : string.Empty;
+        return $" ({job.Labels} labels{numbering}{capped})";
     }
 
     /// <summary>Guarded so the platform-specific spooler call has a Windows-only context;
@@ -934,15 +955,17 @@ public partial class DesignerViewModel : ViewModelBase
         Variables.Clear();
         foreach (string name in names)
         {
-            Variables.Add(new VariableSampleViewModel(name, Document, OnSampleEdited));
+            Variables.Add(new VariableSampleViewModel(name, Document, OnVariableEdited));
         }
 
         OnPropertyChanged(nameof(HasVariables));
     }
 
-    private void OnSampleEdited(string name)
+    /// <summary>An edit from the Variables panel. The row supplies the coalescing key so
+    /// typing a sample and nudging a counter never merge into one undo step.</summary>
+    private void OnVariableEdited(string undoKey)
     {
-        RecordUndo($"sample:{name}");
+        RecordUndo(undoKey);
         ScheduleRender();
     }
 
@@ -1026,11 +1049,21 @@ public partial class DesignerViewModel : ViewModelBase
             double heightMm = document.HeightMm;
             int dpmm = document.Dpmm;
 
-            (string zpl, RenderResult result, int marginDots, string placementWarning) =
+            // One timestamp for the whole pass so the ZPL pane and the canvas agree on
+            // what a date variable currently reads.
+            DateTime now = DateTime.Now;
+
+            (string zpl, RenderResult result, int marginDots, string placementWarning,
+                    string variableWarning) =
                 await Task.Run(
                     () =>
                     {
-                        string generated = _generator.Generate(document);
+                        // A generator instance carries the state of one pass, and a
+                        // superseded render can still be in flight, so never share one.
+                        var generator = new ZplGenerator();
+                        string generated = generator.Generate(
+                            document, new GenerationContext { Now = now });
+                        GenerationInfo run = generator.LastRun;
 
                         var bounds = new ElementBoundsCalculator();
                         var offLabel = document.Elements
@@ -1046,22 +1079,22 @@ public partial class DesignerViewModel : ViewModelBase
                             ? Units.MmToDots(ElementPlacement.PasteboardMarginMm, dpmm)
                             : 0;
                         double marginMm = Units.DotsToMm(margin, dpmm);
-                        string previewZpl = margin > 0
-                            ? _generator.GeneratePreview(document, margin)
-                            : generated;
 
-                        // The preview substitutes template markers with the user's
-                        // sample values (falling back to the default); exported and
-                        // printed ZPL keeps the literal markers.
-                        previewZpl = _substitutor.Substitute(previewZpl, inner =>
-                        {
-                            string name = TemplateVariables.NameOf(inner);
-                            return document.SampleValues.TryGetValue(name, out string? sample)
-                                && sample.Length > 0 ? sample : null;
-                        });
+                        // Always the preview variant, even at margin 0: it keeps job
+                        // settings and printer-side clock codes out of the render, which
+                        // the offline engine would report as unknown commands or draw
+                        // literally instead of as a date.
+                        string previewZpl = new ZplGenerator().GeneratePreview(document, margin);
+
+                        // The preview resolves every marker to something renderable: the
+                        // user's sample, the counter's first value, or the current date.
+                        // Exported and printed ZPL keeps external markers literal.
+                        previewZpl = _substitutor.Substitute(
+                            previewZpl, inner => VariableValues.ForPreview(document, inner, now));
                         RenderResult rendered = _renderer.Render(
                             previewZpl, widthMm + 2 * marginMm, heightMm + 2 * marginMm, dpmm);
-                        return (generated, rendered, margin, DescribePlacement(offLabel));
+                        return (generated, rendered, margin, DescribePlacement(offLabel),
+                            string.Join(" ", run.Warnings));
                     },
                     cts.Token);
 
@@ -1073,6 +1106,7 @@ public partial class DesignerViewModel : ViewModelBase
             GeneratedZpl = zpl;
             UnderlayMarginDots = marginDots;
             PlacementWarning = placementWarning;
+            VariableWarning = variableWarning;
             RefreshVariables();
 
             Bitmap? previous = Underlay;

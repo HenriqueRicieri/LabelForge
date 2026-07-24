@@ -38,9 +38,17 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   (threshold for logos, ordered, Floyd-Steinberg for photos) and embedded in the label as an
   inline `^GF` graphic field, so the saved file and the exported ZPL are self-contained.
 - Template variables: `##MARKER##` placeholders in text and barcode data are discovered
-  automatically and listed in a Variables panel with editable preview samples. The preview renders
-  the samples; the exported and printed ZPL keeps the literal markers (they belong to the
-  downstream system that fills them).
+  automatically and listed in a Variables panel. Each one is either filled at print by the
+  downstream system (the preview renders an editable sample, and the exported and printed ZPL keeps
+  the literal marker), a counter, or a date and time.
+- Counters with a start, step, and zero padding. When the marker ends its field, the run is handed
+  to the printer as `^SN` serialization plus `^PQ`: one small job produced at full speed. When the
+  field cannot be expressed that way, LabelForge numbers every copy itself and sends one block per
+  label, and the panel says which of the two is happening and why.
+- Date and time variables with a format picker. By default the value is stamped from this PC's
+  clock; with the printer-clock option the field becomes `^FC` placeholders instead, whenever the
+  chosen format has an exact ZPL equivalent. The canvas always previews a real date, since the
+  offline renderer has no clock.
 - Job settings saved with the label: copies (`^PQ`), darkness adjust (`^MD`), and print speed
   (`^PR`), where zero means "leave the printer's default" and adds nothing to the ZPL.
 - Live offline preview driven by our own ZPL generator through a swappable renderer, debounced and
@@ -62,8 +70,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 - Importing an existing ZPL label back into the visual designer. Real labels can be rendered in the
   viewer, but the designer edits its own model of the element types above; embedded graphics
   (`~DG`/`^XG`) and full ZPL-to-model import are planned, not present.
-- The full variable-data system. Variables and preview samples exist today; per-variable prompts,
-  input rules (pick lists, masks, lengths), counters, and date/time sources are future work.
+- The full variable-data system. Samples, counters, and date/time sources exist today; per-variable
+  prompts and input rules (pick lists, masks, lengths) are future work, as is storing the layout on
+  the printer (`^DF`/`^XF`) so a batch sends only its data.
 - User-facing string localization. The app ships English only; strings are currently inline and will
   be extracted to resource files later.
 

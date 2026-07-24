@@ -30,6 +30,12 @@ public sealed class LabelDocument
     public IDictionary<string, string> SampleValues { get; init; } =
         new Dictionary<string, string>();
 
+    /// <summary>How each template variable is filled, by variable name. Only variables
+    /// that are not plain external markers need an entry, so a document without counters
+    /// or clocks serializes exactly as it did before they existed.</summary>
+    public IDictionary<string, VariableDefinition> Variables { get; init; } =
+        new Dictionary<string, VariableDefinition>();
+
     /// <summary>Vertical alignment guides: X positions in dots. Design aids only,
     /// never printed; they ride the undo/save pipeline like any document change.</summary>
     public IList<int> VerticalGuides { get; init; } = new List<int>();

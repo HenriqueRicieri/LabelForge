@@ -17,23 +17,51 @@ namespace LabelForge.Core.Zpl;
 public sealed class ZplGenerator : IElementVisitor
 {
     private readonly StringBuilder _sb = new();
+    private readonly List<string> _warnings = [];
+    private readonly HashSet<string> _seenWarnings = new(StringComparer.Ordinal);
     private int _offset;
+    private LabelDocument? _document;
+    private GenerationContext _context = new();
+    private bool _preview;
+    private bool _printerCounter;
+    private bool _printerClock;
+    private bool _softwareCounter;
 
-    public string Generate(LabelDocument document) =>
-        Generate(document, offsetDots: 0, includeOffLabel: false);
+    /// <summary>How the last <see cref="Generate(LabelDocument)"/> produced its dynamic
+    /// fields. Reset at the start of every call; meaningless after a preview, which
+    /// leaves markers alone.</summary>
+    public GenerationInfo LastRun { get; private set; } = GenerationInfo.Empty;
+
+    /// <summary>The first copy of the run, stamped with the current time.</summary>
+    public string Generate(LabelDocument document) => Generate(document, new GenerationContext());
+
+    public string Generate(LabelDocument document, GenerationContext context) =>
+        Generate(document, context, offsetDots: 0, includeOffLabel: false);
 
     /// <summary>Preview-only variant: the whole coordinate space shifts right/down by
     /// <paramref name="offsetDots"/> so the label sits centered in a canvas expanded by
-    /// that margin on every side, and elements parked off the label stay visible.</summary>
+    /// that margin on every side, and elements parked off the label stay visible.
+    /// Template markers are left literal here; the designer substitutes preview values
+    /// on the generated string so the viewer's raw-ZPL path shares that code.</summary>
     public string GeneratePreview(LabelDocument document, int offsetDots) =>
-        Generate(document, offsetDots, includeOffLabel: true);
+        Generate(document, new GenerationContext(), offsetDots, includeOffLabel: true);
 
-    private string Generate(LabelDocument document, int offsetDots, bool includeOffLabel)
+    private string Generate(
+        LabelDocument document, GenerationContext context, int offsetDots, bool includeOffLabel)
     {
         ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(context);
 
         _sb.Clear();
+        _warnings.Clear();
+        _seenWarnings.Clear();
         _offset = offsetDots;
+        _document = document;
+        _context = context;
+        _preview = includeOffLabel;
+        _printerCounter = false;
+        _printerClock = false;
+        _softwareCounter = false;
         Line("^XA");
         Line("^CI28");
         Line($"^PW{document.WidthDots + 2 * offsetDots}");
@@ -74,23 +102,50 @@ public sealed class ZplGenerator : IElementVisitor
             element.Accept(this);
         }
 
-        if (!includeOffLabel && document.Print.Copies > 1)
+        if (!includeOffLabel && context.EmitCopies && document.Print.Copies > 1)
         {
             Line($"^PQ{document.Print.Copies}");
         }
 
         _sb.Append("^XZ");
+        LastRun = new GenerationInfo(
+            _printerCounter, _printerClock, _softwareCounter, _warnings.ToArray());
         return _sb.ToString();
     }
 
     private string Fo(Element element) => $"^FO{element.X + _offset},{element.Y + _offset}";
+
+    /// <summary>Emits a field's data, resolving the document's counters and clocks. The
+    /// preview keeps markers literal so the designer can substitute sample values.</summary>
+    private string Field(string text)
+    {
+        if (_preview || _document is null)
+        {
+            return ZplEncoding.FieldData(text);
+        }
+
+        FieldEncoding encoding = DynamicField.Encode(
+            text, _document, _context.CopyIndex, _context.Now);
+        _printerCounter |= encoding.UsesPrinterCounter;
+        _printerClock |= encoding.UsesPrinterClock;
+        _softwareCounter |= encoding.UsesSoftwareCounter;
+        foreach (string warning in encoding.Warnings)
+        {
+            if (_seenWarnings.Add(warning))
+            {
+                _warnings.Add(warning);
+            }
+        }
+
+        return encoding.Zpl;
+    }
 
     public void Visit(TextElement element)
     {
         string font = element.FontWidthDots > 0
             ? $"^A0{element.Orientation.Letter()},{element.FontHeightDots},{element.FontWidthDots}"
             : $"^A0{element.Orientation.Letter()},{element.FontHeightDots}";
-        Line($"{Fo(element)}{font}{ZplEncoding.FieldData(element.Text)}");
+        Line($"{Fo(element)}{font}{Field(element.Text)}");
     }
 
     public void Visit(BoxElement element) =>
@@ -123,12 +178,12 @@ public sealed class ZplGenerator : IElementVisitor
             _ => throw new NotSupportedException($"Unsupported symbology: {element.Symbology}"),
         };
 
-        Line($"{by}{Fo(element)}{command}{ZplEncoding.FieldData(element.Data)}");
+        Line($"{by}{Fo(element)}{command}{Field(element.Data)}");
     }
 
     public void Visit(DataMatrixElement element) =>
         Line($"{Fo(element)}^BX{element.Orientation.Letter()},{element.ModuleSizeDots},200"
-             + ZplEncoding.FieldData(element.Data));
+             + Field(element.Data));
 
     public void Visit(ImageElement element)
     {
@@ -158,7 +213,7 @@ public sealed class ZplGenerator : IElementVisitor
             QrErrorCorrection.High => "H",
             _ => "M",
         };
-        string payload = ZplEncoding.FieldData($"{ec}A,{element.Data}");
+        string payload = Field($"{ec}A,{element.Data}");
         Line($"{Fo(element)}^BQ{element.Orientation.Letter()},2,{element.Magnification}{payload}");
     }
 

@@ -342,15 +342,65 @@
                     <StackPanel IsVisible="{Binding HasVariables}" Spacing="4" Margin="0,10,0,0">
                         <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" />
                         <TextBlock Text="Variables" FontWeight="SemiBold" />
-                        <TextBlock Text="Preview samples for the ##markers## on this label. Exported and printed ZPL keeps the literal markers."
+                        <TextBlock Text="The ##markers## on this label. One filled at print keeps its marker in the exported and printed ZPL; counters and dates are filled in for you."
                                    TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
+                        <TextBlock Text="{Binding VariableWarning}"
+                                   IsVisible="{Binding VariableWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                   Foreground="#D97706" FontSize="11" FontWeight="SemiBold"
+                                   TextWrapping="Wrap" />
                         <ItemsControl ItemsSource="{Binding Variables}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="vm:VariableSampleViewModel">
-                                    <StackPanel Spacing="2" Margin="0,4,0,0">
+                                    <StackPanel Spacing="2" Margin="0,6,0,0">
                                         <TextBlock Classes="propLabel" Text="{Binding Name}" />
-                                        <TextBox Text="{Binding Sample}"
-                                                 PlaceholderText="{Binding DefaultHint}" />
+                                        <ComboBox ItemsSource="{Binding Kinds}"
+                                                  SelectedItem="{Binding SelectedKind}"
+                                                  HorizontalAlignment="Stretch" />
+
+                                        <TextBox IsVisible="{Binding IsExternal}"
+                                                 Text="{Binding Sample}"
+                                                 PlaceholderText="{Binding DefaultHint}"
+                                                 ToolTip.Tip="Preview value only; the marker itself is what gets printed" />
+
+                                        <StackPanel IsVisible="{Binding IsCounter}" Spacing="2">
+                                            <TextBlock Classes="propLabel" Text="Start" />
+                                            <NumericUpDown Value="{Binding CounterStart}"
+                                                           Minimum="0" Maximum="999999999999"
+                                                           Increment="1" FormatString="0" />
+                                            <TextBlock Classes="propLabel" Text="Step (negative counts down)" />
+                                            <NumericUpDown Value="{Binding CounterStep}"
+                                                           Minimum="-999999" Maximum="999999"
+                                                           Increment="1" FormatString="0" />
+                                            <TextBlock Classes="propLabel" Text="Digits (0 = no padding)" />
+                                            <NumericUpDown Value="{Binding CounterPadding}"
+                                                           Minimum="0" Maximum="12"
+                                                           Increment="1" FormatString="0" />
+                                            <CheckBox Content="Let the printer count (^SN)" FontSize="12"
+                                                      IsChecked="{Binding UsePrinterCounter}"
+                                                      ToolTip.Tip="Sends one job and lets the printer serialize the run, which is much faster for long runs" />
+                                        </StackPanel>
+
+                                        <StackPanel IsVisible="{Binding IsClock}" Spacing="2">
+                                            <TextBlock Classes="propLabel" Text="Format" />
+                                            <ComboBox ItemsSource="{Binding ClockFormats}"
+                                                      SelectedItem="{Binding SelectedClockPreset}"
+                                                      PlaceholderText="Pick a format"
+                                                      HorizontalAlignment="Stretch" />
+                                            <TextBox Text="{Binding ClockFormat}"
+                                                     PlaceholderText="dd/MM/yyyy"
+                                                     ToolTip.Tip="Date format: dd, MM, yyyy, yy, HH, mm, ss" />
+                                            <CheckBox Content="Use the printer's clock (^FC)" FontSize="12"
+                                                      IsChecked="{Binding UsePrinterClock}"
+                                                      ToolTip.Tip="Requires the real time clock option on the printer" />
+                                        </StackPanel>
+
+                                        <TextBlock Text="{Binding PreviewValue}"
+                                                   IsVisible="{Binding PreviewValue, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                   FontFamily="Consolas,Menlo,Monospace" FontSize="11"
+                                                   Opacity="0.75" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding KindHint}"
+                                                   IsVisible="{Binding KindHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                   FontSize="10" Opacity="0.55" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>

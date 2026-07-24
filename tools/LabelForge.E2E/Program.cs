@@ -190,6 +190,63 @@ if (mode == "designer")
     Console.WriteLine($"job settings in ZPL: {d.GeneratedZpl.Contains("^PQ3")} (expected True)");
     Console.WriteLine($"markers stay in export: {d.GeneratedZpl.Contains("##LOTE##")} (expected True)");
 
+    // Counters: switching LOTE to a counter hands the run to the printer (^SN), and
+    // turning that off turns the same run into one block per copy.
+    var lote = d.Variables[0];
+    lote.SelectedKind = VariableKindOption.All[1];
+    lote.CounterStart = 41;
+    lote.CounterPadding = 4;
+    Pump(700);
+    Console.WriteLine(
+        $"counter kind: {lote.Kind}, preview='{lote.PreviewValue}' "
+        + "(expected Counter / 0041, 0042, 0043, ...)");
+    Console.WriteLine($"printer counter in ZPL: {d.GeneratedZpl.Contains("^SNLot 0041,1,Y")} (expected True)");
+
+    var printerJob = LabelForge.Core.Zpl.PrintJob.Build(d.Document, DateTime.Now);
+    Console.WriteLine(
+        $"printer-counted job: {Blocks(printerJob.Zpl)} block(s), {printerJob.Labels} labels, "
+        + $"byPrinter={printerJob.CountedByPrinter} (expected 1/3/True)");
+
+    lote.UsePrinterCounter = false;
+    Pump(700);
+    var pcJob = LabelForge.Core.Zpl.PrintJob.Build(d.Document, DateTime.Now);
+    Console.WriteLine(
+        $"pc-counted job: {Blocks(pcJob.Zpl)} block(s), {pcJob.Labels} labels, "
+        + $"0043 present={pcJob.Zpl.Contains("Lot 0043")} (expected 3/3/True)");
+
+    d.UndoCommand.Execute(null);
+    Pump(300);
+    Console.WriteLine(
+        $"undo the printer-counter toggle: byPrinter={d.Variables[0].UsePrinterCounter} (expected True)");
+
+    // Dates: the printer's own clock becomes ^FC placeholders, and a format it cannot
+    // express falls back to this PC's clock with a stated reason.
+    d.Document.Elements.Add(new LabelForge.Core.Model.TextElement
+    {
+        X = 20, Y = 60, Text = "##EMISSAO##", FontHeightDots = 24,
+    });
+    d.NotifyDocumentEdited();
+    Pump(700);
+    var emissao = d.Variables.First(v => v.Name == "EMISSAO");
+    emissao.SelectedKind = VariableKindOption.All[2];
+    emissao.UsePrinterClock = true;
+    Pump(700);
+    Console.WriteLine(
+        $"printer clock in ZPL: {d.GeneratedZpl.Contains("^FC%^FD%d/%m/%Y^FS")} (expected True), "
+        + $"warning='{d.VariableWarning}' (expect empty)");
+
+    // Capture the Variables panel: clearing the selection collapses the per-element
+    // editor so the counter and date rows are the ones on screen.
+    d.Selection.Clear();
+    Pump(500);
+    Capture("designer-variables.png");
+
+    emissao.ClockFormat = "dd MMM yyyy";
+    Pump(700);
+    Console.WriteLine($"clock fallback: warning='{d.VariableWarning}' (expect PC clock reason)");
+    emissao.SelectedKind = VariableKindOption.All[0];
+    Pump(400);
+
     // Input-path checks through the headless window. Holding the left button on the
     // top ruler shows a transient guide (captured mid-hold); releasing removes it
     // without adding a permanent one. Right-clicking the ruler opens the guide menu.
@@ -277,6 +334,8 @@ if (mode == "designer")
 }
 
 Capture($"{mode}.png");
+
+int Blocks(string zpl) => zpl.Split("^XA", StringSplitOptions.RemoveEmptyEntries).Length;
 
 void Pump(int ms)
 {

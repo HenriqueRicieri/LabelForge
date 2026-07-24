@@ -69,33 +69,18 @@ public sealed class TemplateVariables : IElementVisitor
 
     private void Scan(string content)
     {
-        int i = 0;
-        while (i < content.Length)
+        foreach (TemplateSegment segment in TemplateScanner.Scan(content, _open, _close))
         {
-            int start = content.IndexOf(_open, i, StringComparison.Ordinal);
-            if (start < 0)
+            if (segment.Kind != TemplateSegmentKind.Variable)
             {
-                return;
+                continue;
             }
 
-            int contentStart = start + _open.Length;
-            int end = content.IndexOf(_close, contentStart, StringComparison.Ordinal);
-            if (end < 0)
+            string name = NameOf(segment.Inner);
+            if (name.Length > 0 && _seen.Add(name))
             {
-                return;
+                _names.Add(name);
             }
-
-            string inner = content[contentStart..end];
-            if (!inner.StartsWith('@'))
-            {
-                string name = NameOf(inner);
-                if (name.Length > 0 && _seen.Add(name))
-                {
-                    _names.Add(name);
-                }
-            }
-
-            i = end + _close.Length;
         }
     }
 }

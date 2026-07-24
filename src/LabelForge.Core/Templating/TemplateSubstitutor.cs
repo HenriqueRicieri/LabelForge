@@ -45,38 +45,20 @@ public sealed class TemplateSubstitutor
         ArgumentNullException.ThrowIfNull(zpl);
 
         var sb = new StringBuilder(zpl.Length);
-        int i = 0;
-        while (i < zpl.Length)
+        foreach (TemplateSegment segment in TemplateScanner.Scan(zpl, _open, _close))
         {
-            int start = zpl.IndexOf(_open, i, StringComparison.Ordinal);
-            if (start < 0)
+            switch (segment.Kind)
             {
-                sb.Append(zpl, i, zpl.Length - i);
-                break;
-            }
+                case TemplateSegmentKind.Literal:
+                    sb.Append(segment.Text);
+                    break;
 
-            int contentStart = start + _open.Length;
-            int end = zpl.IndexOf(_close, contentStart, StringComparison.Ordinal);
-            if (end < 0)
-            {
-                // Unterminated marker; leave the remainder untouched.
-                sb.Append(zpl, i, zpl.Length - i);
-                break;
-            }
+                case TemplateSegmentKind.Variable:
+                    sb.Append(resolve?.Invoke(segment.Inner) ?? DefaultSampleValue);
+                    break;
 
-            sb.Append(zpl, i, start - i);
-            string inner = zpl.Substring(contentStart, end - contentStart);
-
-            if (inner.StartsWith('@'))
-            {
-                // Internal directive (##@...##): not printable data, drop it for preview.
+                // Internal directive (##@...##): not printable data, dropped for preview.
             }
-            else
-            {
-                sb.Append(resolve?.Invoke(inner) ?? DefaultSampleValue);
-            }
-
-            i = end + _close.Length;
         }
 
         return sb.ToString();
