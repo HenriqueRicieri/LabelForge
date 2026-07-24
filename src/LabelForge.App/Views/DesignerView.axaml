@@ -260,13 +260,55 @@
                 <NumericUpDown Value="{Binding HeightMm}" Minimum="5" Maximum="1000"
                                Increment="1" FormatString="0.#" Width="110" />
                 <TextBlock Text="Media" VerticalAlignment="Center"
-                           ToolTip.Tip="Set the label size from an official Zebra media part number" />
+                           ToolTip.Tip="Set the label size from a Zebra part number or one of your own saved media" />
                 <AutoCompleteBox x:Name="MediaBox" Width="230"
-                                 PlaceholderText="Zebra part number"
+                                 PlaceholderText="Part number or my media"
                                  ItemsSource="{Binding MediaCatalog}"
                                  SelectedItem="{Binding SelectedMedia}"
                                  FilterMode="Custom"
                                  MinimumPrefixLength="2" />
+                <Button Content="My media..."
+                        ToolTip.Tip="Save the current label size as your own media, for stock the Zebra catalog does not list">
+                    <Button.Flyout>
+                        <Flyout Placement="Bottom">
+                            <StackPanel Spacing="6" Width="270">
+                                <TextBlock Text="Save this size as my media" FontWeight="SemiBold" FontSize="12" />
+                                <TextBlock Text="{Binding NewMediaSizeText}" FontSize="12" Opacity="0.7" />
+                                <TextBlock Text="Name" FontSize="12" Opacity="0.8" />
+                                <TextBox Text="{Binding NewMediaName}" PlaceholderText="Etiqueta 50 x 30" />
+                                <TextBlock Text="Material (optional)" FontSize="12" Opacity="0.8" />
+                                <TextBox Text="{Binding NewMediaMaterial}" PlaceholderText="Couche, termico, BOPP" />
+                                <TextBlock Text="Corner radius in mm (recorded, not drawn yet)"
+                                           FontSize="12" Opacity="0.8" TextWrapping="Wrap" />
+                                <NumericUpDown Value="{Binding NewMediaRadiusMm}" Minimum="0" Maximum="20"
+                                               Increment="0.5" FormatString="0.##" />
+                                <CheckBox Content="Continuous roll" FontSize="12"
+                                          IsChecked="{Binding NewMediaContinuous}" />
+                                <Button Content="Save" HorizontalAlignment="Stretch"
+                                        Command="{Binding SaveUserMediaCommand}" />
+
+                                <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="0,6" />
+                                <TextBlock Text="My media" FontWeight="SemiBold" FontSize="12" />
+                                <TextBlock Text="Nothing saved yet. Set the width and height, then save them under a name."
+                                           IsVisible="{Binding !HasUserMedia}"
+                                           FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
+                                <ItemsControl ItemsSource="{Binding UserMedia}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:UserMediaEntryViewModel">
+                                            <DockPanel Margin="0,2">
+                                                <Button DockPanel.Dock="Right" Content="Remove"
+                                                        FontSize="11" Padding="6,2"
+                                                        Command="{Binding RemoveCommand}" />
+                                                <TextBlock Text="{Binding Display}" VerticalAlignment="Center"
+                                                           FontSize="11" TextWrapping="Wrap" Margin="0,0,6,0" />
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
                 <TextBlock Text="Density" VerticalAlignment="Center" />
                 <ComboBox ItemsSource="{Binding Densities}"
                           SelectedItem="{Binding SelectedDensity}" Width="100" />

@@ -19,7 +19,12 @@ if (args.Contains("dark"))
     Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
 }
 
-var vm = new MainViewModel();
+// The user's media presets live per machine. Point the harness at a scratch file so a
+// run never touches what the person using the app has saved.
+string presetsPath = Path.Combine(AppContext.BaseDirectory, "e2e-user-media.json");
+File.Delete(presetsPath);
+
+var vm = new MainViewModel(new LabelForge.Core.Media.UserMediaStore(presetsPath));
 var window = new MainWindow { DataContext = vm };
 window.Show();
 
@@ -130,6 +135,38 @@ else
     d.WidthMm = 80;
     Console.WriteLine($"manual edit clears media: {(d.SelectedMedia is null ? "null" : "still set")} (expected null)");
     d.WidthMm = 100;
+
+    // User media presets: save the current size under a name, find it in the same
+    // picker as the Zebra catalog, apply it, and remove it again.
+    d.WidthMm = 50.8m;
+    d.HeightMm = 30m;
+    d.NewMediaName = "Etiqueta Filial";
+    d.NewMediaMaterial = "Couche";
+    Console.WriteLine($"preset size preview: '{d.NewMediaSizeText}' (expected 50.8mm x 30mm)");
+    d.SaveUserMediaCommand.Execute(null);
+    Console.WriteLine(
+        $"save preset: {d.UserMedia.Count} saved, name cleared={d.NewMediaName.Length == 0}, "
+        + $"display='{(d.UserMedia.Count > 0 ? d.UserMedia[0].Display : "none")}' "
+        + "(expected 1/True/Etiqueta Filial - Couche (50.8mm x 30mm) - my media)");
+    Console.WriteLine(
+        $"preset leads the picker: {d.MediaCatalog.Count > 0 && d.MediaCatalog[0].IsUserDefined}, "
+        + $"entries={d.MediaCatalog.Count} (expected True/798)");
+    Console.WriteLine(
+        $"preset survives a reload: {new LabelForge.Core.Media.UserMediaStore(presetsPath).Load().Count} "
+        + "on disk (expected 1)");
+
+    d.WidthMm = 100m;
+    d.HeightMm = 60m;
+    d.SelectedMedia = d.MediaCatalog[0];
+    Console.WriteLine(FormattableString.Invariant(
+        $"apply preset: {d.WidthMm}x{d.HeightMm} mm (expected 50.8x30)"));
+
+    d.UserMedia[0].RemoveCommand.Execute(null);
+    Console.WriteLine(
+        $"remove preset: {d.UserMedia.Count} saved, picker back to {d.MediaCatalog.Count}, "
+        + $"selection cleared={d.SelectedMedia is null} (expected 0/797/True)");
+    d.WidthMm = 100m;
+    d.HeightMm = 60m;
 
     // Multi-select: group delete + undo, then leave two selected for the capture.
     d.Selection.SetMany([d.Document.Elements[1], d.Document.Elements[2]]);
@@ -331,6 +368,19 @@ if (mode == "designer")
     Console.WriteLine($"align left: Title X={d.Document.Elements[1].X} (expected 50)");
     d.Selection.SetMany([d.Document.Elements[1], d.Document.Elements[2], d.Document.Elements[4]]);
     Console.WriteLine($"distribute gating with 3 selected: {d.DistributeHorizontalCommand.CanExecute(null)} (expected True)");
+
+    // My media flyout, captured with a preset saved so the list is not empty.
+    d.NewMediaName = "Etiqueta Filial";
+    d.NewMediaMaterial = "Couche";
+    d.SaveUserMediaCommand.Execute(null);
+    var myMediaButton = window.GetVisualDescendants().OfType<Button>()
+        .First(b => b.Content as string == "My media...");
+    myMediaButton.Flyout?.ShowAt(myMediaButton);
+    Pump(500);
+    Capture("designer-my-media.png");
+    myMediaButton.Flyout?.Hide();
+    d.UserMedia[0].RemoveCommand.Execute(null);
+    Pump(200);
 
     // Armed tool highlight in the left bar, captured while the Box tool is armed.
     d.AddBoxCommand.Execute(null);

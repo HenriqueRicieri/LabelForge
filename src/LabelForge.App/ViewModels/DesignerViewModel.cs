@@ -31,6 +31,7 @@ public partial class DesignerViewModel : ViewModelBase
 
     private readonly IZplRenderer _renderer = new BinaryKitsRenderer();
     private readonly TemplateSubstitutor _substitutor = new();
+    private readonly Core.Media.UserMediaStore _userMediaStore;
     private readonly SnapshotHistory _history = new();
     private LabelDocument? _variablesDocument;
     private CancellationTokenSource? _renderCts;
@@ -95,13 +96,44 @@ public partial class DesignerViewModel : ViewModelBase
     public partial ElementPropertiesViewModel? SelectionProperties { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewMediaSizeText))]
     public partial decimal WidthMm { get; set; } = 100m;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewMediaSizeText))]
     public partial decimal HeightMm { get; set; } = 60m;
 
-    /// <summary>Official Zebra media catalog backing the media picker.</summary>
-    public IReadOnlyList<Core.Media.StockMedia> MediaCatalog => Core.Media.StockCatalog.All;
+    /// <summary>What the media picker searches: the user's own presets first, then the
+    /// official Zebra catalog. Replaced wholesale when presets change, rather than
+    /// mutated, because the catalog is 797 entries and the picker only needs the list.</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<Core.Media.StockMedia> MediaCatalog { get; set; } = [];
+
+    /// <summary>The user's saved media definitions, each with its own remove command.</summary>
+    public ObservableCollection<UserMediaEntryViewModel> UserMedia { get; } = [];
+
+    public bool HasUserMedia => UserMedia.Count > 0;
+
+    [ObservableProperty]
+    public partial string NewMediaName { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string NewMediaMaterial { get; set; } = string.Empty;
+
+    /// <summary>Die-cut corner radius recorded with a preset. Descriptive for now, like
+    /// the radius the Zebra catalog already carries; it starts affecting the drawn
+    /// outline when the document gains a corner radius (backlog A2).</summary>
+    [ObservableProperty]
+    public partial decimal NewMediaRadiusMm { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewMediaSizeText))]
+    public partial bool NewMediaContinuous { get; set; }
+
+    /// <summary>The size saving would record right now, shown so it is confirmed before
+    /// it is stored rather than after.</summary>
+    public string NewMediaSizeText => Core.Media.StockMedia.FormatSize(
+        (double)WidthMm, (double)HeightMm, NewMediaContinuous);
 
     /// <summary>Template variables found on the label, with editable preview samples.
     /// Rebuilt only when the variable set or the document instance changes, so typing
@@ -218,9 +250,15 @@ public partial class DesignerViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(RedoCommand))]
     public partial bool CanRedo { get; set; }
 
-    public DesignerViewModel()
+    /// <param name="userMediaStore">Where the user's own media presets live; defaults
+    /// to the per-user file. Injected so a harness can exercise presets without
+    /// touching what the person using the app has saved.</param>
+    public DesignerViewModel(Core.Media.UserMediaStore? userMediaStore = null)
     {
+        _userMediaStore = userMediaStore ?? new Core.Media.UserMediaStore();
         Selection.Changed += (_, _) => OnSelectionChanged();
+
+        ApplyUserMedia(_userMediaStore.Load());
 
         // Property setters record undo states; construction must not, or the
         // history would start with a spurious extra document before the baseline.
@@ -854,9 +892,70 @@ public partial class DesignerViewModel : ViewModelBase
         UpdatePrinterWarning();
         RecordUndo();
         ScheduleRender();
+        string kind = value.IsUserDefined ? "my media" : "media";
         StatusText = value.Continuous
-            ? $"Applied media {value.PartNumber}: continuous {value.WidthMm:0.#} mm roll, adjust the height to your content"
-            : $"Applied media {value.PartNumber} ({value.SizeText})";
+            ? $"Applied {kind} {value.PartNumber}: continuous {value.WidthMm:0.#} mm roll, adjust the height to your content"
+            : $"Applied {kind} {value.PartNumber} ({value.SizeText})";
+    }
+
+    /// <summary>Saves the label's current size as one of the user's own media. Presets
+    /// are per machine, not part of the document, so this records no undo step.</summary>
+    [RelayCommand]
+    private void SaveUserMedia()
+    {
+        string name = NewMediaName.Trim();
+        if (name.Length == 0)
+        {
+            StatusText = "Name the media before saving it";
+            return;
+        }
+
+        var media = Core.Media.StockMedia.UserDefined(
+            name,
+            (double)WidthMm,
+            (double)HeightMm,
+            NewMediaMaterial,
+            (double)NewMediaRadiusMm,
+            NewMediaContinuous);
+
+        Core.Media.UserMediaResult result = _userMediaStore.Add(media);
+        ApplyUserMedia(result.Entries);
+        NewMediaName = string.Empty;
+        NewMediaMaterial = string.Empty;
+
+        // A failed write still leaves a usable preset in this session; say which it is
+        // rather than reporting a success the next start would contradict.
+        StatusText = result.Error is null
+            ? $"Saved my media {name} ({media.SizeText})"
+            : $"Saved for this session only, the presets file could not be written: {result.Error}";
+    }
+
+    private void RemoveUserMedia(Core.Media.StockMedia media)
+    {
+        Core.Media.UserMediaResult result = _userMediaStore.Remove(media.PartNumber);
+        if (SelectedMedia == media)
+        {
+            SelectedMedia = null;
+        }
+
+        ApplyUserMedia(result.Entries);
+        StatusText = result.Error is null
+            ? $"Removed my media {media.PartNumber}"
+            : $"Could not update the presets file: {result.Error}";
+    }
+
+    private void ApplyUserMedia(IReadOnlyList<Core.Media.StockMedia> presets)
+    {
+        UserMedia.Clear();
+        foreach (Core.Media.StockMedia media in presets)
+        {
+            UserMedia.Add(new UserMediaEntryViewModel(media, RemoveUserMedia));
+        }
+
+        // The user's own first: they are the few entries that were deliberately
+        // defined, and the catalog behind them is 797 entries deep.
+        MediaCatalog = [.. presets, .. Core.Media.StockCatalog.All];
+        OnPropertyChanged(nameof(HasUserMedia));
     }
 
     partial void OnSelectedDensityChanged(DensityOption? value)

@@ -64,6 +64,10 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 - A built-in catalog of 797 official Zebra media specifications: search by part number, material,
   or size in the label setup bar and the label takes the exact die-cut dimensions of the stock on
   the roll. Continuous rolls are flagged with a hint instead of a fake fixed height.
+- Your own media presets for third-party stock the Zebra catalog does not list: save the current
+  size under a name (with an optional material, corner radius, and continuous flag) and the same
+  search box finds it alongside the catalog, listed first and tagged so it is never mistaken for a
+  Zebra part number.
 - Save and open the native `.lfl` project format (with a recent-files menu); export ZPL, PNG, and
   PDF at exact physical size.
 - Printing over the network (TCP 9100) and through the Windows spooler (RAW datatype, the USB path).
