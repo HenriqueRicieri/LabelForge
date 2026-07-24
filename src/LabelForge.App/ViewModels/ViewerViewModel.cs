@@ -68,6 +68,12 @@ public partial class ViewerViewModel : ViewModelBase
     [ObservableProperty]
     public partial string InfoText { get; set; } = string.Empty;
 
+    /// <summary>Set when an opened file was not UTF-8 and its encoding had to be
+    /// inferred. Shown because the guess is worth knowing about: accented text would be
+    /// wrong if it was guessed badly, and saving the file back writes UTF-8.</summary>
+    [ObservableProperty]
+    public partial string EncodingNote { get; set; } = string.Empty;
+
     [ObservableProperty]
     public partial string StatusText { get; set; } = string.Empty;
 
@@ -111,9 +117,12 @@ public partial class ViewerViewModel : ViewModelBase
     }
 
     /// <summary>Replaces the editor contents (used when opening a file).</summary>
-    public void LoadZpl(string zpl)
+    /// <param name="encodingNote">Shown in the diagnostics strip when the file's
+    /// encoding had to be inferred; empty for the ordinary UTF-8 case.</param>
+    public void LoadZpl(string zpl, string encodingNote = "")
     {
         SelectedLabelIndex = 0;
+        EncodingNote = encodingNote;
         ZplText = zpl;
     }
 

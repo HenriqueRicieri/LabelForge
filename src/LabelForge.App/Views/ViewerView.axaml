@@ -72,6 +72,10 @@
                 </Border>
                 <TextBlock Text="{Binding InfoText}" VerticalAlignment="Center"
                            FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding EncodingNote}" VerticalAlignment="Center"
+                           IsVisible="{Binding EncodingNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           Foreground="#D97706" FontSize="12" FontWeight="SemiBold"
+                           TextWrapping="Wrap" />
             </StackPanel>
         </Border>
 

@@ -1,5 +1,5 @@
 using System.Net.Sockets;
-using System.Text;
+using LabelForge.Core.Io;
 
 namespace LabelForge.Core.Printing;
 
@@ -46,7 +46,7 @@ public static class RawNetworkPrinter
 
         // The write runs under the caller's token only (see DefaultConnectTimeout).
         await using NetworkStream stream = client.GetStream();
-        byte[] payload = Encoding.UTF8.GetBytes(zpl);
+        byte[] payload = ZplTextFile.ToBytes(zpl);
         await stream.WriteAsync(payload, cancellationToken).ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }

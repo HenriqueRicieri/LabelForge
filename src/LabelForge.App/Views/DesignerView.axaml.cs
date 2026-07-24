@@ -269,7 +269,9 @@ public partial class DesignerView : UserControl
 
         if (file?.TryGetLocalPath() is { } path)
         {
-            await File.WriteAllTextAsync(path, vm.GeneratedZpl);
+            // Explicit UTF-8 without a BOM: the label declares ^CI28, and three BOM
+            // bytes in front of ^XA are bytes a printer has no reason to tolerate.
+            await LabelForge.Core.Io.ZplTextFile.WriteFileAsync(path, vm.GeneratedZpl);
             vm.StatusText = $"Exported {Path.GetFileName(path)}";
         }
     }

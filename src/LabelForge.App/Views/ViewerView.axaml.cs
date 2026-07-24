@@ -158,9 +158,17 @@ public partial class ViewerView : UserControl
             return;
         }
 
+        // Read the bytes and decide the encoding ourselves: a StreamReader's default
+        // would turn every accent of a legacy Latin-1 label into U+FFFD without a word.
         await using var stream = await file.OpenReadAsync();
-        using var reader = new System.IO.StreamReader(stream);
-        vm.LoadZpl(await reader.ReadToEndAsync());
+        using var buffer = new System.IO.MemoryStream();
+        await stream.CopyToAsync(buffer);
+        var read = LabelForge.Core.Io.ZplTextFile.Read(buffer.ToArray());
+        vm.LoadZpl(
+            read.Text,
+            read.Recovered
+                ? $"Not valid UTF-8; read as {read.EncodingName}. Saving writes UTF-8."
+                : string.Empty);
         if (top is Window window)
         {
             window.Title = $"LabelForge - {file.Name}";

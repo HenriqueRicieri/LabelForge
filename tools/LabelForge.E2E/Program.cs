@@ -30,7 +30,15 @@ if (mode == "viewer")
     tabs.SelectedIndex = 1;
     if (args.Length > 1)
     {
-        vm.Viewer.LoadZpl(File.ReadAllText(args[1]));
+        // Same reader the file picker uses, so the harness exercises encoding
+        // detection rather than a lenient decode that only the harness would do.
+        var read = LabelForge.Core.Io.ZplTextFile.Read(File.ReadAllBytes(args[1]));
+        Console.WriteLine(
+            $"opened as {read.EncodingName}, inferred={read.Recovered}, "
+            + $"replacement chars={read.Text.Contains('�')} (expected False)");
+        vm.Viewer.LoadZpl(
+            read.Text,
+            read.Recovered ? $"Not valid UTF-8; read as {read.EncodingName}. Saving writes UTF-8." : "");
     }
 }
 else

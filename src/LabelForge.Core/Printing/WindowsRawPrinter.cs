@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using System.Text;
+using LabelForge.Core.Io;
 
 namespace LabelForge.Core.Printing;
 
@@ -74,7 +74,7 @@ public static class WindowsRawPrinter
                     throw new Win32Exception(Marshal.GetLastWin32Error());
                 }
 
-                byte[] payload = Encoding.UTF8.GetBytes(zpl);
+                byte[] payload = ZplTextFile.ToBytes(zpl);
                 if (!WritePrinter(printer, payload, (uint)payload.Length, out uint written) ||
                     written != payload.Length)
                 {

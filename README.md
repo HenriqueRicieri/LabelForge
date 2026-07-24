@@ -56,6 +56,10 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 - ZPL viewer: an editable ZPL pane with syntax highlighting, a live preview, auto-sizing from
   `^PW`/`^LL`, a selector for files with multiple `^XA` blocks, and a diagnostics strip for
   unsupported commands and engine errors. It tolerates non-ZPL template markers and comment lines.
+- Accented text is handled deliberately end to end. Generated labels declare `^CI28` and are written
+  and sent as UTF-8 without a byte order mark. Opening a file honours its byte order mark, then
+  tries UTF-8, and only then falls back to Latin-1, saying so, so a legacy CP1252 label keeps its
+  accents instead of silently filling with replacement characters.
 - Printer profiles (203/300/600 dpi Zebra models) with design-time head-width and density warnings.
 - A built-in catalog of 797 official Zebra media specifications: search by part number, material,
   or size in the label setup bar and the label takes the exact die-cut dimensions of the stock on

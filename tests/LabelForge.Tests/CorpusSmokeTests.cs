@@ -1,3 +1,4 @@
+using LabelForge.Core.Io;
 using LabelForge.Core.Rendering;
 
 namespace LabelForge.Tests;
@@ -26,7 +27,10 @@ public sealed class CorpusSmokeTests
     [MemberData(nameof(CorpusFiles))]
     public void RealAtakLabels_RenderWithoutCrashing(string path)
     {
-        string zpl = File.ReadAllText(path);
+        // Through the app's own reader: real Atak files are not guaranteed to be UTF-8,
+        // and a lenient decode would feed the renderer replacement characters instead
+        // of the accented text the label actually carries.
+        string zpl = ZplTextFile.ReadFile(path).Text;
         var renderer = new BinaryKitsRenderer();
 
         // Size does not affect the smoke assertion; use a generous 4x6 inch at 203 dpi.
