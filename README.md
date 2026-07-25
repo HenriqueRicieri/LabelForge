@@ -77,7 +77,12 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 - Printer profiles (203/300/600 dpi Zebra models) with design-time head-width and density warnings.
 - A built-in catalog of 797 official Zebra media specifications: search by part number, material,
   or size in the label setup bar and the label takes the exact die-cut dimensions of the stock on
-  the roll. Continuous rolls are flagged with a hint instead of a fake fixed height.
+  the roll.
+- Continuous stock, for rolls with no gaps or die cuts. The label stops having a fixed height and
+  becomes exactly as long as its content plus a trailing gap you set, so the canvas grows as you
+  design and the generated `^LL` advances the roll by that much and no more. The ZPL also carries
+  `^MNN` so a printer left sensing gaps stops hunting for one that is not there; nothing is emitted
+  for die-cut stock, whose sensing mode belongs to whoever loaded the printer.
 - Your own media presets for third-party stock the Zebra catalog does not list: save the current
   size under a name (with an optional material, corner radius, and continuous flag) and the same
   search box finds it alongside the catalog, listed first and tagged so it is never mistaken for a

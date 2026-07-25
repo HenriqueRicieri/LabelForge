@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -147,6 +147,75 @@ public partial class DesignerViewModel : ViewModelBase
     public ObservableCollection<string> RecentFiles { get; } = new(Services.RecentFilesStore.Load());
 
     public bool HasRecentFiles => RecentFiles.Count > 0;
+
+    /// <summary>
+    /// Continuous stock: a roll with no gaps or die cuts. The label stops having a fixed
+    /// height and becomes exactly as long as its content, so the height box turns into a
+    /// readout, the corner radius stops meaning anything, and the ZPL gains ^MNN.
+    /// </summary>
+    public bool IsContinuous
+    {
+        get => Document.IsContinuous;
+        set
+        {
+            if (Document.IsContinuous == value)
+            {
+                return;
+            }
+
+            Document.IsContinuous = value;
+
+            // Both directions need the box re-read at once: entering hands it over to
+            // the measurement, leaving puts the stored die-cut height back rather than
+            // stranding whatever the content last measured.
+            SyncLabelLength();
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasFixedLength));
+            OnPropertyChanged(nameof(LengthHint));
+            if (!_restoring)
+            {
+                // Hand-editing the stock kind means the picked media no longer
+                // describes the label, exactly as editing its size does. Saving this
+                // size as a preset should record the same kind of stock, or the preset
+                // would carry a height that means nothing.
+                SelectedMedia = null;
+                NewMediaContinuous = value;
+                RecordUndo("doc-continuous");
+                ScheduleRender();
+            }
+        }
+    }
+
+    /// <summary>True on die-cut stock, where the height and the corner radius are the
+    /// user's to set. Drives the enabled state of both.</summary>
+    public bool HasFixedLength => !Document.IsContinuous;
+
+    public string LengthHint => Document.IsContinuous
+        ? "Measured from the content"
+        : string.Empty;
+
+    /// <summary>Blank stock left after the last ink on continuous media, so the next
+    /// label has something to start after.</summary>
+    public decimal ContinuousMarginMm
+    {
+        get => (decimal)Document.ContinuousMarginMm;
+        set
+        {
+            double next = Math.Clamp((double)value, 0, 50);
+            if (Math.Abs(next - Document.ContinuousMarginMm) < 0.0001)
+            {
+                return;
+            }
+
+            Document.ContinuousMarginMm = next;
+            OnPropertyChanged();
+            if (!_restoring)
+            {
+                RecordUndo("doc-gap");
+                ScheduleRender();
+            }
+        }
+    }
 
     /// <summary>Die-cut corner radius in mm. Describes the physical stock: it shapes the
     /// canvas and the PDF, never the ZPL.</summary>
@@ -379,6 +448,10 @@ public partial class DesignerViewModel : ViewModelBase
         OnPropertyChanged(nameof(PrintDarkness));
         OnPropertyChanged(nameof(PrintSpeed));
         OnPropertyChanged(nameof(CornerRadiusMm));
+        OnPropertyChanged(nameof(IsContinuous));
+        OnPropertyChanged(nameof(HasFixedLength));
+        OnPropertyChanged(nameof(LengthHint));
+        OnPropertyChanged(nameof(ContinuousMarginMm));
     }
 
     [RelayCommand]
@@ -676,7 +749,7 @@ public partial class DesignerViewModel : ViewModelBase
 
         var notes = new List<string>(result.Warnings);
         int offLabel = added.Count(
-            e => !ElementPlacement.IsPrintable(e, Document.WidthDots, Document.HeightDots));
+            e => !ElementPlacement.IsPrintable(e, Document));
         if (offLabel > 0)
         {
             notes.Add(offLabel == added.Count
@@ -1007,6 +1080,10 @@ public partial class DesignerViewModel : ViewModelBase
         WidthMm = (decimal)value.WidthMm;
         HeightMm = (decimal)value.HeightMm;
         CornerRadiusMm = (decimal)value.RadiusMm;
+
+        // The roll's own kind comes with it, so a continuous stock stops pretending to
+        // have a die-cut height the moment it is picked.
+        IsContinuous = value.Continuous;
         _restoring = false;
 
         Document.WidthMm = value.WidthMm;
@@ -1020,7 +1097,7 @@ public partial class DesignerViewModel : ViewModelBase
         ScheduleRender();
         string kind = value.IsUserDefined ? "my media" : "media";
         StatusText = value.Continuous
-            ? $"Applied {kind} {value.PartNumber}: continuous {value.WidthMm:0.#} mm roll, adjust the height to your content"
+            ? $"Applied {kind} {value.PartNumber}: continuous {value.WidthMm:0.#} mm roll, the length now follows the content"
             : $"Applied {kind} {value.PartNumber} ({value.SizeText})";
     }
 
@@ -1274,8 +1351,31 @@ public partial class DesignerViewModel : ViewModelBase
         _statusHeld = true;
     }
 
+    /// <summary>Re-reads the label's length into the setup bar. On continuous stock the
+    /// height is not something the user typed but something the content decides, so the
+    /// box has to follow it; every edit schedules a render, which is the one place that
+    /// sees them all. The guard keeps this from recording an undo step of its own.</summary>
+    private void SyncLabelLength()
+    {
+        var current = (decimal)Document.HeightMm;
+        if (HeightMm == current)
+        {
+            return;
+        }
+
+        bool restoring = _restoring;
+        _restoring = true;
+        HeightMm = current;
+        _restoring = restoring;
+    }
+
     private async void ScheduleRender(int delayMs = 150)
     {
+        if (Document.IsContinuous)
+        {
+            SyncLabelLength();
+        }
+
         _renderCts?.Cancel();
         _statusHeld = false;
         var cts = new CancellationTokenSource();
@@ -1310,7 +1410,7 @@ public partial class DesignerViewModel : ViewModelBase
                         var offLabel = document.Elements
                             .Where(e => e.IsVisible)
                             .Select(e => (Element: e, Status: ElementPlacement.Classify(
-                                e, bounds.GetBounds(e), document.WidthDots, document.HeightDots)))
+                                e, bounds.GetBounds(e), document)))
                             .Where(t => t.Status != PlacementStatus.Inside)
                             .ToList();
 

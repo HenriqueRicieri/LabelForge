@@ -425,6 +425,44 @@ if (mode == "designer")
     d.CornerRadiusMm = 0m;
     Pump(300);
 
+    // Continuous stock: no die cut, so the label is exactly as long as its content and
+    // the height box becomes a readout rather than something to type into.
+    decimal dieCutHeight = d.HeightMm;
+    d.IsContinuous = true;
+    Pump(600);
+    Console.WriteLine(
+        $"continuous: height {d.HeightMm} mm, editable={d.HasFixedLength} "
+        + $"(expected the content length, False)");
+    Console.WriteLine(
+        $"continuous in ZPL: ^MNN={d.GeneratedZpl.Contains("^MNN")} "
+        + $"^LL{d.Document.HeightDots} present={d.GeneratedZpl.Contains("^LL" + d.Document.HeightDots)} "
+        + "(expected True/True)");
+    Console.WriteLine(
+        $"no rounded corners on a roll: {d.Document.EffectiveCornerRadiusMm} mm (expected 0)");
+    Capture("designer-continuous.png");
+
+    // Pushing the bottom-most element down makes the roll longer, which is the whole
+    // feature. Measured from the ink, not from the origin: the lowest origin is not
+    // necessarily the lowest footprint.
+    var bounds = new LabelForge.Core.Model.ElementBoundsCalculator();
+    var lowest = d.Document.Elements
+        .OrderByDescending(e => bounds.GetBounds(e).Y + bounds.GetBounds(e).Height).First();
+    decimal lengthBefore = d.HeightMm;
+    lowest.Y += 200;
+    d.NotifyDocumentEdited();
+    Pump(600);
+    Console.WriteLine(
+        $"length follows content: {lengthBefore} -> {d.HeightMm} mm "
+        + "(expected +25 mm, the 200 dots it moved at 8 dpmm)");
+
+    d.IsContinuous = false;
+    Pump(400);
+    Console.WriteLine(
+        $"back to die cut: height {d.HeightMm} mm (expected {dieCutHeight}, the stored one)");
+    lowest.Y -= 200;
+    d.NotifyDocumentEdited();
+    Pump(300);
+
     // My media flyout, captured with a preset saved so the list is not empty.
     d.NewMediaName = "Etiqueta Filial";
     d.NewMediaMaterial = "Couche";

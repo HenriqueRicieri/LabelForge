@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
@@ -525,7 +525,7 @@ public sealed class DesignerCanvas : Control
         {
             DotRect b = _bounds.GetBounds(element);
             PlacementStatus status =
-                ElementPlacement.Classify(element, b, doc.WidthDots, doc.HeightDots);
+                ElementPlacement.Classify(element, b, doc);
             if (status == PlacementStatus.Inside)
             {
                 continue;

@@ -90,6 +90,17 @@ public sealed class ZplGenerator : IElementVisitor
         // just flag them as unknown commands.
         if (!includeOffLabel)
         {
+            // Media tracking is emitted for continuous stock and for nothing else.
+            // A roll with no gaps has to be declared, because a printer left sensing
+            // gaps will feed forward hunting for one that is not there. Gap and mark
+            // sensing are the other way round: several modes are valid, the operator's
+            // is the one that matches what is loaded, and overwriting it from a label
+            // would be carrying someone else's printer setup.
+            if (document.IsContinuous)
+            {
+                Line("^MNN");
+            }
+
             if (document.Print.SpeedIps > 0)
             {
                 Line($"^PR{Math.Clamp(document.Print.SpeedIps, 2, 14)}");
@@ -104,8 +115,7 @@ public sealed class ZplGenerator : IElementVisitor
         Element[] emitted = document.Elements
             .Where(e => e.IsVisible)
             .OrderBy(e => e.ZOrder)
-            .Where(e => includeOffLabel ||
-                        ElementPlacement.IsPrintable(e, document.WidthDots, document.HeightDots))
+            .Where(e => includeOffLabel || ElementPlacement.IsPrintable(e, document))
 
             // Even the preview cannot express an origin left of / above the pasteboard.
             .Where(e => e.X + offsetDots >= 0 && e.Y + offsetDots >= 0)

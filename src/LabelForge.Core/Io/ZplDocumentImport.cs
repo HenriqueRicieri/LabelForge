@@ -45,6 +45,14 @@ public static class ZplDocumentImport
         "BC", "B3", "BE", "BU", "BX", "BQ", "B7",
     };
 
+    /// <summary>Media tracking modes that mean continuous stock: no gaps, notches or
+    /// marks to sense, the printer advances by ^LL alone. "N" is what the generator
+    /// writes; a real printer also accepts the variable-length form.</summary>
+    private static readonly HashSet<string> ContinuousTracking = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "N", "V",
+    };
+
     /// <summary>
     /// Commands that configure the printer rather than describe the label: media type,
     /// tear-off position, darkness curves, the printer's own defaults.
@@ -59,9 +67,13 @@ public static class ZplDocumentImport
     /// those is a real loss the user has to hear about: ^LR and ^PM invert or mirror the
     /// whole label, ^LS and ^LT shift every field, ^SN serializes a field, ^DF stores the
     /// format on the printer, and ^CC and ^CT redefine the characters this parser reads.
+    /// ^MN is the one that moved off this list conditionally rather than wholesale.
+    /// Gap and mark sensing stay printer setup, because several modes are valid and the
+    /// operator's matches what is loaded; continuous is different, because a roll with
+    /// no gaps is a fact about the label's own stock and about how long it prints.
     private static readonly HashSet<string> PrinterConfiguration = new(StringComparer.Ordinal)
     {
-        "MM", "MN", "MT", "MP", "MU", "MF", "MC", "MW", "CO",
+        "MM", "MT", "MP", "MU", "MF", "MC", "MW", "CO",
         "IS", "ID", "JU", "JA", "SS", "SZ", "SC", "ST", "XS", "SX",
         "NI", "NC", "NR", "NS", "WD", "KL", "KN", "KP", "HS", "HH", "HW", "HM",
     };
@@ -108,6 +120,8 @@ public static class ZplDocumentImport
             public int? WidthDots { get; set; }
 
             public int? HeightDots { get; set; }
+
+            public bool IsContinuous { get; set; }
 
             public PrintSettings Print { get; } = new();
         }
@@ -276,6 +290,20 @@ public static class ZplDocumentImport
                     RecalledImage(command);
                     return;
 
+                case "MN":
+                    // Continuous stock belongs to the label; any other tracking mode is
+                    // the printer's and is left where it was found.
+                    if (ContinuousTracking.Contains(command.Arg(0)))
+                    {
+                        block.IsContinuous = true;
+                    }
+                    else
+                    {
+                        block.IgnoredConfiguration.Add($"{command.Prefix}{command.Code}");
+                    }
+
+                    return;
+
                 case "PQ":
                     block.Print.Copies = Math.Max(command.Int(0, 1), 1);
                     return;
@@ -355,6 +383,21 @@ public static class ZplDocumentImport
             {
                 block.Elements[i].ZOrder = i;
                 document.Elements.Add(block.Elements[i]);
+            }
+
+            if (block.IsContinuous)
+            {
+                // ZPL never states the trailing blank, so it is recovered from the one
+                // place it is visible: the difference between the length the file asked
+                // for and the content that fills it. That is exactly how it was produced,
+                // so a label of ours comes back with the margin it left with, and a
+                // foreign one keeps whatever slack its author gave it.
+                document.IsContinuous = true;
+                double declaredMm = block.HeightDots is { } length && length > 0
+                    ? (double)length / document.Dpmm
+                    : 0;
+                document.ContinuousMarginMm = Math.Max(
+                    declaredMm - ContinuousLength.ContentMm(document), 0);
             }
 
             var warnings = new List<string>(block.Warnings);

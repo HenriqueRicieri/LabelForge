@@ -10,8 +10,11 @@ public sealed class ElementPlacementTests
 {
     private static readonly ElementBoundsCalculator Bounds = new();
 
+    /// <summary>800 x 1200 dots at 8 dpmm.</summary>
+    private static LabelDocument Label() => new() { WidthMm = 100, HeightMm = 150, Dpmm = 8 };
+
     private static PlacementStatus Classify(Element element) =>
-        ElementPlacement.Classify(element, Bounds.GetBounds(element), 800, 1200);
+        ElementPlacement.Classify(element, Bounds.GetBounds(element), Label());
 
     [Fact]
     public void FullyInside_IsInside() =>

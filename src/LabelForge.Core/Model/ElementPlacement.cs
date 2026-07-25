@@ -33,16 +33,29 @@ public static class ElementPlacement
     /// elements can be parked without printing.</summary>
     public const double PasteboardMarginMm = 20;
 
-    /// <summary>True when the element is meant to print and its origin can be emitted as
-    /// a ^FO that lands on the label. ZPL has no negative origins, and an origin past the
-    /// edge prints nothing. A "do not print" element fails here too, so the generator
-    /// needs no second rule and cannot disagree with the canvas about which is which.</summary>
-    public static bool IsPrintable(Element element, int widthDots, int heightDots) =>
-        !element.DoNotPrint &&
-        element.X >= 0 && element.Y >= 0 && element.X < widthDots && element.Y < heightDots;
-
-    public static PlacementStatus Classify(Element element, DotRect bounds, int widthDots, int heightDots)
+    /// <summary>
+    /// True when the element is meant to print and its origin can be emitted as a ^FO
+    /// that lands on the label. ZPL has no negative origins, and an origin past the edge
+    /// prints nothing. A "do not print" element fails here too, so the generator needs no
+    /// second rule and cannot disagree with the canvas about which is which.
+    ///
+    /// Continuous stock has no bottom edge to fall off: the roll simply gets longer, so
+    /// only the left, top and right bounds apply. That is also what keeps the rule
+    /// answerable at all there, since the label's length is measured from the elements
+    /// this decides about.
+    /// </summary>
+    public static bool IsPrintable(Element element, LabelDocument document)
     {
+        ArgumentNullException.ThrowIfNull(document);
+        return !element.DoNotPrint &&
+               element.X >= 0 && element.Y >= 0 && element.X < document.WidthDots &&
+               (document.IsContinuous || element.Y < document.HeightDots);
+    }
+
+    public static PlacementStatus Classify(Element element, DotRect bounds, LabelDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
         // Asked for, so it is reported as a choice even when the element also happens to
         // sit off the label.
         if (element.DoNotPrint)
@@ -50,12 +63,15 @@ public static class ElementPlacement
             return PlacementStatus.Suppressed;
         }
 
-        if (!IsPrintable(element, widthDots, heightDots))
+        if (!IsPrintable(element, document))
         {
             return PlacementStatus.NotPrintable;
         }
 
-        return bounds.X + bounds.Width > widthDots || bounds.Y + bounds.Height > heightDots
+        // On continuous stock the bottom cannot clip, because the label was measured to
+        // reach the last element in the first place.
+        return bounds.X + bounds.Width > document.WidthDots ||
+               bounds.Y + bounds.Height > document.HeightDots
             ? PlacementStatus.Clipped
             : PlacementStatus.Inside;
     }

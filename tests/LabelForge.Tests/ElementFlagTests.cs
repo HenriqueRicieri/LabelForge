@@ -1,4 +1,4 @@
-using LabelForge.Core.Editing;
+﻿using LabelForge.Core.Editing;
 using LabelForge.Core.Io;
 using LabelForge.Core.Model;
 using LabelForge.Core.Zpl;
@@ -77,33 +77,35 @@ public sealed class ElementFlagTests
     public void Classification_SeparatesADecisionFromAnAccident()
     {
         var bounds = new DotRect(20, 20, 100, 30);
+        LabelDocument label = Label();
 
         Assert.Equal(
             PlacementStatus.Suppressed,
-            ElementPlacement.Classify(Text("x", doNotPrint: true), bounds, 800, 480));
+            ElementPlacement.Classify(Text("x", doNotPrint: true), bounds, label));
 
         Assert.Equal(
             PlacementStatus.NotPrintable,
-            ElementPlacement.Classify(new TextElement { X = 900, Y = 20 }, bounds, 800, 480));
+            ElementPlacement.Classify(new TextElement { X = 900, Y = 20 }, bounds, label));
 
         // Both at once still reads as the deliberate one.
         Assert.Equal(
             PlacementStatus.Suppressed,
             ElementPlacement.Classify(
-                new TextElement { X = 900, Y = 20, DoNotPrint = true }, bounds, 800, 480));
+                new TextElement { X = 900, Y = 20, DoNotPrint = true }, bounds, label));
 
         Assert.Equal(
             PlacementStatus.Inside,
-            ElementPlacement.Classify(Text("x"), bounds, 800, 480));
+            ElementPlacement.Classify(Text("x"), bounds, label));
     }
 
     [Fact]
     public void IsPrintable_AndTheGeneratorAgree()
     {
         TextElement suppressed = Text("x", doNotPrint: true);
+        LabelDocument label = Label();
 
-        Assert.False(ElementPlacement.IsPrintable(suppressed, 800, 480));
-        Assert.True(ElementPlacement.IsPrintable(Text("x"), 800, 480));
+        Assert.False(ElementPlacement.IsPrintable(suppressed, label));
+        Assert.True(ElementPlacement.IsPrintable(Text("x"), label));
     }
 
     /// <summary>Alignment is a canvas gesture, so a locked element must sit it out while
