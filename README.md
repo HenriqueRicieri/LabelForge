@@ -36,7 +36,14 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   Barcode data is validated against its symbology with a clear warning when it cannot be encoded.
 - Images (PNG, JPEG, BMP) are converted to the printer's 1-bit black with a selectable dither
   (threshold for logos, ordered, Floyd-Steinberg for photos) and embedded in the label as an
-  inline `^GF` graphic field, so the saved file and the exported ZPL are self-contained.
+  inline `^GF` graphic field, so the saved file and the exported ZPL are self-contained. Place the
+  same image twice and it is downloaded once as `~DG` and recalled with `^XG` instead of repeating
+  the payload; a single placement stays inline and leaves the printer's memory alone.
+- Graphics can be lifted out of an existing label: Insert > Graphics from a ZPL file reads its
+  `~DG` downloads and inline `^GF` fields, including the row compression Zebra drivers emit, and
+  adds each one as a normal image element positioned where the source label drew it. Graphics the
+  file only recalls by name are listed rather than skipped quietly, because those live in the
+  printer's own memory and their bitmaps are genuinely not in the file.
 - Template variables: `##MARKER##` placeholders in text and barcode data are discovered
   automatically and listed in a Variables panel. Each one is either filled at print by the
   downstream system (the preview renders an editable sample, and the exported and printed ZPL keeps
@@ -79,8 +86,8 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 ## Not yet built
 
 - Importing an existing ZPL label back into the visual designer. Real labels can be rendered in the
-  viewer, but the designer edits its own model of the element types above; embedded graphics
-  (`~DG`/`^XG`) and full ZPL-to-model import are planned, not present.
+  viewer and their embedded graphics can be pulled into the designer, but everything else in a
+  foreign label (text, barcodes, boxes) is still view-only; full ZPL-to-model import is planned.
 - The full variable-data system. Samples, counters, and date/time sources exist today; per-variable
   prompts and input rules (pick lists, masks, lengths) are future work, as is storing the layout on
   the printer (`^DF`/`^XF`) so a batch sends only its data.

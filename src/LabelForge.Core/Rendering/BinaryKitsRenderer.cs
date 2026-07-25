@@ -1,5 +1,6 @@
 using System.Globalization;
 using LabelForge.Core.Model;
+using LabelForge.Core.Zpl;
 using BinaryKits.Zpl.Label.Elements;
 using BinaryKits.Zpl.Viewer;
 using BinaryKits.Zpl.Viewer.ElementDrawers;
@@ -65,7 +66,12 @@ public sealed class BinaryKitsRenderer : IZplRenderer
     {
         var storage = new PrinterStorage();
         var analyzer = new ZplAnalyzer(storage);
-        AnalyzeInfo info = analyzer.Analyze(zpl);
+
+        // BinaryKits stores and recalls downloaded graphics by the literal name, and a
+        // label that writes the short form a printer accepts ("~DGLOGO" then "^XGLOGO")
+        // silently renders with no logo. Qualifying both sides is a render-time fix; the
+        // ZPL the caller holds is untouched.
+        AnalyzeInfo info = analyzer.Analyze(ZplGraphicScanner.QualifyGraphicNames(zpl));
 
         var unknownCommands = info.UnknownCommands ?? Array.Empty<string>();
         var errors = new List<string>(info.Errors ?? Array.Empty<string>());

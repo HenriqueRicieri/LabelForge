@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using LabelForge.Core.Model;
 
@@ -17,8 +18,15 @@ namespace LabelForge.Core.Zpl;
 public sealed class ZplGenerator : IElementVisitor
 {
     private readonly StringBuilder _sb = new();
+
+    /// <summary>~DG downloads, which have to precede the ^XA block that recalls them.</summary>
+    private readonly StringBuilder _downloads = new();
     private readonly List<string> _warnings = [];
     private readonly HashSet<string> _seenWarnings = new(StringComparer.Ordinal);
+
+    /// <summary>Rasterized images keyed by everything that decides their bits, so a
+    /// stamp placed twice is converted once and recognized as the same graphic.</summary>
+    private readonly Dictionary<string, SharedGraphic> _graphics = new(StringComparer.Ordinal);
     private int _offset;
     private LabelDocument? _document;
     private GenerationContext _context = new();
@@ -26,6 +34,14 @@ public sealed class ZplGenerator : IElementVisitor
     private bool _printerCounter;
     private bool _printerClock;
     private bool _softwareCounter;
+
+    /// <summary>An image that appears more than once, downloaded once under a name.</summary>
+    /// <param name="Name">Storage name; short, because Zebra caps it at eight characters.</param>
+    /// <param name="Uses">How many elements share these bits.</param>
+    private sealed record SharedGraphic(string Name, int Uses)
+    {
+        public bool Downloaded { get; set; }
+    }
 
     /// <summary>How the last <see cref="Generate(LabelDocument)"/> produced its dynamic
     /// fields. Reset at the start of every call; meaningless after a preview, which
@@ -53,8 +69,10 @@ public sealed class ZplGenerator : IElementVisitor
         ArgumentNullException.ThrowIfNull(context);
 
         _sb.Clear();
+        _downloads.Clear();
         _warnings.Clear();
         _seenWarnings.Clear();
+        _graphics.Clear();
         _offset = offsetDots;
         _document = document;
         _context = context;
@@ -83,22 +101,20 @@ public sealed class ZplGenerator : IElementVisitor
             }
         }
 
-        foreach (var element in document.Elements
-                     .Where(e => e.IsVisible)
-                     .OrderBy(e => e.ZOrder))
-        {
-            if (!includeOffLabel &&
-                !ElementPlacement.IsPrintable(element, document.WidthDots, document.HeightDots))
-            {
-                continue;
-            }
+        Element[] emitted = document.Elements
+            .Where(e => e.IsVisible)
+            .OrderBy(e => e.ZOrder)
+            .Where(e => includeOffLabel ||
+                        ElementPlacement.IsPrintable(e, document.WidthDots, document.HeightDots))
 
             // Even the preview cannot express an origin left of / above the pasteboard.
-            if (element.X + offsetDots < 0 || element.Y + offsetDots < 0)
-            {
-                continue;
-            }
+            .Where(e => e.X + offsetDots >= 0 && e.Y + offsetDots >= 0)
+            .ToArray();
 
+        PlanSharedGraphics(emitted);
+
+        foreach (Element element in emitted)
+        {
             element.Accept(this);
         }
 
@@ -110,7 +126,58 @@ public sealed class ZplGenerator : IElementVisitor
         _sb.Append("^XZ");
         LastRun = new GenerationInfo(
             _printerCounter, _printerClock, _softwareCounter, _warnings.ToArray());
-        return _sb.ToString();
+
+        // Downloads have to reach the printer before the block that recalls them.
+        return _downloads.Length > 0 ? _downloads.ToString() + _sb : _sb.ToString();
+    }
+
+    /// <summary>
+    /// Decides which images are worth putting in printer memory. An image placed once
+    /// stays an inline ^GF, so an ordinary label touches no printer state at all. The
+    /// same bits placed again become a single ~DG download recalled by ^XG, which is
+    /// what a repeated stamp costs on a real label: the payload once instead of N times.
+    /// </summary>
+    private void PlanSharedGraphics(IReadOnlyList<Element> elements)
+    {
+        var order = new List<string>();
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (Element element in elements)
+        {
+            if (element is not ImageElement image || GraphicKey(image) is not { } key)
+            {
+                continue;
+            }
+
+            if (!counts.TryGetValue(key, out int seen))
+            {
+                order.Add(key);
+            }
+
+            counts[key] = seen + 1;
+        }
+
+        // Named in first-use order so the same document always generates the same ZPL.
+        int index = 0;
+        foreach (string key in order.Where(k => counts[k] > 1))
+        {
+            _graphics[key] = new SharedGraphic($"LFG{index++}", counts[key]);
+        }
+    }
+
+    /// <summary>Identity of the bits an image will rasterize to. The pipeline is
+    /// deterministic, so equal source bytes at equal size and dithering give equal bits
+    /// and the images can share one download without converting either twice.
+    /// Null when there is nothing to draw.</summary>
+    private static string? GraphicKey(ImageElement image)
+    {
+        if (image.ImageData.Length == 0 || image.WidthDots <= 0 || image.HeightDots <= 0)
+        {
+            return null;
+        }
+
+        string digest = Convert.ToHexString(SHA256.HashData(image.ImageData));
+        return $"{digest}:{image.WidthDots}x{image.HeightDots}:{image.Dithering}";
     }
 
     private string Fo(Element element) => $"^FO{element.X + _offset},{element.Y + _offset}";
@@ -187,20 +254,53 @@ public sealed class ZplGenerator : IElementVisitor
 
     public void Visit(ImageElement element)
     {
-        // Undecodable or empty image data degrades to an omitted field, mirroring
-        // the renderer's never-throw rule; the designer still shows the placeholder.
-        byte[]? gray = element.ImageData.Length > 0
-            ? Imaging.ImageRasterizer.ToGrayscale(element.ImageData, element.WidthDots, element.HeightDots)
-            : null;
-        if (gray is null)
+        if (GraphicKey(element) is { } key &&
+            _graphics.TryGetValue(key, out SharedGraphic? shared))
         {
+            if (!shared.Downloaded)
+            {
+                if (Rasterize(element) is not { } bits)
+                {
+                    // Undecodable: drop the plan so the other placements take the
+                    // inline path and degrade the same way a lone image would.
+                    _graphics.Remove(key);
+                    return;
+                }
+
+                if (_context.IncludeGraphicDownloads)
+                {
+                    _downloads
+                        .Append(Imaging.ZplImageEncoder.EncodeDownload(
+                            shared.Name, bits, element.WidthDots, element.HeightDots))
+                        .Append('\n');
+                }
+
+                shared.Downloaded = true;
+            }
+
+            Line(Fo(element) + Imaging.ZplImageEncoder.RecallGraphic(shared.Name));
             return;
         }
 
-        bool[] black = Imaging.ImageDitherer.Dither(
-            gray, element.WidthDots, element.HeightDots, element.Dithering);
-        Line(Fo(element) + Imaging.ZplImageEncoder.EncodeGfa(
-            black, element.WidthDots, element.HeightDots));
+        // Undecodable or empty image data degrades to an omitted field, mirroring
+        // the renderer's never-throw rule; the designer still shows the placeholder.
+        if (Rasterize(element) is { } black)
+        {
+            Line(Fo(element) + Imaging.ZplImageEncoder.EncodeGfa(
+                black, element.WidthDots, element.HeightDots));
+        }
+    }
+
+    private static bool[]? Rasterize(ImageElement element)
+    {
+        byte[]? gray = element.ImageData.Length > 0
+            ? Imaging.ImageRasterizer.ToGrayscale(element.ImageData, element.WidthDots, element.HeightDots)
+            : null;
+
+        return gray is null
+            ? null
+            : Imaging.ImageDitherer.Dither(
+                gray, element.WidthDots, element.HeightDots, element.Dithering);
     }
 
     public void Visit(QrCodeElement element)

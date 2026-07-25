@@ -56,11 +56,20 @@ public static class PrintJob
         }
 
         // One block per copy, each a specific label, so ^PQ must not repeat them.
+        // A graphic shared across placements is downloaded by the first block only: the
+        // whole run is one stream to one printer, and a ~DG stays in memory for the rest
+        // of it, so repeating a logo per copy would be paying for it thousands of times.
         var sb = new StringBuilder(single.Length * labels);
         for (int copy = 0; copy < labels; copy++)
         {
             sb.Append(generator.Generate(
-                document, context with { CopyIndex = copy, EmitCopies = false }));
+                document,
+                context with
+                {
+                    CopyIndex = copy,
+                    EmitCopies = false,
+                    IncludeGraphicDownloads = copy == 0,
+                }));
             sb.Append('\n');
         }
 

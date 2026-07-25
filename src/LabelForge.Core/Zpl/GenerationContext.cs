@@ -22,6 +22,14 @@ public sealed record GenerationContext
     /// <summary>Whether ^PQ may be emitted. False when the caller is already producing
     /// one block per copy.</summary>
     public bool EmitCopies { get; init; } = true;
+
+    /// <summary>Whether the ~DG downloads a repeated graphic needs belong on this block.
+    /// A block always recalls them with ^XG; only the download itself is optional, and
+    /// it is skipped exactly once: on the later blocks of a multi-copy run whose first
+    /// block already put the graphic in the printer's memory. Any block generated on its
+    /// own keeps the download, so what the ZPL pane shows and what a file export writes
+    /// are always self-contained.</summary>
+    public bool IncludeGraphicDownloads { get; init; } = true;
 }
 
 /// <summary>

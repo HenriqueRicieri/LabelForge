@@ -208,6 +208,8 @@
                         <MenuItem Header="_QR Code" Command="{Binding AddQrCommand}" />
                         <MenuItem Header="_Data Matrix" Command="{Binding AddDataMatrixCommand}" />
                         <MenuItem Header="_Image..." Click="OnAddImage" />
+                        <Separator />
+                        <MenuItem Header="_Graphics from a ZPL file..." Click="OnImportGraphics" />
                     </MenuItem>
                 </Menu>
                 <Button DockPanel.Dock="Right" Content="Print..." Margin="4,4">

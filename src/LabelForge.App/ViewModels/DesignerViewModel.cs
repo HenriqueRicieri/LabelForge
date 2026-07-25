@@ -35,6 +35,7 @@ public partial class DesignerViewModel : ViewModelBase
     private readonly SnapshotHistory _history = new();
     private LabelDocument? _variablesDocument;
     private CancellationTokenSource? _renderCts;
+    private bool _statusHeld;
     private bool _restoring;
     private long _lastRecordTicks;
     private string? _lastCoalesceKey;
@@ -595,6 +596,59 @@ public partial class DesignerViewModel : ViewModelBase
             WidthDots = Math.Max((int)Math.Round(pixelWidth * scale), 8),
             HeightDots = Math.Max((int)Math.Round(pixelHeight * scale), 8),
         });
+    }
+
+    /// <summary>
+    /// Adds every graphic an existing ZPL label carries to this document as editable
+    /// images (the file dialog runs in the view, like the image import).
+    ///
+    /// Each one lands where the source label drew it rather than under the mouse: a
+    /// stamp's position relative to the rest of the layout is usually the reason to
+    /// import it at all. On a smaller label some of them will land off the label, which
+    /// the pasteboard shows honestly and the status line counts, instead of being
+    /// silently shoved inside. The whole import is one undo step.
+    /// </summary>
+    public void ImportGraphicsFromZpl(string zpl, string sourceName)
+    {
+        ZplGraphicImportResult result = ZplGraphicImport.FromZpl(zpl);
+        if (result.Graphics.Count == 0)
+        {
+            Notify(result.Warnings.Count > 0
+                ? string.Join(" ", result.Warnings)
+                : $"No graphics found in {sourceName}");
+            return;
+        }
+
+        int nextZ = Document.Elements.Count == 0
+            ? 0
+            : Document.Elements.Max(e => e.ZOrder) + 1;
+
+        var added = new List<Element>();
+        foreach (ImportedGraphic graphic in result.Graphics)
+        {
+            graphic.Element.ZOrder = nextZ++;
+            Document.Elements.Add(graphic.Element);
+            added.Add(graphic.Element);
+        }
+
+        Selection.SetMany(added);
+        RecordUndo();
+        ScheduleRender();
+
+        var notes = new List<string>(result.Warnings);
+        int offLabel = added.Count(
+            e => !ElementPlacement.IsPrintable(e, Document.WidthDots, Document.HeightDots));
+        if (offLabel > 0)
+        {
+            notes.Add(offLabel == added.Count
+                ? "The source label is larger than this one, so they all landed on the pasteboard."
+                : $"{offLabel} landed off the label, on the pasteboard.");
+        }
+
+        string what = added.Count == 1 ? "1 graphic" : $"{added.Count} graphics";
+        Notify(notes.Count == 0
+            ? $"Imported {what} from {sourceName}"
+            : $"Imported {what} from {sourceName}. {string.Join(" ", notes)}");
     }
 
     /// <summary>Arms the insert: the mouse becomes a placement tool until a click or Esc.</summary>
@@ -1165,9 +1219,25 @@ public partial class DesignerViewModel : ViewModelBase
             _ => $"{problems.Count} barcodes need attention: {string.Join("; ", problems)}",
         };
 
+    /// <summary>
+    /// Puts a message on the status line and protects it from the render's size readout.
+    ///
+    /// The readout is the resting state of that line, and it lands whenever the render
+    /// that a command scheduled finishes, a moment after the command set its message.
+    /// Without this the answer to "what did the import find?" would flash and vanish.
+    /// The next edit schedules a render, which clears the hold, so the line goes back to
+    /// reporting the label size on its own.
+    /// </summary>
+    private void Notify(string message)
+    {
+        StatusText = message;
+        _statusHeld = true;
+    }
+
     private async void ScheduleRender(int delayMs = 150)
     {
         _renderCts?.Cancel();
+        _statusHeld = false;
         var cts = new CancellationTokenSource();
         _renderCts = cts;
 
@@ -1273,10 +1343,17 @@ public partial class DesignerViewModel : ViewModelBase
             }
 
             // The rendered bitmap may be pasteboard-expanded; always report the label's
-            // own size.
-            StatusText = diagnosis.Count > 0
-                ? string.Join(" | ", diagnosis)
-                : $"{document.WidthDots} x {document.HeightDots} dots";
+            // own size. A render problem outranks anything a command had to say; the
+            // idle size readout does not (see Notify).
+            if (diagnosis.Count > 0)
+            {
+                StatusText = string.Join(" | ", diagnosis);
+                _statusHeld = false;
+            }
+            else if (!_statusHeld)
+            {
+                StatusText = $"{document.WidthDots} x {document.HeightDots} dots";
+            }
         }
         catch (OperationCanceledException)
         {

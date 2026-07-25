@@ -140,8 +140,9 @@ public sealed class ZplGeneratorTests
                 WidthDots = 8, HeightDots = 1, Dithering = DitherMode.Threshold,
             }));
 
-        // 8x1 target, left half black: one byte per row, F0.
-        Assert.Equal(Header(800, 1200) + "^FO10,20^GFA,1,1,1,F0^FS\n^XZ", zpl);
+        // 8x1 target, left half black: one byte per row, F0, whose trailing white
+        // nibble is written as the comma that fills a row out.
+        Assert.Equal(Header(800, 1200) + "^FO10,20^GFA,1,1,1,F,^FS\n^XZ", zpl);
     }
 
     [Fact]

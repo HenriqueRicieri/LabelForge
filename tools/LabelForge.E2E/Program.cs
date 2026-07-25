@@ -414,11 +414,88 @@ if (mode == "designer")
     d.CancelInsert();
     d.Selection.Set(d.Document.Elements[2]);
     Pump(150);
+
+    // Graphic import: pull the logos out of an existing label and check they come back
+    // as ordinary images that generate, share one download, and survive a save.
+    string graphicSource = FindGraphicSource();
+    d.NewDocumentCommand.Execute(null);
+    d.WidthMm = 100m;
+    d.HeightMm = 150m;
+    Pump(200);
+    d.ImportGraphicsFromZpl(
+        LabelForge.Core.Io.ZplTextFile.ReadFile(graphicSource).Text,
+        Path.GetFileName(graphicSource));
+    Pump(700);
+    Console.WriteLine(
+        $"import graphics from {Path.GetFileName(graphicSource)}: {d.Document.Elements.Count} elements, "
+        + $"all images={d.Document.Elements.All(e => e is LabelForge.Core.Model.ImageElement)}, "
+        + $"status='{d.StatusText}'");
+
+    var firstGraphic = (LabelForge.Core.Model.ImageElement)d.Document.Elements[0];
+    Console.WriteLine(
+        $"first graphic: '{firstGraphic.Name}' {firstGraphic.WidthDots}x{firstGraphic.HeightDots} dots "
+        + $"at {firstGraphic.X},{firstGraphic.Y}, {firstGraphic.ImageData.Length} PNG bytes");
+    Console.WriteLine(
+        $"import is one undo step: CanUndo={d.CanUndo}, "
+        + $"undo empties it={UndoLeavesNothing()} (expected True/True)");
+
+    // Place the same stamp a second time: that one should be downloaded once and
+    // recalled twice, while the graphics used once each stay inline.
+    var twin = (LabelForge.Core.Model.ImageElement)LabelForge.Core.Io.LabelDocumentJson
+        .DeserializeElements(LabelForge.Core.Io.LabelDocumentJson.SerializeElements([firstGraphic]))[0];
+    twin.Id = Guid.NewGuid();
+    twin.Y = firstGraphic.Y + firstGraphic.HeightDots + 20;
+    d.Document.Elements.Add(twin);
+    d.NotifyDocumentEdited();
+    Pump(900);
+    Console.WriteLine(
+        $"repeated stamp: ~DG count={Count(d.GeneratedZpl, "~DG")}, "
+        + $"^XG count={Count(d.GeneratedZpl, "^XG")}, inline ^GF count={Count(d.GeneratedZpl, "^GFA,")} "
+        + "(expected 1/2/2: the doubled stamp shares, the two single ones stay inline)");
+
+    var reimported = LabelForge.Core.Io.LabelDocumentJson.Deserialize(d.SerializeDocument());
+    Console.WriteLine(
+        $"imported graphics survive a save: {reimported.Elements.Count} elements, "
+        + $"bytes kept={((LabelForge.Core.Model.ImageElement)reimported.Elements[0]).ImageData.Length}");
+
+    d.Selection.Clear();
+    Pump(400);
+    Capture("designer-imported-graphics.png");
+
+    bool UndoLeavesNothing()
+    {
+        d.UndoCommand.Execute(null);
+        bool empty = d.Document.Elements.Count == 0;
+        d.RedoCommand.Execute(null);
+        return empty;
+    }
 }
 
 Capture($"{mode}.png");
 
 int Blocks(string zpl) => zpl.Split("^XA", StringSplitOptions.RemoveEmptyEntries).Length;
+
+int Count(string haystack, string needle) =>
+    haystack.Split(needle, StringSplitOptions.None).Length - 1;
+
+/// <summary>A label with downloaded graphics: the real corpus when it is present,
+/// otherwise the committed fixture, so the harness runs on a clean clone too.</summary>
+string FindGraphicSource()
+{
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    while (dir is not null)
+    {
+        string corpus = Path.Combine(dir.FullName, "exemplos zpl", "440.zpl");
+        if (File.Exists(corpus))
+        {
+            return corpus;
+        }
+
+        dir = dir.Parent;
+    }
+
+    return Path.Combine(AppContext.BaseDirectory, "Fixtures", "embedded-graphic-short-name.zpl");
+}
 
 void Pump(int ms)
 {

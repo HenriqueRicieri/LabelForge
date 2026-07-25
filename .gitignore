@@ -11,6 +11,7 @@ exemplos zpl/
 
 # Local development context, not part of the app
 CLAUDE.md
+.claudeignore
 docs/PLAN.md
 docs/REVIEW.md
 docs/IMPROVEMENTS.md

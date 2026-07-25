@@ -151,6 +151,43 @@ public partial class DesignerView : UserControl
         }
     }
 
+    /// <summary>Pulls the logos and stamps out of an existing label. The file is read
+    /// through ZplTextFile, not a plain reader, so a legacy CP1252 label does not lose
+    /// its accents on the way in even though only the graphics are used here.</summary>
+    private async void OnImportGraphics(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import graphics from a ZPL file",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("ZPL files") { Patterns = ["*.zpl", "*.ZPL", "*.prn", "*.txt"] },
+                new FilePickerFileType("All files") { Patterns = ["*"] },
+            ],
+        });
+
+        if (files.FirstOrDefault()?.TryGetLocalPath() is not { } path)
+        {
+            return;
+        }
+
+        try
+        {
+            Core.Io.ZplTextRead read = await Core.Io.ZplTextFile.ReadFileAsync(path);
+            vm.ImportGraphicsFromZpl(read.Text, Path.GetFileName(path));
+        }
+        catch (Exception ex)
+        {
+            vm.StatusText = $"Could not read the file: {ex.Message}";
+        }
+    }
+
     private void OnThemeSystem(object? sender, RoutedEventArgs e) => SetTheme(Avalonia.Styling.ThemeVariant.Default);
 
     private void OnThemeLight(object? sender, RoutedEventArgs e) => SetTheme(Avalonia.Styling.ThemeVariant.Light);

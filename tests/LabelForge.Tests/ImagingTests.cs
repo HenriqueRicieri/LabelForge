@@ -62,11 +62,12 @@ public sealed class ImagingTests
     [Fact]
     public void EncodeGfa_PadsRowsToWholeBytes()
     {
-        // 12 wide needs 2 bytes per row; the last 4 bits of each row are padding.
+        // 12 wide needs 2 bytes per row; the last 4 bits of each row are padding,
+        // and padding at the end of a row is exactly what the comma stands for.
         var black = new bool[12];
         Array.Fill(black, true);
 
-        Assert.Equal("^GFA,2,2,2,FFF0^FS", ZplImageEncoder.EncodeGfa(black, 12, 1));
+        Assert.Equal("^GFA,2,2,2,FFF,^FS", ZplImageEncoder.EncodeGfa(black, 12, 1));
     }
 
     [Fact]
