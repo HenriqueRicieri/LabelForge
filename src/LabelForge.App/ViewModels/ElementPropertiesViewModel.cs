@@ -95,6 +95,15 @@ public abstract class ElementPropertiesViewModel : ObservableObject
         set => Edit(Element.Orientation, value?.Value ?? Orientation.Normal, v => Element.Orientation = v);
     }
 
+    /// <summary>Knocks this field out of whatever ink is under it (^FR) instead of
+    /// adding to it. Applies to any element, which is why it lives on the base editor;
+    /// over blank stock it prints nothing, which is the command working as intended.</summary>
+    public bool IsReversed
+    {
+        get => Element.IsReversed;
+        set => Edit(Element.IsReversed, value, v => Element.IsReversed = v);
+    }
+
     /// <summary>Re-reads every property from the model (e.g. after a canvas drag).</summary>
     public void Refresh() => OnPropertyChanged(string.Empty);
 

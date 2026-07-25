@@ -41,6 +41,16 @@ public abstract class Element
 
     public bool IsLocked { get; set; }
 
+    /// <summary>
+    /// Print this field in reverse (^FR): wherever it lands on ink it knocks the ink out
+    /// instead of adding to it, which is how a label puts white text in a black bar.
+    ///
+    /// This is the only colour the model has beyond black. It is a property of the field
+    /// rather than of the element type, because ZPL applies ^FR to any field, and it
+    /// depends on what is underneath: reversing over blank stock prints nothing at all.
+    /// </summary>
+    public bool IsReversed { get; set; }
+
     /// <summary>Double-dispatch entry point used by the ZPL generator and future
     /// visitors (export, validation). Keeps the model free of ZPL string-building.</summary>
     public abstract void Accept(IElementVisitor visitor);

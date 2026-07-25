@@ -36,13 +36,33 @@ public sealed record ZplDocumentImportResult(
 /// </summary>
 public static class ZplDocumentImport
 {
-    /// <summary>Commands that carry no element of their own, either because they are
-    /// structural or because the generator re-emits them from the document. Seeing one
-    /// is not worth telling the user about.</summary>
-    private static readonly HashSet<string> Silent = new(StringComparer.Ordinal)
+    /// <summary>Commands this importer consumes. Either they produce an element, or they
+    /// are structural, or the generator re-emits them from the document.</summary>
+    private static readonly HashSet<string> Handled = new(StringComparer.Ordinal)
     {
         "XA", "XZ", "CI", "FS", "FH", "LH", "PW", "LL", "BY", "PQ", "MD", "PR",
-        "DG", "FO", "FT", "FD", "FB", "GB", "GF", "XG", "BC", "B3", "BE", "BU", "BX", "BQ",
+        "DG", "FO", "FT", "FD", "FB", "FR", "GB", "GF", "XG", "BC", "B3", "BE", "BU", "BX", "BQ",
+    };
+
+    /// <summary>
+    /// Commands that configure the printer rather than describe the label: media type,
+    /// tear-off position, darkness curves, the printer's own defaults.
+    ///
+    /// Dropping these is correct, not a shortfall. They belong to whoever set the printer
+    /// up, and a label the designer re-emits should not be carrying someone else's tear
+    /// offset. Naming them separately keeps the warning list to actual losses, which is
+    /// the only way that list stays worth reading.
+    /// </summary>
+    /// Kept deliberately narrow. Commands that change what the label looks like or where
+    /// it prints stay off this list even when they look like setup, because losing one of
+    /// those is a real loss the user has to hear about: ^LR and ^PM invert or mirror the
+    /// whole label, ^LS and ^LT shift every field, ^SN serializes a field, ^DF stores the
+    /// format on the printer, and ^CC and ^CT redefine the characters this parser reads.
+    private static readonly HashSet<string> PrinterConfiguration = new(StringComparer.Ordinal)
+    {
+        "MM", "MN", "MT", "MP", "MU", "MF", "MC", "MW", "CO",
+        "IS", "ID", "JU", "JA", "SS", "SZ", "SC", "ST", "XS", "SX",
+        "NI", "NC", "NR", "NS", "WD", "KL", "KN", "KP", "HS", "HH", "HW", "HM",
     };
 
     /// <param name="labelIndex">Which ^XA block to import, or -1 to take the first block
@@ -80,6 +100,10 @@ public static class ZplDocumentImport
 
             public HashSet<string> SeenWarnings { get; } = new(StringComparer.Ordinal);
 
+            /// <summary>Printer setup seen and deliberately left behind, kept apart from
+            /// the warnings so the list of real losses stays worth reading.</summary>
+            public SortedSet<string> IgnoredConfiguration { get; } = new(StringComparer.Ordinal);
+
             public int? WidthDots { get; set; }
 
             public int? HeightDots { get; set; }
@@ -97,6 +121,7 @@ public static class ZplDocumentImport
         private Orientation _orientation = Orientation.Normal;
         private bool _hexEscapes;
         private char _hexMarker = '_';
+        private bool _reversed;
 
         // Font state. ^BY is not here on purpose: in ZPL it is a format-level default
         // that outlives the field that set it.
@@ -170,6 +195,10 @@ public static class ZplDocumentImport
                 case "FH":
                     _hexEscapes = true;
                     _hexMarker = command.Parameters.Length > 0 ? command.Parameters[0] : '_';
+                    return;
+
+                case "FR":
+                    _reversed = true;
                     return;
 
                 case "FB":
@@ -271,7 +300,11 @@ public static class ZplDocumentImport
                 return;
             }
 
-            if (!Silent.Contains(command.Code))
+            if (PrinterConfiguration.Contains(command.Code))
+            {
+                block.IgnoredConfiguration.Add($"{command.Prefix}{command.Code}");
+            }
+            else if (!Handled.Contains(command.Code))
             {
                 Warn($"{command.Prefix}{command.Code} is not modelled and was dropped.");
             }
@@ -318,8 +351,16 @@ public static class ZplDocumentImport
                 document.Elements.Add(block.Elements[i]);
             }
 
-            return new ZplDocumentImportResult(
-                document, _blocks.Count, index, block.Warnings);
+            var warnings = new List<string>(block.Warnings);
+            if (block.IgnoredConfiguration.Count > 0)
+            {
+                warnings.Add(
+                    "Printer setup in the file was left behind, which is deliberate: it "
+                    + "belongs to whoever configured the printer, not to this label ("
+                    + string.Join(", ", block.IgnoredConfiguration) + ").");
+            }
+
+            return new ZplDocumentImportResult(document, _blocks.Count, index, warnings);
         }
 
         private void StartBarcode(
@@ -522,6 +563,7 @@ public static class ZplDocumentImport
         private void Add(Element element)
         {
             element.Orientation = _orientation;
+            element.IsReversed = _reversed;
 
             // ZPL has no negative origins, so a label home that pushes a field off the
             // top-left is clamped rather than producing a coordinate we cannot re-emit.
@@ -569,6 +611,7 @@ public static class ZplDocumentImport
             _qrMagnification = null;
             _hexEscapes = false;
             _hexMarker = '_';
+            _reversed = false;
             _blockWidth = 0;
             _blockMaxLines = 1;
             _blockSpacing = 0;

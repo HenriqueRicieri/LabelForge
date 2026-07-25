@@ -397,6 +397,9 @@
                         <ComboBox ItemsSource="{Binding SelectionProperties.Orientations, FallbackValue={x:Null}}"
                                   SelectedItem="{Binding SelectionProperties.SelectedOrientation, FallbackValue={x:Null}}"
                                   HorizontalAlignment="Stretch" />
+                        <CheckBox Content="Reverse (knock out of the ink below)" FontSize="12" Margin="0,4,0,0"
+                                  IsChecked="{Binding SelectionProperties.IsReversed, FallbackValue=false}"
+                                  ToolTip.Tip="^FR: prints white where this field crosses black. Over blank stock it prints nothing." />
 
                         <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="0,8" />
 

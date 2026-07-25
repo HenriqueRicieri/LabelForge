@@ -273,6 +273,48 @@ public sealed class ZplDocumentImportTests
         Assert.DoesNotContain(result.Warnings, w => w.Contains("^CO", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// Printer setup is dropped on purpose: it belongs to whoever configured the printer,
+    /// and a label we re-emit should not carry someone else's tear offset. Saying so
+    /// separately is what keeps the warning list to actual losses.
+    /// </summary>
+    [Fact]
+    public void PrinterSetup_IsReportedAsDeliberateRatherThanAsALoss()
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA\n^MMT\n^MNY\n^IS R:X.GRF,Y\n^FO0,0^A0N,30^FDkeep^FS\n^XZ");
+
+        Assert.Single(result.Document.Elements);
+        string note = Assert.Single(result.Warnings);
+        Assert.Contains("deliberate", note, StringComparison.Ordinal);
+        Assert.Contains("^MM", note, StringComparison.Ordinal);
+        Assert.Contains("^MN", note, StringComparison.Ordinal);
+        Assert.Contains("^IS", note, StringComparison.Ordinal);
+        Assert.DoesNotContain("not modelled", note, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The commands that look like setup but change the label are deliberately not on
+    /// that list, because losing one silently would change what prints: these invert or
+    /// mirror the whole label, shift every field, serialize a field, store the format on
+    /// the printer, or redefine the characters this parser reads.
+    /// </summary>
+    [Theory]
+    [InlineData("^LRY")]
+    [InlineData("^PMY")]
+    [InlineData("^LS40")]
+    [InlineData("^LT20")]
+    [InlineData("^SNserial,1,Y")]
+    [InlineData("^DFR:FMT.ZPL")]
+    [InlineData("^CC~")]
+    public void CommandsThatChangeTheLabel_AreNeverTreatedAsPrinterSetup(string command)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n{command}\n^FO0,0^A0N,30^FDkeep^FS\n^XZ");
+
+        Assert.Contains(result.Warnings, w => w.Contains("not modelled", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void UnmodelledCommands_AreReportedRatherThanDroppedSilently()
     {

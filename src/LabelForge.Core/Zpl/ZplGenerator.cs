@@ -180,7 +180,12 @@ public sealed class ZplGenerator : IElementVisitor
         return $"{digest}:{image.WidthDots}x{image.HeightDots}:{image.Dithering}";
     }
 
-    private string Fo(Element element) => $"^FO{element.X + _offset},{element.Y + _offset}";
+    /// <summary>The field origin, plus the reverse marker when the field asks for it.
+    /// ^FR goes here rather than next to the data because that is the one position that
+    /// works for every field type, graphic commands included.</summary>
+    private string Fo(Element element) =>
+        $"^FO{element.X + _offset},{element.Y + _offset}"
+        + (element.IsReversed ? "^FR" : string.Empty);
 
     /// <summary>Emits a field's data, resolving the document's counters and clocks. The
     /// preview keeps markers literal so the designer can substitute sample values.</summary>
