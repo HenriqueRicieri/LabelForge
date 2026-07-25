@@ -1,5 +1,18 @@
 namespace LabelForge.Core.Model;
 
+/// <summary>How a text block's lines sit inside its width (the ^FB justification
+/// argument). Only meaningful when <see cref="TextElement.BlockWidthDots"/> is set.</summary>
+public enum TextJustification
+{
+    Left,
+    Center,
+    Right,
+
+    /// <summary>Spread to both edges. The last line of a block is left aligned, which
+    /// is what the printer does and what every typesetter expects.</summary>
+    Justified,
+}
+
 /// <summary>A text field. v1 uses the scalable font 0 (^A0), sized in dots.</summary>
 public sealed class TextElement : Element
 {
@@ -10,6 +23,32 @@ public sealed class TextElement : Element
 
     /// <summary>Character width in dots. If 0, the printer derives it from the height.</summary>
     public int FontWidthDots { get; set; }
+
+    /// <summary>
+    /// Width of the text block in dots, or 0 for a plain single line that runs as far as
+    /// it likes (no ^FB at all, which is how every label saved before this behaved).
+    ///
+    /// Setting it turns the field into a ZPL field block: the text wraps inside this
+    /// width and aligns by <see cref="Justification"/>. Real labels use it mostly to
+    /// centre one line inside a known width rather than to wrap paragraphs.
+    /// </summary>
+    public int BlockWidthDots { get; set; }
+
+    /// <summary>Maximum lines the block prints. ZPL's own default is 1, and real labels
+    /// rely on it, so it is kept faithfully rather than quietly raised: changing it would
+    /// change what an imported label prints.</summary>
+    public int BlockMaxLines { get; set; } = 1;
+
+    /// <summary>Dots added between lines; negative closes them up.</summary>
+    public int BlockLineSpacingDots { get; set; }
+
+    /// <summary>Indent applied to every line after the first, in dots.</summary>
+    public int BlockHangingIndentDots { get; set; }
+
+    public TextJustification Justification { get; set; } = TextJustification.Left;
+
+    /// <summary>True when this field is a block, i.e. when ^FB has to be emitted.</summary>
+    public bool IsBlock => BlockWidthDots > 0;
 
     public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
 }

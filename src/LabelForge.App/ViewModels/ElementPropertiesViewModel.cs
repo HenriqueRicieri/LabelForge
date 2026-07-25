@@ -141,6 +141,48 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
         get => _text.FontWidthDots;
         set => Edit(_text.FontWidthDots, Math.Max((int)value, 0), v => _text.FontWidthDots = v);
     }
+
+    /// <summary>0 keeps the field a plain single line and emits no ^FB at all.</summary>
+    public decimal BlockWidth
+    {
+        get => _text.BlockWidthDots;
+        set => Edit(_text.BlockWidthDots, Math.Max((int)value, 0), v =>
+        {
+            _text.BlockWidthDots = v;
+            OnPropertyChanged(nameof(IsBlock));
+        });
+    }
+
+    /// <summary>Drives whether the rest of the block editors are enabled: without a
+    /// width there is no block for them to describe.</summary>
+    public bool IsBlock => _text.IsBlock;
+
+    public decimal BlockMaxLines
+    {
+        get => _text.BlockMaxLines;
+        set => Edit(_text.BlockMaxLines, Math.Clamp((int)value, 1, 9999), v => _text.BlockMaxLines = v);
+    }
+
+    public decimal BlockLineSpacing
+    {
+        get => _text.BlockLineSpacingDots;
+        set => Edit(_text.BlockLineSpacingDots, (int)value, v => _text.BlockLineSpacingDots = v);
+    }
+
+    public decimal BlockHangingIndent
+    {
+        get => _text.BlockHangingIndentDots;
+        set => Edit(_text.BlockHangingIndentDots, Math.Max((int)value, 0), v => _text.BlockHangingIndentDots = v);
+    }
+
+    public IReadOnlyList<TextJustification> Justifications { get; } =
+        Enum.GetValues<TextJustification>();
+
+    public TextJustification Justification
+    {
+        get => _text.Justification;
+        set => Edit(_text.Justification, value, v => _text.Justification = v);
+    }
 }
 
 public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel

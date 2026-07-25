@@ -42,7 +42,7 @@ public static class ZplDocumentImport
     private static readonly HashSet<string> Silent = new(StringComparer.Ordinal)
     {
         "XA", "XZ", "CI", "FS", "FH", "LH", "PW", "LL", "BY", "PQ", "MD", "PR",
-        "DG", "FO", "FT", "FD", "GB", "GF", "XG", "BC", "B3", "BE", "BU", "BX", "BQ",
+        "DG", "FO", "FT", "FD", "FB", "GB", "GF", "XG", "BC", "B3", "BE", "BU", "BX", "BQ",
     };
 
     /// <param name="labelIndex">Which ^XA block to import, or -1 to take the first block
@@ -114,6 +114,13 @@ public static class ZplDocumentImport
         private int? _dataMatrixModule;
         private int? _qrMagnification;
 
+        // ^FB state, field-level like the font.
+        private int _blockWidth;
+        private int _blockMaxLines = 1;
+        private int _blockSpacing;
+        private int _blockIndent;
+        private TextJustification _justification = TextJustification.Left;
+
         public ZplGraphicScan Graphics { get; set; } = new([], [], []);
 
         public void Apply(ZplCommand command)
@@ -163,6 +170,23 @@ public static class ZplDocumentImport
                 case "FH":
                     _hexEscapes = true;
                     _hexMarker = command.Parameters.Length > 0 ? command.Parameters[0] : '_';
+                    return;
+
+                case "FB":
+                    // ^FBwidth,maxLines,lineSpacing,justification,hangingIndent. Every
+                    // argument is optional in the wild ("^FB931,1,,C" is the commonest
+                    // corpus form), so each falls back to the ZPL default on its own.
+                    _blockWidth = command.Int(0);
+                    _blockMaxLines = Math.Max(command.Int(1, 1), 1);
+                    _blockSpacing = command.Int(2);
+                    _justification = command.Arg(3).ToUpperInvariant() switch
+                    {
+                        "C" => TextJustification.Center,
+                        "R" => TextJustification.Right,
+                        "J" => TextJustification.Justified,
+                        _ => TextJustification.Left,
+                    };
+                    _blockIndent = command.Int(4);
                     return;
 
                 case "BY":
@@ -344,6 +368,11 @@ public static class ZplDocumentImport
                     Text = data,
                     FontHeightDots = _fontHeight,
                     FontWidthDots = _fontWidth,
+                    BlockWidthDots = _blockWidth,
+                    BlockMaxLines = _blockMaxLines,
+                    BlockLineSpacingDots = _blockSpacing,
+                    BlockHangingIndentDots = _blockIndent,
+                    Justification = _justification,
                 });
                 return;
             }
@@ -540,6 +569,11 @@ public static class ZplDocumentImport
             _qrMagnification = null;
             _hexEscapes = false;
             _hexMarker = '_';
+            _blockWidth = 0;
+            _blockMaxLines = 1;
+            _blockSpacing = 0;
+            _blockIndent = 0;
+            _justification = TextJustification.Left;
         }
 
         private void Warn(string message)

@@ -212,8 +212,25 @@ public sealed class ZplGenerator : IElementVisitor
         string font = element.FontWidthDots > 0
             ? $"^A0{element.Orientation.Letter()},{element.FontHeightDots},{element.FontWidthDots}"
             : $"^A0{element.Orientation.Letter()},{element.FontHeightDots}";
-        Line($"{Fo(element)}{font}{Field(element.Text)}");
+
+        // A plain line emits no ^FB at all, so a label that never asked for a block is
+        // byte-for-byte what it always was.
+        string block = element.IsBlock
+            ? $"^FB{element.BlockWidthDots},{Math.Max(element.BlockMaxLines, 1)},"
+              + $"{element.BlockLineSpacingDots},{Justify(element.Justification)},"
+              + $"{element.BlockHangingIndentDots}"
+            : string.Empty;
+
+        Line($"{Fo(element)}{font}{block}{Field(element.Text)}");
     }
+
+    private static string Justify(TextJustification justification) => justification switch
+    {
+        TextJustification.Center => "C",
+        TextJustification.Right => "R",
+        TextJustification.Justified => "J",
+        _ => "L",
+    };
 
     public void Visit(BoxElement element) =>
         Line($"{Fo(element)}^GB{element.WidthDots},{element.HeightDots},{element.ThicknessDots},B^FS");

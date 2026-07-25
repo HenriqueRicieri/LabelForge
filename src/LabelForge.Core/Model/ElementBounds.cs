@@ -47,8 +47,27 @@ public sealed class ElementBoundsCalculator : IElementVisitor
         int advance = element.FontWidthDots > 0
             ? element.FontWidthDots
             : (int)Math.Round(element.FontHeightDots * 0.55);
-        int width = Math.Max(element.Text.Length, 1) * Math.Max(advance, 1);
-        _result = new DotRect(element.X, element.Y, width, element.FontHeightDots);
+        advance = Math.Max(advance, 1);
+        int naturalWidth = Math.Max(element.Text.Length, 1) * advance;
+
+        if (!element.IsBlock)
+        {
+            _result = new DotRect(element.X, element.Y, naturalWidth, element.FontHeightDots);
+            return;
+        }
+
+        // A block's width is declared rather than guessed, which is the one text
+        // footprint here that is not a heuristic. The line count still is: it comes from
+        // the same average advance, capped by what the block is allowed to print.
+        int lines = Math.Clamp(
+            (int)Math.Ceiling((double)naturalWidth / Math.Max(element.BlockWidthDots, 1)),
+            1,
+            Math.Max(element.BlockMaxLines, 1));
+        int height = lines * element.FontHeightDots
+                     + Math.Max(lines - 1, 0) * element.BlockLineSpacingDots;
+
+        _result = new DotRect(
+            element.X, element.Y, element.BlockWidthDots, Math.Max(height, element.FontHeightDots));
     }
 
     public void Visit(BarcodeElement element)

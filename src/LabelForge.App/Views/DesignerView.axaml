@@ -49,6 +49,26 @@
                 <TextBlock Classes="propLabel" Text="Font width (dots, 0 = auto)" />
                 <NumericUpDown Value="{Binding FontWidth}" Minimum="0" Maximum="600"
                                Increment="2" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="Block width (dots, 0 = single line)"
+                           Margin="0,8,0,0" />
+                <NumericUpDown Value="{Binding BlockWidth}" Minimum="0" Maximum="9999"
+                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="Alignment" IsVisible="{Binding IsBlock}" />
+                <ComboBox ItemsSource="{Binding Justifications}"
+                          SelectedItem="{Binding Justification}"
+                          IsVisible="{Binding IsBlock}" HorizontalAlignment="Stretch" />
+                <TextBlock Classes="propLabel" Text="Maximum lines" IsVisible="{Binding IsBlock}" />
+                <NumericUpDown Value="{Binding BlockMaxLines}" Minimum="1" Maximum="9999"
+                               Increment="1" FormatString="0" IsVisible="{Binding IsBlock}" />
+                <TextBlock Text="The preview always draws every line. A printer stops at this many."
+                           IsVisible="{Binding IsBlock}" Foreground="#D97706"
+                           TextWrapping="Wrap" FontSize="12" />
+                <TextBlock Classes="propLabel" Text="Line spacing (dots)" IsVisible="{Binding IsBlock}" />
+                <NumericUpDown Value="{Binding BlockLineSpacing}" Minimum="-200" Maximum="200"
+                               Increment="2" FormatString="0" IsVisible="{Binding IsBlock}" />
+                <TextBlock Classes="propLabel" Text="Hanging indent (dots)" IsVisible="{Binding IsBlock}" />
+                <NumericUpDown Value="{Binding BlockHangingIndent}" Minimum="0" Maximum="9999"
+                               Increment="10" FormatString="0" IsVisible="{Binding IsBlock}" />
             </StackPanel>
         </DataTemplate>
 
