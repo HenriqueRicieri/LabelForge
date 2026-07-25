@@ -599,6 +599,38 @@ public partial class DesignerViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Replaces the document with a ZPL label read back into the model.
+    ///
+    /// The file is parsed at the density currently selected here, because ZPL states
+    /// ^PW and ^LL in dots and never says which printer it was written for; that is a
+    /// fact about the format, not a gap to paper over with a guess. The result is not
+    /// given a file path: it came from a .zpl, so saving should ask where the .lfl goes
+    /// rather than offering to overwrite the source.
+    /// </summary>
+    public void ImportZplDocument(string zpl, string sourceName)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(zpl, Document.Dpmm);
+
+        LoadDocument(result.Document, path: null);
+
+        var notes = new List<string>();
+        if (result.LabelCount > 1)
+        {
+            notes.Add($"Label {result.SelectedIndex + 1} of {result.LabelCount} in the file.");
+        }
+
+        notes.AddRange(result.Warnings);
+
+        string what = result.Document.Elements.Count == 1
+            ? "1 element"
+            : $"{result.Document.Elements.Count} elements";
+        Notify(result.Document.Elements.Count == 0
+            ? $"Nothing in {sourceName} could be turned into elements. "
+              + string.Join(" ", result.Warnings)
+            : $"Imported {what} from {sourceName}. {string.Join(" ", notes)}".TrimEnd());
+    }
+
+    /// <summary>
     /// Adds every graphic an existing ZPL label carries to this document as editable
     /// images (the file dialog runs in the view, like the image import).
     ///

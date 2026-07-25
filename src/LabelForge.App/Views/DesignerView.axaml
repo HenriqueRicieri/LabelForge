@@ -161,6 +161,7 @@
                         <MenuItem Header="New from _Sample" Command="{Binding LoadSampleCommand}" />
                         <MenuItem Header="_Open..." Click="OnOpenFile" InputGesture="Ctrl+O" />
                         <MenuItem x:Name="RecentMenu" Header="Open _Recent" IsEnabled="{Binding HasRecentFiles}" />
+                        <MenuItem Header="_Import ZPL..." Click="OnImportZpl" />
                         <Separator />
                         <MenuItem Header="_Save" Click="OnSaveFile" InputGesture="Ctrl+S" />
                         <MenuItem Header="Save _As..." Click="OnSaveFileAs" />

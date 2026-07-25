@@ -151,19 +151,61 @@ public partial class DesignerView : UserControl
         }
     }
 
+    /// <summary>Opens a ZPL label as a document. Read through ZplTextFile so a legacy
+    /// CP1252 file keeps its accents instead of collecting replacement characters.</summary>
+    private async void OnImportZpl(object? sender, RoutedEventArgs e)
+    {
+        if (await PickZplFile("Import a ZPL label") is not { } picked)
+        {
+            return;
+        }
+
+        (DesignerViewModel vm, string path) = picked;
+        try
+        {
+            ZplTextRead read = await ZplTextFile.ReadFileAsync(path);
+            vm.ImportZplDocument(read.Text, Path.GetFileName(path));
+        }
+        catch (Exception ex)
+        {
+            vm.StatusText = $"Could not read the file: {ex.Message}";
+        }
+    }
+
     /// <summary>Pulls the logos and stamps out of an existing label. The file is read
     /// through ZplTextFile, not a plain reader, so a legacy CP1252 label does not lose
     /// its accents on the way in even though only the graphics are used here.</summary>
     private async void OnImportGraphics(object? sender, RoutedEventArgs e)
     {
-        if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)
+        if (await PickZplFile("Import graphics from a ZPL file") is not { } picked)
         {
             return;
         }
 
+        (DesignerViewModel vm, string path) = picked;
+        try
+        {
+            ZplTextRead read = await ZplTextFile.ReadFileAsync(path);
+            vm.ImportGraphicsFromZpl(read.Text, Path.GetFileName(path));
+        }
+        catch (Exception ex)
+        {
+            vm.StatusText = $"Could not read the file: {ex.Message}";
+        }
+    }
+
+    /// <summary>Shared open dialog for the two ZPL import entries. Null when the window
+    /// or view model is not up yet, or when the user cancels.</summary>
+    private async Task<(DesignerViewModel Vm, string Path)?> PickZplFile(string title)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)
+        {
+            return null;
+        }
+
         var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Import graphics from a ZPL file",
+            Title = title,
             AllowMultiple = false,
             FileTypeFilter =
             [
@@ -172,20 +214,7 @@ public partial class DesignerView : UserControl
             ],
         });
 
-        if (files.FirstOrDefault()?.TryGetLocalPath() is not { } path)
-        {
-            return;
-        }
-
-        try
-        {
-            Core.Io.ZplTextRead read = await Core.Io.ZplTextFile.ReadFileAsync(path);
-            vm.ImportGraphicsFromZpl(read.Text, Path.GetFileName(path));
-        }
-        catch (Exception ex)
-        {
-            vm.StatusText = $"Could not read the file: {ex.Message}";
-        }
+        return files.FirstOrDefault()?.TryGetLocalPath() is { } path ? (vm, path) : null;
     }
 
     private void OnThemeSystem(object? sender, RoutedEventArgs e) => SetTheme(Avalonia.Styling.ThemeVariant.Default);

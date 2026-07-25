@@ -462,6 +462,30 @@ if (mode == "designer")
     Pump(400);
     Capture("designer-imported-graphics.png");
 
+    // Whole-label import: read a real ZPL file back into the model, then confirm the
+    // round trip by regenerating it and comparing against a re-import of that output.
+    d.ImportZplDocument(
+        LabelForge.Core.Io.ZplTextFile.ReadFile(graphicSource).Text,
+        Path.GetFileName(graphicSource));
+    Pump(900);
+    Console.WriteLine(
+        $"import label from {Path.GetFileName(graphicSource)}: {d.Document.Elements.Count} elements "
+        + $"[{string.Join(" ", d.Document.Elements.GroupBy(e => e.GetType().Name).Select(g => $"{g.Key}:{g.Count()}"))}]");
+    Console.WriteLine($"import status: '{d.StatusText}'");
+    Console.WriteLine(
+        $"no file path after a ZPL import: {d.CurrentFilePath is null} (expected True, "
+        + "saving must ask where the .lfl goes)");
+
+    string generated = new LabelForge.Core.Zpl.ZplGenerator().Generate(d.Document);
+    var again = LabelForge.Core.Io.ZplDocumentImport.FromZpl(generated, d.Document.Dpmm);
+    Console.WriteLine(
+        $"regenerate and re-import is stable: "
+        + $"{generated == new LabelForge.Core.Zpl.ZplGenerator().Generate(again.Document)} (expected True)");
+
+    d.Selection.Clear();
+    Pump(500);
+    Capture("designer-imported-label.png");
+
     bool UndoLeavesNothing()
     {
         d.UndoCommand.Execute(null);

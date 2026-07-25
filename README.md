@@ -39,7 +39,12 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   inline `^GF` graphic field, so the saved file and the exported ZPL are self-contained. Place the
   same image twice and it is downloaded once as `~DG` and recalled with `^XG` instead of repeating
   the payload; a single placement stays inline and leaves the printer's memory alone.
-- Graphics can be lifted out of an existing label: Insert > Graphics from a ZPL file reads its
+- An existing ZPL label can be opened as a document: File > Import ZPL parses it back into the
+  model so its text, barcodes, boxes and graphics become editable elements. ZPL states positions in
+  dots and never names the printer it was written for, so the import uses the density selected in
+  the designer. A file holding several labels imports the first one that has content, because real
+  files routinely start with a bare printer-configuration block.
+- Graphics alone can be lifted out of an existing label: Insert > Graphics from a ZPL file reads its
   `~DG` downloads and inline `^GF` fields, including the row compression Zebra drivers emit, and
   adds each one as a normal image element positioned where the source label drew it. Graphics the
   file only recalls by name are listed rather than skipped quietly, because those live in the
@@ -85,9 +90,11 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 
 ## Not yet built
 
-- Importing an existing ZPL label back into the visual designer. Real labels can be rendered in the
-  viewer and their embedded graphics can be pulled into the designer, but everything else in a
-  foreign label (text, barcodes, boxes) is still view-only; full ZPL-to-model import is planned.
+- Complete ZPL-to-model import. File > Import ZPL reads a label back into the designer and covers
+  every command LabelForge itself writes, so a label it generated round-trips byte for byte, and a
+  foreign label comes back as far as those commands reach. What it does not model yet, mainly `^FB`
+  word wrap, `^FR` reverse fields, and fonts other than the scalable font 0, is reported on import
+  rather than dropped in silence.
 - The full variable-data system. Samples, counters, and date/time sources exist today; per-variable
   prompts and input rules (pick lists, masks, lengths) are future work, as is storing the layout on
   the printer (`^DF`/`^XF`) so a batch sends only its data.
