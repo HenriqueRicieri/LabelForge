@@ -41,7 +41,8 @@ public static class ZplDocumentImport
     private static readonly HashSet<string> Handled = new(StringComparer.Ordinal)
     {
         "XA", "XZ", "CI", "FS", "FH", "LH", "PW", "LL", "BY", "PQ", "MD", "PR",
-        "DG", "FO", "FT", "FD", "FB", "FR", "GB", "GF", "XG", "BC", "B3", "BE", "BU", "BX", "BQ",
+        "DG", "FO", "FT", "FD", "FB", "FR", "GB", "GF", "XG",
+        "BC", "B3", "BE", "BU", "BX", "BQ", "B7",
     };
 
     /// <summary>
@@ -138,6 +139,7 @@ public static class ZplDocumentImport
 
         private int? _dataMatrixModule;
         private int? _qrMagnification;
+        private Pdf417Element? _pdf417;
 
         // ^FB state, field-level like the font.
         private int _blockWidth;
@@ -252,6 +254,10 @@ public static class ZplDocumentImport
                 case "BQ":
                     _orientation = ToOrientation(command.Arg(0));
                     _qrMagnification = Math.Clamp(command.Int(2, 5), 1, 10);
+                    return;
+
+                case "B7":
+                    StartPdf417(command);
                     return;
 
                 case "FD":
@@ -372,6 +378,36 @@ public static class ZplDocumentImport
             _interpretation = !string.Equals(command.Arg(printIndex), "N", StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// ^B7 orientation, row height, security level, columns, rows, truncate.
+        ///
+        /// Every argument falls back to the ZPL default on its own rather than to this
+        /// model's default, because an imported label has to keep printing what it
+        /// printed: ZPL's security level really is 0, however poor a choice that is for
+        /// a symbol created here.
+        /// </summary>
+        private void StartPdf417(ZplCommand command)
+        {
+            _orientation = ToOrientation(command.Arg(0));
+            _pdf417 = new Pdf417Element
+            {
+                ModuleWidthDots = Math.Clamp(_moduleWidth, 1, 10),
+                RowHeightDots = Math.Max(command.Int(1, 8), 1),
+                SecurityLevel = Math.Clamp(command.Int(2, 0), 0, 8),
+                DataColumns = Math.Clamp(
+                    command.Int(3, 0), 0, Pdf417Metrics.MaxColumns),
+                Truncate = string.Equals(command.Arg(5), "Y", StringComparison.OrdinalIgnoreCase),
+            };
+
+            // The model sizes a PDF417 by its column count, so a row count is a real
+            // loss: it is the other way the file could have pinned the shape.
+            if (command.Arg(4).Length > 0)
+            {
+                Warn($"^B7 asked for {command.Arg(4)} rows, which was dropped: this model "
+                     + "sizes a PDF417 by its column count.");
+            }
+        }
+
         /// <summary>A ^FD closes whatever field type is pending. Which one it is decides
         /// the element, so the order here mirrors the generator's emission.</summary>
         private void Field(string data)
@@ -399,6 +435,13 @@ public static class ZplDocumentImport
             if (_qrMagnification is { } magnification)
             {
                 Add(BuildQr(data, magnification));
+                return;
+            }
+
+            if (_pdf417 is { } pdf)
+            {
+                pdf.Data = data;
+                Add(pdf);
                 return;
             }
 
@@ -609,6 +652,7 @@ public static class ZplDocumentImport
             _symbology = null;
             _dataMatrixModule = null;
             _qrMagnification = null;
+            _pdf417 = null;
             _hexEscapes = false;
             _hexMarker = '_';
             _reversed = false;

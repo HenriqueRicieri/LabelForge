@@ -232,6 +232,37 @@ if (mode == "designer")
         $"datamatrix add: {d.Document.Elements.Count - beforeDm} added, "
         + $"selected type ok={d.SelectedElement is LabelForge.Core.Model.DataMatrixElement} (expected 1/True)");
 
+    // PDF417: inserted from the toolbar, sized by its column count, and drawn by the
+    // offline renderer (the canvas underlay is the render of this ZPL).
+    int beforePdf = d.Document.Elements.Count;
+    d.AddPdf417Command.Execute(null);
+    d.PlaceAt(360, 300);
+    Pump(700);
+    Console.WriteLine(
+        $"pdf417 add: {d.Document.Elements.Count - beforePdf} added, "
+        + $"selected type ok={d.SelectedElement is LabelForge.Core.Model.Pdf417Element} (expected 1/True)");
+    Console.WriteLine($"pdf417 in ZPL: {d.GeneratedZpl.Contains("^B7N,8,2,5,,N")} (expected True)");
+
+    if (d.SelectionProperties is Pdf417PropertiesViewModel pdf)
+    {
+        Console.WriteLine($"pdf417 shape: '{pdf.ShapeInfo}', warning='{pdf.Warning}' (expect no warning)");
+
+        // Automatic columns hand the shape to the printer, so the panel has to say the
+        // preview is one plausible layout rather than the one that will print.
+        pdf.Columns = 0;
+        Pump(700);
+        Console.WriteLine($"pdf417 automatic: '{pdf.ShapeInfo}', warns={pdf.HasWarning} (expected True)");
+        Console.WriteLine($"pdf417 automatic in ZPL: {d.GeneratedZpl.Contains("^B7N,8,2,,,N")} (expected True)");
+        Capture("designer-pdf417.png");
+
+        pdf.Columns = 5;
+        Pump(500);
+    }
+    else
+    {
+        Console.WriteLine("pdf417 panel: no Pdf417PropertiesViewModel (expected one)");
+    }
+
     d.Document.Elements.Add(new LabelForge.Core.Model.TextElement
     {
         X = 20, Y = 20, Text = "Lot ##LOTE##", FontHeightDots = 30,

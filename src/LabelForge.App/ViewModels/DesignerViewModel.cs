@@ -537,6 +537,7 @@ public partial class DesignerViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsBarcodeArmed));
         OnPropertyChanged(nameof(IsQrArmed));
         OnPropertyChanged(nameof(IsDataMatrixArmed));
+        OnPropertyChanged(nameof(IsPdf417Armed));
         OnPropertyChanged(nameof(IsImageArmed));
     }
 
@@ -551,6 +552,8 @@ public partial class DesignerViewModel : ViewModelBase
     public bool IsQrArmed => ArmedTool == "QR";
 
     public bool IsDataMatrixArmed => ArmedTool == "DataMatrix";
+
+    public bool IsPdf417Armed => ArmedTool == "Pdf417";
 
     public bool IsImageArmed => ArmedTool == "Image";
 
@@ -579,6 +582,10 @@ public partial class DesignerViewModel : ViewModelBase
     [RelayCommand]
     private void AddDataMatrix() => ArmInsert("DataMatrix",
         () => new DataMatrixElement { Data = "LF-000123", ModuleSizeDots = 4 });
+
+    [RelayCommand]
+    private void AddPdf417() => ArmInsert("Pdf417",
+        () => new Pdf417Element { Data = "LF-000123", DataColumns = 5 });
 
     /// <summary>Arms image placement with an already-picked file (the file dialog
     /// runs in the view). The image scales to fit a 240-dot box, keeping aspect.</summary>
@@ -928,6 +935,7 @@ public partial class DesignerViewModel : ViewModelBase
         BarcodeElement barcode => new BarcodePropertiesViewModel(barcode, Document, OnPanelEdited),
         QrCodeElement qr => new QrPropertiesViewModel(qr, Document, OnPanelEdited),
         DataMatrixElement dm => new DataMatrixPropertiesViewModel(dm, Document, OnPanelEdited),
+        Pdf417Element pdf => new Pdf417PropertiesViewModel(pdf, Document, OnPanelEdited),
         ImageElement image => new ImagePropertiesViewModel(image, Document, OnPanelEdited),
         LineElement line => new LinePropertiesViewModel(line, Document, OnPanelEdited),
         BoxElement box => new BoxPropertiesViewModel(box, Document, OnPanelEdited),
@@ -1446,6 +1454,7 @@ public partial class DesignerViewModel : ViewModelBase
             BarcodeElement => "Barcode",
             QrCodeElement => "QR code",
             DataMatrixElement => "Data Matrix",
+            Pdf417Element => "PDF417",
             ImageElement => "Image",
             LineElement => "Line",
             BoxElement => "Box",

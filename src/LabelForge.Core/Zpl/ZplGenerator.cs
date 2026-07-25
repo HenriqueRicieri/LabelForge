@@ -274,6 +274,21 @@ public sealed class ZplGenerator : IElementVisitor
         Line($"{Fo(element)}^BX{element.Orientation.Letter()},{element.ModuleSizeDots},200"
              + Field(element.Data));
 
+    public void Visit(Pdf417Element element)
+    {
+        // ^B7 orientation, row height, security level, columns, rows, truncate.
+        // The row count is deliberately left empty: the model sizes a symbol by its
+        // column count, and stating both over-constrains the shape.
+        string columns = element.DataColumns > 0
+            ? element.DataColumns.ToString(CultureInfo.InvariantCulture)
+            : string.Empty;
+
+        Line($"^BY{element.ModuleWidthDots}{Fo(element)}"
+             + $"^B7{element.Orientation.Letter()},{element.RowHeightDots},"
+             + $"{element.SecurityLevel},{columns},,{(element.Truncate ? "Y" : "N")}"
+             + Field(element.Data));
+    }
+
     public void Visit(ImageElement element)
     {
         if (GraphicKey(element) is { } key &&

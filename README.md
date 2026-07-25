@@ -32,8 +32,10 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 - Snapshot-based undo/redo that shares the save format, so a document that undoes correctly is
   guaranteed to save and reopen correctly. Related edits coalesce into one step by identity.
 - Element types: text, linear barcode (Code 128, Code 39, EAN-13, UPC-A), QR code, Data Matrix,
-  image, line, box, with a per-type properties panel and positions typed in dots or millimeters.
-  Barcode data is validated against its symbology with a clear warning when it cannot be encoded.
+  PDF417, image, line, box, with a per-type properties panel and positions typed in dots or
+  millimeters. Barcode data is validated against its symbology with a clear warning when it cannot
+  be encoded. A PDF417 states the shape its settings produce, and says so when the column count is
+  left automatic, because that hands the shape to the printer.
 - Images (PNG, JPEG, BMP) are converted to the printer's 1-bit black with a selectable dither
   (threshold for logos, ordered, Floyd-Steinberg for photos) and embedded in the label as an
   inline `^GF` graphic field, so the saved file and the exported ZPL are self-contained. Place the

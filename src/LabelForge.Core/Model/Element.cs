@@ -14,6 +14,7 @@ namespace LabelForge.Core.Model;
 [JsonDerivedType(typeof(BarcodeElement), "barcode")]
 [JsonDerivedType(typeof(QrCodeElement), "qr")]
 [JsonDerivedType(typeof(DataMatrixElement), "datamatrix")]
+[JsonDerivedType(typeof(Pdf417Element), "pdf417")]
 [JsonDerivedType(typeof(ImageElement), "image")]
 [JsonDerivedType(typeof(LineElement), "line")]
 [JsonDerivedType(typeof(BoxElement), "box")]
@@ -76,6 +77,7 @@ public interface IElementVisitor
     void Visit(BarcodeElement element);
     void Visit(QrCodeElement element);
     void Visit(DataMatrixElement element);
+    void Visit(Pdf417Element element);
     void Visit(ImageElement element);
     void Visit(LineElement element);
     void Visit(BoxElement element);

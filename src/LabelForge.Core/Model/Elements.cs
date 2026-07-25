@@ -126,6 +126,51 @@ public sealed class DataMatrixElement : Element
     public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
 }
 
+/// <summary>
+/// A PDF417 stacked barcode (^B7). Unlike QR and Data Matrix, whose shape follows from
+/// the data alone, a PDF417 has a free parameter: how many data columns the codewords
+/// are laid out in. That single number decides whether the symbol is a wide strip or a
+/// tall block, so it is modelled explicitly rather than left to chance.
+/// </summary>
+public sealed class Pdf417Element : Element
+{
+    public string Data { get; set; } = string.Empty;
+
+    /// <summary>Narrow-module width in dots, 1-10. Emitted as ^BY, the same
+    /// format-level default the linear barcodes use.</summary>
+    public int ModuleWidthDots { get; set; } = 2;
+
+    /// <summary>Height of one row in dots. The symbol's total height is this times the
+    /// row count, so it is the knob that makes a PDF417 taller.</summary>
+    public int RowHeightDots { get; set; } = 8;
+
+    /// <summary>
+    /// Error-correction level, 0-8: the symbol carries 2^(level+1) correction codewords.
+    ///
+    /// The default is 2, not ZPL's own 0. Level 0 is error detection with no correction
+    /// at all, which is not a state anyone wants a printed label in, and 2 is what the
+    /// PDF417 standard recommends for payloads of the size labels actually carry.
+    /// </summary>
+    public int SecurityLevel { get; set; } = 2;
+
+    /// <summary>
+    /// Data columns, 1-30, or 0 to let the printer choose.
+    ///
+    /// Automatic is what ZPL does by default and is kept so a foreign label survives
+    /// import unchanged, but it is not the default here: the printer's aspect-ratio
+    /// heuristic is its own, so neither the offline preview nor the footprint math can
+    /// promise the shape the printer will pick. A fixed column count is what makes the
+    /// designer, the preview and the print agree.
+    /// </summary>
+    public int DataColumns { get; set; } = 5;
+
+    /// <summary>Drop the right row indicator and shorten the stop pattern. Saves width
+    /// on a controlled scanning setup; leave it off for general use.</summary>
+    public bool Truncate { get; set; }
+
+    public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
+}
+
 /// <summary>How an image's grays become the printer's 1-bit black.</summary>
 public enum DitherMode
 {

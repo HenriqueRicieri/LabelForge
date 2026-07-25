@@ -52,6 +52,8 @@ public sealed class TemplateVariables : IElementVisitor
 
     public void Visit(DataMatrixElement element) => Scan(element.Data);
 
+    public void Visit(Pdf417Element element) => Scan(element.Data);
+
     public void Visit(ImageElement element)
     {
         // No textual content.

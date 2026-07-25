@@ -329,6 +329,132 @@ public sealed class DataMatrixPropertiesViewModel : ElementPropertiesViewModel
     }
 }
 
+public sealed class Pdf417PropertiesViewModel : ElementPropertiesViewModel
+{
+    private readonly Pdf417Element _pdf;
+
+    public Pdf417PropertiesViewModel(Pdf417Element element, LabelDocument document, Action<string> edited)
+        : base(element, document, edited) => _pdf = element;
+
+    public override string TypeName => "PDF417";
+
+    public string Data
+    {
+        get => _pdf.Data;
+        set
+        {
+            Edit(_pdf.Data, value ?? string.Empty, v => _pdf.Data = v);
+            OnShapeChanged();
+        }
+    }
+
+    public decimal ModuleWidth
+    {
+        get => _pdf.ModuleWidthDots;
+        set
+        {
+            Edit(_pdf.ModuleWidthDots, Math.Clamp((int)value, 1, 10), v => _pdf.ModuleWidthDots = v);
+            OnShapeChanged();
+        }
+    }
+
+    public decimal RowHeight
+    {
+        get => _pdf.RowHeightDots;
+        set
+        {
+            Edit(_pdf.RowHeightDots, Math.Max((int)value, 1), v => _pdf.RowHeightDots = v);
+            OnShapeChanged();
+        }
+    }
+
+    public decimal SecurityLevel
+    {
+        get => _pdf.SecurityLevel;
+        set
+        {
+            Edit(_pdf.SecurityLevel, Math.Clamp((int)value, 0, 8), v => _pdf.SecurityLevel = v);
+            OnShapeChanged();
+        }
+    }
+
+    /// <summary>Data columns, with 0 shown as "Automatic" by the view's minimum-zero
+    /// spinner. Kept as a number rather than a checkbox plus a number, because that is
+    /// what the ZPL parameter is.</summary>
+    public decimal Columns
+    {
+        get => _pdf.DataColumns;
+        set
+        {
+            Edit(
+                _pdf.DataColumns,
+                Math.Clamp((int)value, 0, Pdf417Metrics.MaxColumns),
+                v => _pdf.DataColumns = v);
+            OnShapeChanged();
+        }
+    }
+
+    public bool Truncate
+    {
+        get => _pdf.Truncate;
+        set
+        {
+            Edit(_pdf.Truncate, value, v => _pdf.Truncate = v);
+            OnShapeChanged();
+        }
+    }
+
+    /// <summary>The shape the symbol is expected to take, so the numbers above are not
+    /// the only feedback for a parameter whose effect is a whole layout.</summary>
+    public string ShapeInfo
+    {
+        get
+        {
+            Pdf417Shape shape = Pdf417Metrics.Measure(_pdf);
+            string columns = Count(shape.Columns, "column");
+            return (shape.ColumnsAreAutomatic ? $"about {columns}" : columns)
+                   + $" x {Count(shape.Rows, "row")}, "
+                   + $"about {shape.WidthDots} x {shape.HeightDots} dots";
+        }
+    }
+
+    /// <summary>
+    /// What the preview cannot promise. Automatic columns are the printer's own
+    /// aspect-ratio choice, so the offline render is one plausible shape rather than
+    /// the shape; over capacity, there is no symbol at all to draw.
+    /// </summary>
+    public string Warning
+    {
+        get
+        {
+            Pdf417Shape shape = Pdf417Metrics.Measure(_pdf);
+            if (shape.OverCapacity)
+            {
+                return "This is more data than a PDF417 holds at this security level. "
+                       + "Shorten the data, add columns, or lower the security level.";
+            }
+
+            return shape.ColumnsAreAutomatic
+                ? "With columns set to automatic the printer chooses the symbol's shape, "
+                  + "so the preview shows one plausible layout rather than the one that "
+                  + "will print. Set a column count to pin it."
+                : string.Empty;
+        }
+    }
+
+    public bool HasWarning => Warning.Length > 0;
+
+    private static string Count(int value, string noun) =>
+        value == 1 ? $"1 {noun}" : $"{value} {noun}s";
+
+    private void OnShapeChanged()
+    {
+        OnPropertyChanged(nameof(ShapeInfo));
+        OnPropertyChanged(nameof(Warning));
+        OnPropertyChanged(nameof(HasWarning));
+    }
+}
+
 public sealed class ImagePropertiesViewModel : ElementPropertiesViewModel
 {
     private readonly ImageElement _image;

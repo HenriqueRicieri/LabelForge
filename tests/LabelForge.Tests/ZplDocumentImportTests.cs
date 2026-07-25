@@ -76,6 +76,17 @@ public sealed class ZplDocumentImportTests
             X = 620, Y = 200, Data = "LF-000123", ModuleSizeDots = 5,
             Orientation = Orientation.Rotated180,
         });
+        document.Elements.Add(new Pdf417Element
+        {
+            X = 20, Y = 420, Data = "CARGO-000123", ModuleWidthDots = 3, RowHeightDots = 10,
+            SecurityLevel = 4, DataColumns = 6, Orientation = Orientation.Rotated270,
+        });
+        document.Elements.Add(new Pdf417Element
+        {
+            // The automatic column count, which emits an empty argument the parser has
+            // to read back as automatic rather than as zero columns.
+            X = 300, Y = 420, Data = "AUTO SHAPE", DataColumns = 0, Truncate = true,
+        });
         document.Elements.Add(new ImageElement
         {
             X = 620, Y = 380, ImageData = TestImages.HalfBlackPng(),

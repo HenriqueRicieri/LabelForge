@@ -137,6 +137,14 @@ public sealed class ElementBoundsCalculator : IElementVisitor
         _result = new DotRect(element.X, element.Y, side, side);
     }
 
+    public void Visit(Pdf417Element element)
+    {
+        // The one place the symbol's shape is worked out; see Pdf417Metrics for how
+        // exact each half of it is.
+        Pdf417Shape shape = Pdf417Metrics.Measure(element);
+        _result = new DotRect(element.X, element.Y, shape.WidthDots, shape.HeightDots);
+    }
+
     public void Visit(ImageElement element) =>
         _result = new DotRect(element.X, element.Y, element.WidthDots, element.HeightDots);
 

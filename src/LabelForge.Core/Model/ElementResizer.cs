@@ -80,6 +80,19 @@ public static class ElementResizer
                 break;
             }
 
+            case Pdf417Element pdf:
+            {
+                // A stacked symbol quantizes on both axes and they are independent:
+                // width in whole modules across the row, height in whole rows.
+                Pdf417Shape shape = Pdf417Metrics.Measure(pdf);
+                int modules = Pdf417Metrics.WidthModules(shape.Columns, pdf.Truncate);
+                pdf.ModuleWidthDots = Math.Clamp(
+                    (int)Math.Round((double)targetWidth / modules), 1, 10);
+                pdf.RowHeightDots = Math.Max(
+                    (int)Math.Round((double)targetHeight / shape.Rows), 1);
+                break;
+            }
+
             case ImageElement image:
                 image.WidthDots = Math.Max(targetWidth, 8);
                 image.HeightDots = Math.Max(targetHeight, 8);
