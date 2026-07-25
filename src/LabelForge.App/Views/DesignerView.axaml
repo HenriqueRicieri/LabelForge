@@ -400,6 +400,12 @@
                         <CheckBox Content="Reverse (knock out of the ink below)" FontSize="12" Margin="0,4,0,0"
                                   IsChecked="{Binding SelectionProperties.IsReversed, FallbackValue=false}"
                                   ToolTip.Tip="^FR: prints white where this field crosses black. Over blank stock it prints nothing." />
+                        <CheckBox Content="Lock position" FontSize="12"
+                                  IsChecked="{Binding SelectionProperties.IsLocked, FallbackValue=false}"
+                                  ToolTip.Tip="Blocks dragging, resizing and alignment on the canvas. These fields still edit it." />
+                        <CheckBox Content="Do not print" FontSize="12"
+                                  IsChecked="{Binding SelectionProperties.DoNotPrint, FallbackValue=false}"
+                                  ToolTip.Tip="Stays on the canvas, outlined in grey, and is left out of the exported and printed ZPL." />
 
                         <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="0,8" />
 

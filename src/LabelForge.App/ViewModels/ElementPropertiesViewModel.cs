@@ -104,6 +104,22 @@ public abstract class ElementPropertiesViewModel : ObservableObject
         set => Edit(Element.IsReversed, value, v => Element.IsReversed = v);
     }
 
+    /// <summary>Blocks canvas drag, resize and alignment for this element. These editors
+    /// keep working, so a lock guards finished layout from the mouse without making the
+    /// element read-only.</summary>
+    public bool IsLocked
+    {
+        get => Element.IsLocked;
+        set => Edit(Element.IsLocked, value, v => Element.IsLocked = v);
+    }
+
+    /// <summary>Keeps the element on the canvas and out of the print.</summary>
+    public bool DoNotPrint
+    {
+        get => Element.DoNotPrint;
+        set => Edit(Element.DoNotPrint, value, v => Element.DoNotPrint = v);
+    }
+
     /// <summary>Re-reads every property from the model (e.g. after a canvas drag).</summary>
     public void Refresh() => OnPropertyChanged(string.Empty);
 

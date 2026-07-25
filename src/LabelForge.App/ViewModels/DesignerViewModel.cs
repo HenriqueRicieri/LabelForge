@@ -1397,15 +1397,18 @@ public partial class DesignerViewModel : ViewModelBase
         }
     }
 
-    /// <summary>One line summarizing elements off the label ("will not print") and
-    /// elements crossing its right/bottom edge ("will be clipped"); empty when none.</summary>
+    /// <summary>One line summarizing elements off the label ("will not print"), elements
+    /// crossing its right/bottom edge ("will be clipped"), and elements deliberately kept
+    /// out of the print; empty when none. The deliberate ones are phrased as a statement
+    /// rather than a warning, because the user asked for them.</summary>
     private static string DescribePlacement(
         IReadOnlyList<(Element Element, PlacementStatus Status)> offLabel)
     {
         var outside = offLabel.Where(t => t.Status == PlacementStatus.NotPrintable).ToList();
         var clipped = offLabel.Where(t => t.Status == PlacementStatus.Clipped).ToList();
+        var suppressed = offLabel.Where(t => t.Status == PlacementStatus.Suppressed).ToList();
 
-        var parts = new List<string>(2);
+        var parts = new List<string>(3);
         if (outside.Count == 1)
         {
             parts.Add($"'{DisplayName(outside[0].Element)}' is outside the label and will not print");
@@ -1422,6 +1425,15 @@ public partial class DesignerViewModel : ViewModelBase
         else if (clipped.Count > 1)
         {
             parts.Add($"{clipped.Count} elements extend past the label edge and will be clipped");
+        }
+
+        if (suppressed.Count == 1)
+        {
+            parts.Add($"'{DisplayName(suppressed[0].Element)}' is set not to print");
+        }
+        else if (suppressed.Count > 1)
+        {
+            parts.Add($"{suppressed.Count} elements are set not to print");
         }
 
         return string.Join("; ", parts);

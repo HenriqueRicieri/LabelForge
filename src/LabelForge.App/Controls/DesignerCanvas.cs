@@ -77,6 +77,12 @@ public sealed class DesignerCanvas : Control
     private static readonly Pen WarnPen = new(
         new SolidColorBrush(Color.FromRgb(0xD9, 0x77, 0x06)), 1.5, new DashStyle([4, 3], 0));
 
+    // "Do not print": a long grey dash. Deliberately not the amber warning, because the
+    // user asked for this and it is not a mistake to flag; the longer dash also reads as
+    // different at a glance rather than as a slightly different shade of the same thing.
+    private static readonly Pen SuppressedPen = new(
+        new SolidColorBrush(Color.FromRgb(0x6B, 0x72, 0x80)), 1.5, new DashStyle([8, 4], 0));
+
     // Pasteboard dim: translucent surface color washed over the expanded underlay so
     // off-label content stays visible but reads as "will not print".
     private static readonly SolidColorBrush DimBrush = new(Color.FromArgb(0xBE, 0xD9, 0xD9, 0xD9));
@@ -513,17 +519,20 @@ public sealed class DesignerCanvas : Control
             context.DrawRectangle(null, LabelBorderPen, labelRect.Inflate(0.5));
         }
 
-        // Amber dashed outline on anything that will not print exactly as drawn.
+        // Dashed outline on anything that will not print exactly as drawn: amber when
+        // the layout caused it, grey when the user asked for it.
         foreach (Element element in doc.Elements.Where(el => el.IsVisible))
         {
             DotRect b = _bounds.GetBounds(element);
-            if (ElementPlacement.Classify(element, b, doc.WidthDots, doc.HeightDots) ==
-                PlacementStatus.Inside)
+            PlacementStatus status =
+                ElementPlacement.Classify(element, b, doc.WidthDots, doc.HeightDots);
+            if (status == PlacementStatus.Inside)
             {
                 continue;
             }
 
-            context.DrawRectangle(null, WarnPen, new Rect(
+            Pen pen = status == PlacementStatus.Suppressed ? SuppressedPen : WarnPen;
+            context.DrawRectangle(null, pen, new Rect(
                 origin.X + b.X * scale,
                 origin.Y + b.Y * scale,
                 Math.Max(b.Width * scale, 4),

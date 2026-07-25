@@ -486,6 +486,41 @@ if (mode == "designer")
     Pump(500);
     Capture("designer-imported-label.png");
 
+    // Element flags: a locked element resists canvas gestures, a "do not print" one stays
+    // on the canvas with its own outline and leaves the exported ZPL.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    d.Document.Elements.Add(new LabelForge.Core.Model.TextElement
+    {
+        X = 60, Y = 60, Text = "prints normally", FontHeightDots = 40,
+    });
+    d.Document.Elements.Add(new LabelForge.Core.Model.TextElement
+    {
+        X = 60, Y = 160, Text = "internal note", FontHeightDots = 40, DoNotPrint = true,
+    });
+    d.Document.Elements.Add(new LabelForge.Core.Model.BoxElement
+    {
+        X = 50, Y = 40, WidthDots = 500, HeightDots = 220, ThicknessDots = 3, IsLocked = true,
+    });
+    d.NotifyDocumentEdited();
+    Pump(900);
+    Console.WriteLine(
+        $"do-not-print stays off the ZPL: {!d.GeneratedZpl.Contains("internal note")} "
+        + $"and on the canvas: {d.PlacementWarning.Contains("set not to print")} (expected True/True)");
+
+    var lockedBox = d.Document.Elements[2];
+    int lockedX = lockedBox.X;
+    d.Selection.SetMany([d.Document.Elements[0], lockedBox]);
+    d.AlignLeftCommand.Execute(null);
+    Console.WriteLine(
+        $"locked element resists alignment: {lockedBox.X == lockedX} (expected True, still at {lockedX})");
+
+    d.Selection.Set(d.Document.Elements[1]);
+    Pump(500);
+    Capture("designer-element-flags.png");
+    d.Selection.Clear();
+    Pump(200);
+
     bool UndoLeavesNothing()
     {
         d.UndoCommand.Execute(null);

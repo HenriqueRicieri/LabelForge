@@ -13,6 +13,12 @@ public enum PlacementStatus
     /// <summary>Cannot be expressed in ZPL (negative origin) or the origin is past the
     /// label edge; the generator skips it entirely.</summary>
     NotPrintable,
+
+    /// <summary>The user marked it "do not print". Skipped for the same reason as
+    /// <see cref="NotPrintable"/> but by choice rather than by accident, which is why it
+    /// is a separate answer: the canvas and the warning line must not call a deliberate
+    /// decision a mistake.</summary>
+    Suppressed,
 }
 
 /// <summary>
@@ -27,13 +33,23 @@ public static class ElementPlacement
     /// elements can be parked without printing.</summary>
     public const double PasteboardMarginMm = 20;
 
-    /// <summary>True when the element's origin can be emitted as a ^FO and lands on the
-    /// label. ZPL has no negative origins, and an origin past the edge prints nothing.</summary>
+    /// <summary>True when the element is meant to print and its origin can be emitted as
+    /// a ^FO that lands on the label. ZPL has no negative origins, and an origin past the
+    /// edge prints nothing. A "do not print" element fails here too, so the generator
+    /// needs no second rule and cannot disagree with the canvas about which is which.</summary>
     public static bool IsPrintable(Element element, int widthDots, int heightDots) =>
+        !element.DoNotPrint &&
         element.X >= 0 && element.Y >= 0 && element.X < widthDots && element.Y < heightDots;
 
     public static PlacementStatus Classify(Element element, DotRect bounds, int widthDots, int heightDots)
     {
+        // Asked for, so it is reported as a choice even when the element also happens to
+        // sit off the label.
+        if (element.DoNotPrint)
+        {
+            return PlacementStatus.Suppressed;
+        }
+
         if (!IsPrintable(element, widthDots, heightDots))
         {
             return PlacementStatus.NotPrintable;

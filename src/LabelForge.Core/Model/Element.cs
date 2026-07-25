@@ -39,7 +39,20 @@ public abstract class Element
 
     public bool IsVisible { get; set; } = true;
 
+    /// <summary>Blocks canvas drag, resize and alignment. Panel edits still apply, so a
+    /// lock protects finished layout from the mouse without making it read-only.</summary>
     public bool IsLocked { get; set; }
+
+    /// <summary>
+    /// Keep this element on the canvas but out of the print. For annotations, keep-out
+    /// outlines, and work in progress.
+    ///
+    /// Distinct from <see cref="IsVisible"/>, which hides an element everywhere, and
+    /// from the positional rule that skips anything parked off the label: this one is a
+    /// deliberate choice the user made, so the canvas marks it differently and the
+    /// warning line says so in different words.
+    /// </summary>
+    public bool DoNotPrint { get; set; }
 
     /// <summary>
     /// Print this field in reverse (^FR): wherever it lands on ink it knocks the ink out
