@@ -52,6 +52,15 @@ public abstract class ElementPropertiesViewModel : ObservableObject
     /// element alone cannot answer (the density for millimetres, the marker syntax).</summary>
     protected LabelDocument Document => _document;
 
+    /// <summary>Supplies the markers the data boxes complete from. Assigned by the
+    /// designer when it builds the editor, and read through rather than copied, so
+    /// importing a catalog while an element is selected takes effect at once.</summary>
+    internal Func<IReadOnlyList<string>>? SuggestionSource { get; set; }
+
+    /// <summary>Ready-to-paste markers from the label's field catalog; empty when it has
+    /// none, which leaves the data boxes behaving as plain text boxes.</summary>
+    public IReadOnlyList<string> FieldSuggestions => SuggestionSource?.Invoke() ?? [];
+
     public abstract string TypeName { get; }
 
     public IReadOnlyList<OrientationOption> Orientations => OrientationOption.All;

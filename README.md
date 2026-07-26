@@ -1,4 +1,4 @@
-# LabelForge
+﻿# LabelForge
 
 LabelForge is a desktop application for designing Zebra labels visually and generating ZPL (Zebra
 Programming Language) code. It also works the other way around: a live viewer where you edit ZPL and
@@ -94,6 +94,12 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 - Die-cut corner radius, taken from the picked media or set by hand. The canvas draws the label's
   real shape and shades the cut-away corners without hiding what sits in them, and the exported PDF
   is clipped to the same shape. It describes the stock, so it never changes the generated ZPL.
+- Field catalogs: import the list of fields your data source provides (whatever it
+  exports; the reader is tolerant of format), name it for the kind of label you are
+  designing, and the text and data boxes complete `##MARKERS##` from it. Markers the
+  catalog does not list are named with a suggestion, because a mistyped marker is not
+  rejected by anything downstream, it simply prints as written. The marker delimiters are
+  a property of the label, not of the app, so a system that writes `{{NAME}}` works too.
 - Save and open the native `.lfl` project format (with a recent-files menu); export ZPL, PNG, and
   PDF at exact physical size.
 - Printing over the network (TCP 9100) and through the Windows spooler (RAW datatype, the USB path).

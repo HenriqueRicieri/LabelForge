@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:LabelForge.App.ViewModels"
         xmlns:controls="using:LabelForge.App.Controls"
@@ -42,7 +42,10 @@
         <DataTemplate DataType="vm:TextPropertiesViewModel">
             <StackPanel Spacing="4">
                 <TextBlock Classes="propLabel" Text="Text" />
-                <TextBox Text="{Binding Text}" />
+                <AutoCompleteBox Text="{Binding Text}" ItemsSource="{Binding FieldSuggestions}"
+                                 FilterMode="Custom" MinimumPrefixLength="0"
+                                 AttachedToVisualTree="OnFieldBoxAttached"
+                                 HorizontalAlignment="Stretch" />
                 <TextBlock Classes="propLabel" Text="Font height (dots)" />
                 <NumericUpDown Value="{Binding FontHeight}" Minimum="6" Maximum="600"
                                Increment="2" FormatString="0" />
@@ -75,7 +78,10 @@
         <DataTemplate DataType="vm:BarcodePropertiesViewModel">
             <StackPanel Spacing="4">
                 <TextBlock Classes="propLabel" Text="Data" />
-                <TextBox Text="{Binding Data}" />
+                <AutoCompleteBox Text="{Binding Data}" ItemsSource="{Binding FieldSuggestions}"
+                                 FilterMode="Custom" MinimumPrefixLength="0"
+                                 AttachedToVisualTree="OnFieldBoxAttached"
+                                 HorizontalAlignment="Stretch" />
                 <TextBlock Text="{Binding Warning}" IsVisible="{Binding HasWarning}"
                            Foreground="#D97706" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />
                 <TextBlock Classes="propLabel" Text="Symbology" />
@@ -101,7 +107,10 @@
         <DataTemplate DataType="vm:QrPropertiesViewModel">
             <StackPanel Spacing="4">
                 <TextBlock Classes="propLabel" Text="Data" />
-                <TextBox Text="{Binding Data}" />
+                <AutoCompleteBox Text="{Binding Data}" ItemsSource="{Binding FieldSuggestions}"
+                                 FilterMode="Custom" MinimumPrefixLength="0"
+                                 AttachedToVisualTree="OnFieldBoxAttached"
+                                 HorizontalAlignment="Stretch" />
                 <TextBlock Classes="propLabel" Text="Magnification (1-10)" />
                 <NumericUpDown Value="{Binding Magnification}" Minimum="1" Maximum="10"
                                Increment="1" FormatString="0" />
@@ -115,7 +124,10 @@
         <DataTemplate DataType="vm:DataMatrixPropertiesViewModel">
             <StackPanel Spacing="4">
                 <TextBlock Classes="propLabel" Text="Data" />
-                <TextBox Text="{Binding Data}" />
+                <AutoCompleteBox Text="{Binding Data}" ItemsSource="{Binding FieldSuggestions}"
+                                 FilterMode="Custom" MinimumPrefixLength="0"
+                                 AttachedToVisualTree="OnFieldBoxAttached"
+                                 HorizontalAlignment="Stretch" />
                 <TextBlock Classes="propLabel" Text="Module size (dots, 1-20)" />
                 <NumericUpDown Value="{Binding ModuleSize}" Minimum="1" Maximum="20"
                                Increment="1" FormatString="0" />
@@ -125,8 +137,10 @@
         <DataTemplate DataType="vm:Pdf417PropertiesViewModel">
             <StackPanel Spacing="4">
                 <TextBlock Classes="propLabel" Text="Data" />
-                <TextBox Text="{Binding Data}" AcceptsReturn="True" TextWrapping="Wrap"
-                         MaxHeight="90" />
+                <AutoCompleteBox Text="{Binding Data}" ItemsSource="{Binding FieldSuggestions}"
+                                 FilterMode="Custom" MinimumPrefixLength="0"
+                                 AttachedToVisualTree="OnFieldBoxAttached"
+                                 HorizontalAlignment="Stretch" />
                 <TextBlock Text="{Binding ShapeInfo}" Opacity="0.6" FontSize="12" />
                 <TextBlock IsVisible="{Binding HasWarning}" Text="{Binding Warning}"
                            Foreground="#D97706" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />
@@ -409,6 +423,59 @@
         <Border DockPanel.Dock="Right" Width="260" Background="{DynamicResource AppPanelBackground}" Padding="12">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="8">
+                    <!-- Which data source's fields this label is written against -->
+                    <StackPanel Spacing="4">
+                        <DockPanel>
+                            <TextBlock Text="Fields" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Button DockPanel.Dock="Right" Content="Manage..." Padding="8,2" FontSize="11"
+                                    HorizontalAlignment="Right"
+                                    ToolTip.Tip="Import a field list, or remove one you no longer use">
+                                <Button.Flyout>
+                                    <Flyout Placement="Left">
+                                        <StackPanel Spacing="6" Width="300">
+                                            <TextBlock Text="Field catalogs" FontWeight="SemiBold" FontSize="12" />
+                                            <TextBlock TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                                                       Text="A catalog is the list of fields the system that fills your markers can provide. Import the list it exports and give it your own name for this kind of label." />
+                                            <TextBlock Text="Name (optional; the file name is used if blank)"
+                                                       FontSize="11" Opacity="0.8" TextWrapping="Wrap" />
+                                            <TextBox Text="{Binding NewCatalogName}"
+                                                     PlaceholderText="Etiqueta externa (caixaria)" />
+                                            <Button Content="Import a field list..." Click="OnImportFieldCatalog"
+                                                    HorizontalAlignment="Stretch" />
+                                            <Rectangle Height="1" Fill="{DynamicResource AppSeparator}"
+                                                       IsVisible="{Binding HasFieldCatalogs}" />
+                                            <ItemsControl ItemsSource="{Binding FieldCatalogs}"
+                                                          IsVisible="{Binding HasFieldCatalogs}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="vm:FieldCatalogEntryViewModel">
+                                                        <DockPanel Margin="0,2">
+                                                            <Button DockPanel.Dock="Right" Content="Remove"
+                                                                    FontSize="11" Padding="6,2"
+                                                                    Command="{Binding RemoveCommand}" />
+                                                            <TextBlock Text="{Binding Display}" FontSize="12"
+                                                                       VerticalAlignment="Center"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                        </DockPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
+                        </DockPanel>
+                        <ComboBox ItemsSource="{Binding CatalogChoices}"
+                                  SelectedItem="{Binding SelectedFieldCatalog}"
+                                  HorizontalAlignment="Stretch"
+                                  PlaceholderText="No catalog"
+                                  ToolTip.Tip="The fields this label can use. Picking one turns on completion in the text and data boxes and flags markers the catalog does not list." />
+                        <TextBlock Text="{Binding UnknownFieldWarning}"
+                                   IsVisible="{Binding UnknownFieldWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                   Foreground="#D97706" FontSize="11" FontWeight="SemiBold"
+                                   TextWrapping="Wrap" />
+                        <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="0,6,0,0" />
+                    </StackPanel>
+
                     <TextBlock Text="Properties" FontWeight="SemiBold" />
 
                     <TextBlock Text="Nothing selected. Click an element on the canvas. Drag on empty space to select several; Ctrl+click adds or removes."

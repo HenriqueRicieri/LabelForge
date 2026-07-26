@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -629,6 +629,61 @@ if (mode == "designer")
         $"check turned off: '{d.ValidationWarning}' (expect empty), "
         + $"ZPL untouched={d.GeneratedZpl.Contains("^FO0,120")} (expected True)");
     d.CheckQuietZones = true;
+    d.Selection.Clear();
+    Pump(200);
+
+    // Field catalog: import a field list, bind the label to it, and check that a marker
+    // the catalog does not list is named rather than printed silently.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    d.NewCatalogName = "Etiqueta externa (caixaria)";
+    d.ImportFieldCatalog(
+        "- ##CODIGO_BARRAS##\t Tipo: String\t Origem: tbVolume.codigo\r\n"
+        + "- ##DATA_PRODUCAO##\t Tipo: DateTime\r\n"
+        + "- ##TABELA_NUTRICIONAL##\t Tipo: List<ProdutoTabelaNutricionalPrint>\r\n",
+        "TodasMarkupsVolumePrint");
+    Pump(400);
+    Console.WriteLine(
+        $"catalog import: '{d.SelectedFieldCatalog?.Name}' with "
+        + $"{d.SelectedFieldCatalog?.Fields.Count} fields, bound={d.Document.FieldCatalog.Length > 0} "
+        + "(expected the typed name, 3, True)");
+    Console.WriteLine(
+        $"completion offers: {string.Join(" ", d.FieldSuggestions)} (expected full markers)");
+
+    var good = new LabelForge.Core.Model.TextElement
+    {
+        X = 40, Y = 40, Text = "##CODIGO_BARRAS##", FontHeightDots = 30,
+    };
+    var typo = new LabelForge.Core.Model.TextElement
+    {
+        X = 40, Y = 100, Text = "##CODIGO_BARAS##", FontHeightDots = 30,
+    };
+    d.Document.Elements.Add(good);
+    d.Document.Elements.Add(typo);
+    d.NotifyDocumentEdited();
+    Pump(900);
+    Console.WriteLine($"unknown marker: '{d.UnknownFieldWarning}' (expect the typo and a suggestion)");
+    d.Selection.Set(typo);
+    Pump(400);
+    Capture("designer-field-catalog.png");
+
+    // An indexed list field is addressed with [n].Member and must not be flagged.
+    typo.Text = "##TABELA_NUTRICIONAL[2].QUANTIDADE##";
+    d.NotifyDocumentEdited();
+    Pump(900);
+    Console.WriteLine($"indexed list field: '{d.UnknownFieldWarning}' (expect empty)");
+
+    // Unbinding the catalog turns the check off; the ZPL never had anything to do with it.
+    string zplWithCatalog = d.GeneratedZpl;
+    d.SelectedFieldCatalog = null;
+    Pump(900);
+    Console.WriteLine(
+        $"no catalog: '{d.UnknownFieldWarning}' (expect empty), "
+        + $"ZPL unchanged={d.GeneratedZpl == zplWithCatalog} (expected True)");
+
+    d.FieldCatalogs[0].RemoveCommand.Execute(null);
+    Pump(300);
+    Console.WriteLine($"catalog removed: {d.FieldCatalogs.Count} left (expected 0)");
     d.Selection.Clear();
     Pump(200);
 

@@ -32,6 +32,7 @@ public partial class DesignerViewModel : ViewModelBase
     private readonly IZplRenderer _renderer = new BinaryKitsRenderer();
     private readonly TemplateSubstitutor _substitutor = new();
     private readonly Core.Media.UserMediaStore _userMediaStore;
+    private readonly Core.Fields.FieldCatalogStore _fieldCatalogStore;
     private readonly SnapshotHistory _history = new();
     private LabelDocument? _variablesDocument;
     private CancellationTokenSource? _renderCts;
@@ -148,6 +149,126 @@ public partial class DesignerViewModel : ViewModelBase
 
     public bool HasRecentFiles => RecentFiles.Count > 0;
 
+    /// <summary>Field catalogs installed on this machine, newest import last. Rebuilt
+    /// wholesale when one is imported or removed, the same way the media list is.</summary>
+    public ObservableCollection<FieldCatalogEntryViewModel> FieldCatalogs { get; } = [];
+
+    public bool HasFieldCatalogs => FieldCatalogs.Count > 0;
+
+    /// <summary>
+    /// The catalog this label is designed against, or null for none.
+    ///
+    /// Picking one is how the user says what kind of label this is: the catalog carries
+    /// their own name for it, so there is no separate list of label types to keep in
+    /// step with anything.
+    /// </summary>
+    public Core.Fields.FieldCatalog? SelectedFieldCatalog
+    {
+        get => _catalogs.FirstOrDefault(
+            c => string.Equals(c.Name, Document.FieldCatalog, StringComparison.OrdinalIgnoreCase));
+        set
+        {
+            string next = value?.Name ?? string.Empty;
+            if (string.Equals(Document.FieldCatalog, next, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            Document.FieldCatalog = next;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(FieldSuggestions));
+            if (!_restoring)
+            {
+                RecordUndo("doc-catalog");
+                ScheduleRender();
+            }
+        }
+    }
+
+    private IReadOnlyList<Core.Fields.FieldCatalog> _catalogs = [];
+
+    /// <summary>
+    /// Ready-to-paste markers from the bound catalog, for the completion boxes.
+    ///
+    /// Full markers rather than bare names, because that is what goes in the field and
+    /// typing the delimiters by hand is half the mistakes. A label with no catalog gets
+    /// an empty list and the boxes behave like plain text boxes.
+    /// </summary>
+    public IReadOnlyList<string> FieldSuggestions =>
+        SelectedFieldCatalog is { } catalog
+            ? catalog.Fields.Select(f => Document.Markers.Marker(f.Name)).ToArray()
+            : [];
+
+    /// <summary>Imports a field list, naming the catalog after the file unless the user
+    /// has typed a name. Replaces a catalog of the same name, which is what re-importing
+    /// a list that gained a field means.</summary>
+    public void ImportFieldCatalog(string text, string suggestedName)
+    {
+        IReadOnlyList<Core.Fields.FieldDefinition> fields =
+            Core.Fields.FieldListReader.Read(text, Document.Markers);
+
+        string name = NewCatalogName.Trim();
+        if (name.Length == 0)
+        {
+            name = suggestedName.Trim();
+        }
+
+        Core.Fields.FieldCatalogResult result =
+            _fieldCatalogStore.Add(new Core.Fields.FieldCatalog(name, fields));
+        ApplyFieldCatalogs(result.Catalogs);
+
+        if (result.Error is not null)
+        {
+            Notify($"Could not save the catalog: {result.Error}");
+            return;
+        }
+
+        NewCatalogName = string.Empty;
+
+        // Binding the label to what was just imported is the point of importing it.
+        _restoring = true;
+        SelectedFieldCatalog = _catalogs.FirstOrDefault(
+            c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+        _restoring = false;
+        RecordUndo("doc-catalog");
+        ScheduleRender();
+        Notify($"Imported {fields.Count} fields as \"{name}\"");
+    }
+
+    /// <summary>Name to save the next import under; empty means "use the file's name".</summary>
+    [ObservableProperty]
+    public partial string NewCatalogName { get; set; } = string.Empty;
+
+    private void RemoveFieldCatalog(Core.Fields.FieldCatalog catalog)
+    {
+        Core.Fields.FieldCatalogResult result = _fieldCatalogStore.Remove(catalog.Name);
+        ApplyFieldCatalogs(result.Catalogs);
+        StatusText = result.Error is null
+            ? $"Removed the catalog \"{catalog.Name}\""
+            : $"Could not update the catalogs file: {result.Error}";
+        ScheduleRender();
+    }
+
+    private void ApplyFieldCatalogs(IReadOnlyList<Core.Fields.FieldCatalog> catalogs)
+    {
+        _catalogs = catalogs;
+        FieldCatalogs.Clear();
+        foreach (Core.Fields.FieldCatalog catalog in catalogs)
+        {
+            FieldCatalogs.Add(new FieldCatalogEntryViewModel(catalog, RemoveFieldCatalog));
+        }
+
+        OnPropertyChanged(nameof(HasFieldCatalogs));
+        OnPropertyChanged(nameof(CatalogChoices));
+        OnPropertyChanged(nameof(SelectedFieldCatalog));
+        OnPropertyChanged(nameof(FieldSuggestions));
+    }
+
+    /// <summary>What the picker offers: the installed catalogs, plus a null entry so a
+    /// label can be unbound again without removing anything.</summary>
+    public IReadOnlyList<Core.Fields.FieldCatalog?> CatalogChoices =>
+        [null, .. _catalogs];
+
     /// <summary>
     /// Continuous stock: a roll with no gaps or die cuts. The label stops having a fixed
     /// height and becomes exactly as long as its content, so the height box turns into a
@@ -193,6 +314,12 @@ public partial class DesignerViewModel : ViewModelBase
     public string LengthHint => Document.IsContinuous
         ? "Measured from the content"
         : string.Empty;
+
+    /// <summary>Markers this label uses that its field catalog does not list. Shown
+    /// under the catalog picker rather than in the toolbar summary, because that is where
+    /// the reader can do something about it.</summary>
+    [ObservableProperty]
+    public partial string UnknownFieldWarning { get; set; } = string.Empty;
 
     /// <summary>Warn when a symbol's quiet zone is not clear. A design aid: it only ever
     /// produces warnings, and never changes a byte of the generated ZPL.</summary>
@@ -368,12 +495,16 @@ public partial class DesignerViewModel : ViewModelBase
     /// <param name="userMediaStore">Where the user's own media presets live; defaults
     /// to the per-user file. Injected so a harness can exercise presets without
     /// touching what the person using the app has saved.</param>
-    public DesignerViewModel(Core.Media.UserMediaStore? userMediaStore = null)
+    public DesignerViewModel(
+        Core.Media.UserMediaStore? userMediaStore = null,
+        Core.Fields.FieldCatalogStore? fieldCatalogStore = null)
     {
         _userMediaStore = userMediaStore ?? new Core.Media.UserMediaStore();
+        _fieldCatalogStore = fieldCatalogStore ?? new Core.Fields.FieldCatalogStore();
         Selection.Changed += (_, _) => OnSelectionChanged();
 
         ApplyUserMedia(_userMediaStore.Load());
+        ApplyFieldCatalogs(_fieldCatalogStore.Load());
 
         // Property setters record undo states; construction must not, or the
         // history would start with a spurious extra document before the baseline.
@@ -475,6 +606,8 @@ public partial class DesignerViewModel : ViewModelBase
         OnPropertyChanged(nameof(LengthHint));
         OnPropertyChanged(nameof(ContinuousMarginMm));
         OnPropertyChanged(nameof(CheckQuietZones));
+        OnPropertyChanged(nameof(SelectedFieldCatalog));
+        OnPropertyChanged(nameof(FieldSuggestions));
     }
 
     [RelayCommand]
@@ -1025,7 +1158,18 @@ public partial class DesignerViewModel : ViewModelBase
         ScheduleRender();
     }
 
-    private ElementPropertiesViewModel? CreatePropertiesEditor(Element? value) => value switch
+    private ElementPropertiesViewModel? CreatePropertiesEditor(Element? value)
+    {
+        ElementPropertiesViewModel? editor = BuildPropertiesEditor(value);
+        if (editor is not null)
+        {
+            editor.SuggestionSource = () => FieldSuggestions;
+        }
+
+        return editor;
+    }
+
+    private ElementPropertiesViewModel? BuildPropertiesEditor(Element? value) => value switch
     {
         TextElement text => new TextPropertiesViewModel(text, Document, OnPanelEdited),
         BarcodeElement barcode => new BarcodePropertiesViewModel(barcode, Document, OnPanelEdited),
@@ -1389,6 +1533,37 @@ public partial class DesignerViewModel : ViewModelBase
         return problems;
     }
 
+    /// <summary>
+    /// Markers this label uses that its field catalog does not list.
+    ///
+    /// The failure being caught is a quiet one: a marker the filling system does not
+    /// recognise is not rejected anywhere, it is simply left alone, so the label prints
+    /// the marker text itself. Nothing errors and the roll comes out wrong.
+    /// </summary>
+    private List<string> CollectUnknownFieldProblems()
+    {
+        IReadOnlyList<Core.Fields.UnknownField> unknown =
+            Core.Fields.UnknownFieldCheck.Check(Document, SelectedFieldCatalog);
+        if (unknown.Count == 0)
+        {
+            return [];
+        }
+
+        string catalog = $"'{SelectedFieldCatalog?.Name}'";
+        return
+        [
+            unknown.Count == 1
+                ? $"{Describe(unknown[0])} is not in {catalog}, so it will print as written instead of being filled in."
+                : $"{unknown.Count} markers are not in {catalog}, so they will print as written instead of being filled in: "
+                  + string.Join(", ", unknown.Select(Describe)),
+        ];
+
+        static string Describe(Core.Fields.UnknownField field) =>
+            field.Suggestion is null
+                ? $"'{field.Name}'"
+                : $"'{field.Name}' (did you mean {field.Suggestion}?)";
+    }
+
     /// <summary>Refreshes the document-wide validation summary shown near the canvas, so
     /// a barcode that will not encode or will not scan is visible even when it is not
     /// selected.</summary>
@@ -1533,6 +1708,7 @@ public partial class DesignerViewModel : ViewModelBase
             // empty render, so it must not be offered as the reason for one.
             List<string> barcodeProblems = CollectBarcodeProblems();
             UpdateValidationWarning([.. barcodeProblems, .. CollectQuietZoneProblems()]);
+            UnknownFieldWarning = string.Join(" ", CollectUnknownFieldProblems());
 
             // On a failed or empty render, lead with a specific diagnosis when a
             // barcode cannot be encoded, but keep the engine's own message too: the

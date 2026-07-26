@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -175,6 +175,106 @@ public partial class DesignerView : UserControl
     /// <summary>Pulls the logos and stamps out of an existing label. The file is read
     /// through ZplTextFile, not a plain reader, so a legacy CP1252 label does not lose
     /// its accents on the way in even though only the graphics are used here.</summary>
+    /// <summary>
+    /// Turns a data box into a marker-completing one.
+    ///
+    /// The default AutoCompleteBox behaviour replaces the whole box with the chosen
+    /// item, which is wrong here: real fields read "MA,##CODIGO_BARRAS##" or "Lote
+    /// ##LOTE## / ##SERIE##", and completing one marker must not delete the rest of the
+    /// field. So both halves are marker-aware. The filter only offers anything while the
+    /// caret is inside an unterminated marker, and the selector splices the chosen field
+    /// into that marker and leaves everything around it alone.
+    /// </summary>
+    private void OnFieldBoxAttached(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        if (sender is not AutoCompleteBox box)
+        {
+            return;
+        }
+
+        box.TextFilter = (search, item) =>
+        {
+            string? fragment = OpenFragment(search);
+            return fragment is not null && item is not null &&
+                   item.Contains(fragment, StringComparison.OrdinalIgnoreCase);
+        };
+
+        box.ItemSelector = (search, item) =>
+        {
+            string marker = item as string ?? string.Empty;
+            if (search is null || OpenFragment(search) is null)
+            {
+                return marker;
+            }
+
+            // Everything before the marker being typed is kept verbatim.
+            int start = search.LastIndexOf(Open, StringComparison.Ordinal);
+            return search[..start] + marker;
+        };
+    }
+
+    /// <summary>The part of a field's text that is being typed as a marker: what follows
+    /// the last opening delimiter, when that delimiter has not been closed again. Null
+    /// when the caret is not inside a marker, which is how completion stays out of the
+    /// way while ordinary text is typed.</summary>
+    private string? OpenFragment(string? text)
+    {
+        if (text is null)
+        {
+            return null;
+        }
+
+        int start = text.LastIndexOf(Open, StringComparison.Ordinal);
+        if (start < 0)
+        {
+            return null;
+        }
+
+        string tail = text[(start + Open.Length)..];
+        return tail.Contains(Close, StringComparison.Ordinal) ? null : tail;
+    }
+
+    private string Open => ViewModel?.Document.Markers.Open ?? "##";
+
+    private string Close => ViewModel?.Document.Markers.Close ?? "##";
+
+    /// <summary>Imports a field list exported by whatever system fills the markers in.
+    /// Deliberately not restricted to .csv: the sample exports were tab separated despite
+    /// the extension, and the reader does not care.</summary>
+    private async void OnImportFieldCatalog(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import a field list",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Field lists") { Patterns = ["*.csv", "*.tsv", "*.txt"] },
+                new FilePickerFileType("All files") { Patterns = ["*"] },
+            ],
+        });
+
+        if (files.FirstOrDefault()?.TryGetLocalPath() is not { } path)
+        {
+            return;
+        }
+
+        try
+        {
+            string text = await File.ReadAllTextAsync(path);
+            vm.ImportFieldCatalog(text, Path.GetFileNameWithoutExtension(path));
+        }
+        catch (Exception ex)
+        {
+            vm.StatusText = $"Could not read the field list: {ex.Message}";
+        }
+    }
+
     private async void OnImportGraphics(object? sender, RoutedEventArgs e)
     {
         if (await PickZplFile("Import graphics from a ZPL file") is not { } picked)
