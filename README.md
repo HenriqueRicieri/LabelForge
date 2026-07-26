@@ -29,6 +29,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 - Align and distribute tools: left/center/right and top/middle/bottom (one element aligns against
   the label, several align within their own bounding box) plus horizontal/vertical distribution
   with equalized gaps.
+- An optional design grid (View > Grid) at 1, 2, 2.5, 5 or 10 mm. Drags and resizes snap to
+  it alongside the guides, edges and other elements, by proximity rather than as a cage, and
+  Alt still drags free of everything. Saved with the label and never printed.
 - Zoom to selection (Ctrl+Shift+0, or from either right-click menu), which frames the
   element you just picked instead of leaving you to find it on a fitted view.
 - Help > Keyboard and Mouse: every key and gesture the designer answers to, including the

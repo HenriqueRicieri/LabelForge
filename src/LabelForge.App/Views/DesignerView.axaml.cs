@@ -30,6 +30,11 @@ public partial class DesignerView : UserControl
         // sidesteps binding ancestor lookups inside menu popups.
         DataContextChanged += (_, _) => WireRecentFiles();
 
+        // Same reasoning for the grid pitches: a fixed handful, and the tick beside the
+        // active one has to be recomputed each time the menu opens.
+        GridMenu.SubmenuOpened += (_, _) => BuildGridMenu();
+        BuildGridMenu();
+
         Canvas.DocumentEdited += (_, _) => ViewModel?.NotifyDocumentEdited();
         Canvas.LiveEdited += (_, _) => ViewModel?.NotifyDocumentPreview();
         Canvas.DeleteRequested += (_, _) => ViewModel?.DeleteSelectedCommand.Execute(null);
@@ -188,6 +193,36 @@ public partial class DesignerView : UserControl
     /// out the current state from the verb.</summary>
     private static Control? Check(bool on) =>
         on ? new TextBlock { Text = "✓" } : null;
+
+    /// <summary>
+    /// The grid pitches on offer, with a tick beside the one in force.
+    ///
+    /// A handful of presets rather than a free number: the useful pitches are the ones a
+    /// ruler already reads in, and a box accepting 3.7 mm would invite a grid nothing else
+    /// on the label lines up with.
+    /// </summary>
+    private void BuildGridMenu()
+    {
+        GridMenu.Items.Clear();
+        if (ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        foreach (double pitch in new[] { 0d, 1, 2, 2.5, 5, 10 })
+        {
+            double value = pitch;
+            var item = new MenuItem
+            {
+                Header = value <= 0
+                    ? "Off"
+                    : value.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture) + " mm",
+                Icon = Check(Math.Abs(vm.GridPitchMm - value) < 0.001),
+            };
+            item.Click += (_, _) => vm.GridPitchMm = value;
+            GridMenu.Items.Add(item);
+        }
+    }
 
     /// <summary>Opens the keyboard and mouse reference. Modal to the window, because it
     /// is something you consult and close rather than work beside.</summary>

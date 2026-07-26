@@ -63,6 +63,17 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial int UnderlayMarginDots { get; set; }
 
+    /// <summary>
+    /// Bumped once per completed render pass, whether or not the renderer ran.
+    ///
+    /// The canvas draws several things the renderer never sees, the die-cut corners, the
+    /// quiet zones and the grid among them, and it used to learn about those through the
+    /// new underlay every edit produced. Reusing an identical bitmap took that signal
+    /// away, so this replaces it with one that says what it means.
+    /// </summary>
+    [ObservableProperty]
+    public partial int CanvasRevision { get; set; }
+
     [ObservableProperty]
     public partial string GeneratedZpl { get; set; } = string.Empty;
 
@@ -401,6 +412,31 @@ public partial class DesignerViewModel : ViewModelBase
             {
                 RecordUndo("doc-quiet-zones");
                 ScheduleRender();
+            }
+        }
+    }
+
+    /// <summary>Design grid pitch in millimeters; 0 is off. Draws and snaps, because
+    /// wanting one without the other is not a real state.</summary>
+    public double GridPitchMm
+    {
+        get => Document.GridPitchMm;
+        set
+        {
+            if (Math.Abs(Document.GridPitchMm - value) < 0.0001)
+            {
+                return;
+            }
+
+            Document.GridPitchMm = value;
+            OnPropertyChanged();
+            if (!_restoring)
+            {
+                RecordUndo("doc-grid");
+                ScheduleRender();
+                Notify(value <= 0
+                    ? "Grid off"
+                    : FormattableString.Invariant($"Grid at {value:0.##} mm; drags snap to it"));
             }
         }
     }
@@ -788,6 +824,7 @@ public partial class DesignerViewModel : ViewModelBase
         OnPropertyChanged(nameof(LengthHint));
         OnPropertyChanged(nameof(ContinuousMarginMm));
         OnPropertyChanged(nameof(CheckQuietZones));
+        OnPropertyChanged(nameof(GridPitchMm));
         OnPropertyChanged(nameof(SelectedFieldCatalog));
         OnPropertyChanged(nameof(FieldSuggestions));
     }
@@ -2081,6 +2118,7 @@ public partial class DesignerViewModel : ViewModelBase
             }
 
             GeneratedZpl = zpl;
+            CanvasRevision++;
             SnapshotForRecovery();
             UnderlayMarginDots = marginDots;
             PlacementWarning = placementWarning;

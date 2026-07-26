@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace LabelForge.Core.Model;
 
@@ -108,6 +108,19 @@ public sealed class LabelDocument
     /// or clocks serializes exactly as it did before they existed.</summary>
     public IDictionary<string, VariableDefinition> Variables { get; init; } =
         new Dictionary<string, VariableDefinition>();
+
+    /// <summary>
+    /// Design grid pitch in millimeters; 0 turns it off, which is how the print settings
+    /// say the same thing.
+    ///
+    /// One number rather than a switch for showing it and another for snapping to it. The
+    /// two are the same intention in practice, and a grid you can see but slide through,
+    /// or snap to but not see, is a state worth nobody's time.
+    ///
+    /// A design aid like the guides: saved with the label, covered by undo, and never
+    /// anywhere near the ZPL.
+    /// </summary>
+    public double GridPitchMm { get; set; }
 
     /// <summary>Vertical alignment guides: X positions in dots. Design aids only,
     /// never printed; they ride the undo/save pipeline like any document change.</summary>

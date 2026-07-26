@@ -754,6 +754,62 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(200);
 
+    // Design grid: drawn and snapped to from one source, and a canvas-only change, which
+    // is the case the render cache could have stopped repainting.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    var snapped = new LabelForge.Core.Model.BoxElement
+    {
+        X = 137, Y = 91, WidthDots = 120, HeightDots = 80, ThicknessDots = 3,
+    };
+    d.Document.Elements.Add(snapped);
+    d.NotifyDocumentEdited();
+    Pump(900);
+    int revisionBeforeGrid = d.CanvasRevision;
+    d.GridPitchMm = 5;
+    Pump(900);
+    bool repainted = d.CanvasRevision > revisionBeforeGrid;
+    Console.WriteLine(FormattableString.Invariant(
+        $"grid on: pitch {d.Document.GridPitchMm} mm, canvas told to repaint={repainted} (expected 5, True)"));
+    Console.WriteLine(
+        $"grid stays out of the ZPL: {!d.GeneratedZpl.Contains("grid", StringComparison.OrdinalIgnoreCase)} "
+        + "(expected True)");
+    Capture("designer-grid.png");
+
+    // Dragging near a grid line lands on it. 5 mm at 8 dpmm is every 40 dots, and the
+    // grid snaps by proximity like the guides do rather than forcing every position onto
+    // it, so the drag has to end within the threshold for there to be anything to see.
+    snapped.X = 200;
+    snapped.Y = 120;
+    d.Selection.Set(snapped);
+    d.NotifyDocumentEdited();
+    Pump(700);
+    var gridFrom = canvas.TranslatePoint(canvas.DotsToView(240, 150), window)!.Value;
+    var gridTo = canvas.TranslatePoint(canvas.DotsToView(245, 155), window)!.Value;
+    window.MouseDown(gridFrom, MouseButton.Left);
+    window.MouseMove(gridTo);
+    window.MouseUp(gridTo, MouseButton.Left);
+    Pump(700);
+    Console.WriteLine(
+        $"drag near a line lands on it: {snapped.X},{snapped.Y} "
+        + $"(expected multiples of 40, got {snapped.X % 40}/{snapped.Y % 40} left over)");
+
+    // And a drag that ends well away from any line is left where it was put, because the
+    // grid is a hint and not a cage.
+    var freeFrom = canvas.TranslatePoint(canvas.DotsToView(240, 160), window)!.Value;
+    var freeTo = canvas.TranslatePoint(canvas.DotsToView(263, 183), window)!.Value;
+    window.MouseDown(freeFrom, MouseButton.Left);
+    window.MouseMove(freeTo);
+    window.MouseUp(freeTo, MouseButton.Left);
+    Pump(700);
+    Console.WriteLine(
+        $"drag between lines stays put: {snapped.X},{snapped.Y} "
+        + "(expected not forced onto the grid)");
+
+    d.GridPitchMm = 0;
+    d.Selection.Clear();
+    Pump(400);
+
     // Render caching. Observable without a test hook: a skipped render leaves the very
     // bitmap that is already on screen, so the reference is unchanged.
     d.NewDocumentCommand.Execute(null);

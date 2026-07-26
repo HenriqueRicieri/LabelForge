@@ -266,6 +266,8 @@
                         <MenuItem Header="_Delete" Command="{Binding DeleteSelectedCommand}" InputGesture="Delete" />
                     </MenuItem>
                     <MenuItem Header="_View">
+                        <MenuItem x:Name="GridMenu" Header="_Grid" />
+                        <Separator />
                         <MenuItem Header="Theme: _System" Click="OnThemeSystem" />
                         <MenuItem Header="Theme: _Light" Click="OnThemeLight" />
                         <MenuItem Header="Theme: _Dark" Click="OnThemeDark" />
@@ -743,6 +745,7 @@
             <controls:DesignerCanvas Name="Canvas"
                                      Underlay="{Binding Underlay}"
                                      UnderlayMarginDots="{Binding UnderlayMarginDots}"
+                                     CanvasRevision="{Binding CanvasRevision}"
                                      Document="{Binding Document}"
                                      Selection="{Binding Selection}"
                                      IsPlacing="{Binding IsPlacing}" />

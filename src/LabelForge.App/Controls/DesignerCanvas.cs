@@ -35,13 +35,33 @@ public sealed class DesignerCanvas : Control
     public static readonly StyledProperty<bool> IsPlacingProperty =
         AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(IsPlacing));
 
+    /// <summary>
+    /// Bumped by the designer whenever the label may need redrawing for a reason the
+    /// underlay cannot express.
+    ///
+    /// The underlay changing used to be the signal for everything, because every edit
+    /// produced a new bitmap. Once identical renders started reusing the bitmap, the
+    /// things this control draws itself stopped being repainted: the die-cut corners, the
+    /// quiet zones, the grid. None of them reach the renderer, so none of them change the
+    /// underlay, and all of them change what should be on screen.
+    /// </summary>
+    public static readonly StyledProperty<int> CanvasRevisionProperty =
+        AvaloniaProperty.Register<DesignerCanvas, int>(nameof(CanvasRevision));
+
+    public int CanvasRevision
+    {
+        get => GetValue(CanvasRevisionProperty);
+        set => SetValue(CanvasRevisionProperty, value);
+    }
+
     public static readonly StyledProperty<int> UnderlayMarginDotsProperty =
         AvaloniaProperty.Register<DesignerCanvas, int>(nameof(UnderlayMarginDots));
 
     static DesignerCanvas()
     {
         AffectsRender<DesignerCanvas>(
-            UnderlayProperty, DocumentProperty, SelectionProperty, UnderlayMarginDotsProperty);
+            UnderlayProperty, DocumentProperty, SelectionProperty, UnderlayMarginDotsProperty,
+            CanvasRevisionProperty);
     }
 
     private enum ResizeHandle
@@ -82,6 +102,12 @@ public sealed class DesignerCanvas : Control
     // different at a glance rather than as a slightly different shade of the same thing.
     private static readonly Pen SuppressedPen = new(
         new SolidColorBrush(Color.FromRgb(0x6B, 0x72, 0x80)), 1.5, new DashStyle([8, 4], 0));
+
+    // The design grid: faint enough to read the label through, since it is scaffolding
+    // and not content.
+    private static readonly Pen GridPen = new(new SolidColorBrush(Color.FromArgb(0x33, 0, 0, 0)), 1);
+    private static readonly Pen DarkGridPen =
+        new(new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF)), 1);
 
     // Quiet zone: the blank a symbol needs around it. Drawn only for the selection, and
     // in a fine dotted line rather than a dash, because it marks stock that has to stay
@@ -599,6 +625,29 @@ public sealed class DesignerCanvas : Control
         else
         {
             context.DrawRectangle(null, LabelBorderPen, labelRect.Inflate(0.5));
+        }
+
+        // The design grid, under everything that matters and light enough to read
+        // through. Skipped once the lines would be closer than a few pixels: a grey wash
+        // is not a grid, and at that zoom it tells nobody anything.
+        if (DesignGrid.IsEnabled(doc))
+        {
+            double pitchPx = doc.GridPitchMm * doc.Dpmm * scale;
+            if (pitchPx >= 4)
+            {
+                IPen gridPen = IsDark ? DarkGridPen : GridPen;
+                foreach (int x in DesignGrid.Lines(doc, doc.WidthDots))
+                {
+                    double px = Math.Round(origin.X + x * scale) + 0.5;
+                    context.DrawLine(gridPen, new Point(px, labelRect.Y), new Point(px, labelRect.Bottom));
+                }
+
+                foreach (int y in DesignGrid.Lines(doc, doc.HeightDots))
+                {
+                    double py = Math.Round(origin.Y + y * scale) + 0.5;
+                    context.DrawLine(gridPen, new Point(labelRect.X, py), new Point(labelRect.Right, py));
+                }
+            }
         }
 
         // Dashed outline on anything that will not print exactly as drawn: amber when
@@ -1292,6 +1341,12 @@ public sealed class DesignerCanvas : Control
         _snapTargetsX.AddRange([0, doc.WidthDots / 2, doc.WidthDots]);
         _snapTargetsY.AddRange(doc.HorizontalGuides);
         _snapTargetsY.AddRange([0, doc.HeightDots / 2, doc.HeightDots]);
+
+        // The grid joins the same list rather than getting a rule of its own. The snapper
+        // takes the closest target, so a guide a dot away still beats a grid line three
+        // away, and Alt still escapes the lot.
+        _snapTargetsX.AddRange(DesignGrid.Lines(doc, doc.WidthDots));
+        _snapTargetsY.AddRange(DesignGrid.Lines(doc, doc.HeightDots));
 
         foreach (Element element in doc.Elements)
         {
