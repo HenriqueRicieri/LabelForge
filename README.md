@@ -36,6 +36,10 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   millimeters. Barcode data is validated against its symbology with a clear warning when it cannot
   be encoded. A PDF417 states the shape its settings produce, and says so when the column count is
   left automatic, because that hands the shape to the printer.
+- Quiet zone checking: every symbology's standard asks for a blank margin around the symbol, and a
+  barcode that takes a second pass to scan is a label that failed. The canvas draws that margin for
+  the selected symbol and warns when a neighbour sits in it or when the symbol is flush with the
+  edge of the stock. A design aid only, so it never changes the generated ZPL.
 - Images (PNG, JPEG, BMP) are converted to the printer's 1-bit black with a selectable dither
   (threshold for logos, ordered, Floyd-Steinberg for photos) and embedded in the label as an
   inline `^GF` graphic field, so the saved file and the exported ZPL are self-contained. Place the

@@ -327,6 +327,9 @@
                 <NumericUpDown Value="{Binding CornerRadiusMm}" Minimum="0" Maximum="50"
                                Increment="0.5" FormatString="0.##" Width="105"
                                IsVisible="{Binding HasFixedLength}" />
+                <CheckBox Content="Quiet zones" IsChecked="{Binding CheckQuietZones}"
+                          VerticalAlignment="Center"
+                          ToolTip.Tip="Warn when something crowds the blank margin a barcode needs to scan. A design aid only: it never changes the generated ZPL." />
                 <TextBlock Text="Media" VerticalAlignment="Center"
                            ToolTip.Tip="Set the label size from a Zebra part number or one of your own saved media" />
                 <AutoCompleteBox x:Name="MediaBox" Width="230"

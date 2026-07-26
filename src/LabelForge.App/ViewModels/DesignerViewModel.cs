@@ -194,6 +194,28 @@ public partial class DesignerViewModel : ViewModelBase
         ? "Measured from the content"
         : string.Empty;
 
+    /// <summary>Warn when a symbol's quiet zone is not clear. A design aid: it only ever
+    /// produces warnings, and never changes a byte of the generated ZPL.</summary>
+    public bool CheckQuietZones
+    {
+        get => Document.CheckQuietZones;
+        set
+        {
+            if (Document.CheckQuietZones == value)
+            {
+                return;
+            }
+
+            Document.CheckQuietZones = value;
+            OnPropertyChanged();
+            if (!_restoring)
+            {
+                RecordUndo("doc-quiet-zones");
+                ScheduleRender();
+            }
+        }
+    }
+
     /// <summary>Blank stock left after the last ink on continuous media, so the next
     /// label has something to start after.</summary>
     public decimal ContinuousMarginMm
@@ -452,6 +474,7 @@ public partial class DesignerViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasFixedLength));
         OnPropertyChanged(nameof(LengthHint));
         OnPropertyChanged(nameof(ContinuousMarginMm));
+        OnPropertyChanged(nameof(CheckQuietZones));
     }
 
     [RelayCommand]
@@ -1326,14 +1349,54 @@ public partial class DesignerViewModel : ViewModelBase
         return problems;
     }
 
-    /// <summary>Refreshes the document-wide barcode validation summary shown near the
-    /// canvas, so an un-encodable barcode is visible even when it is not selected.</summary>
+    /// <summary>
+    /// Symbols whose quiet zone is not clear: the blank margin a scanner needs to find
+    /// the symbol at all. Reported separately from encoding problems because it is a
+    /// different kind of failure. Un-encodable data produces no barcode; a crowded quiet
+    /// zone produces one that looks perfect and does not scan.
+    /// </summary>
+    private List<string> CollectQuietZoneProblems()
+    {
+        var problems = new List<string>();
+
+        // One line per symbol, not per intruder: three neighbours crowding one barcode is
+        // one thing to fix, and listing it three times would bury the other symbols.
+        foreach (var group in QuietZoneChecker.Check(Document).GroupBy(f => f.Code))
+        {
+            string name = DisplayName(group.Key);
+            string[] intruders = group
+                .Where(f => f.Intruder is not null)
+                .Select(f => DisplayName(f.Intruder!))
+                .Distinct()
+                .ToArray();
+
+            if (intruders.Length > 0)
+            {
+                problems.Add(
+                    $"Quiet zone of '{name}' is crowded by {string.Join(", ", intruders.Select(i => $"'{i}'"))}: "
+                    + "a scanner needs that margin blank to find the symbol.");
+            }
+
+            if (group.Any(f => f.Intruder is null))
+            {
+                problems.Add(
+                    $"Quiet zone of '{name}' runs off the label: move it in so the blank "
+                    + "margin fits on the stock.");
+            }
+        }
+
+        return problems;
+    }
+
+    /// <summary>Refreshes the document-wide validation summary shown near the canvas, so
+    /// a barcode that will not encode or will not scan is visible even when it is not
+    /// selected.</summary>
     private void UpdateValidationWarning(IReadOnlyList<string> problems) =>
         ValidationWarning = problems.Count switch
         {
             0 => string.Empty,
             1 => problems[0],
-            _ => $"{problems.Count} barcodes need attention: {string.Join("; ", problems)}",
+            _ => $"{problems.Count} things need attention: {string.Join("; ", problems)}",
         };
 
     /// <summary>
@@ -1465,8 +1528,10 @@ public partial class DesignerViewModel : ViewModelBase
 
             // Document-wide validation summary, shown near the canvas regardless of
             // what is selected.
+            // Kept apart for the diagnosis below: a crowded quiet zone never explains an
+            // empty render, so it must not be offered as the reason for one.
             List<string> barcodeProblems = CollectBarcodeProblems();
-            UpdateValidationWarning(barcodeProblems);
+            UpdateValidationWarning([.. barcodeProblems, .. CollectQuietZoneProblems()]);
 
             // On a failed or empty render, lead with a specific diagnosis when a
             // barcode cannot be encoded, but keep the engine's own message too: the

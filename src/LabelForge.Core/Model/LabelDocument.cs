@@ -44,6 +44,17 @@ public sealed class LabelDocument
     /// </summary>
     public bool IsContinuous { get; set; }
 
+    /// <summary>
+    /// Warn when a symbol's quiet zone is not clear. On by default: a barcode that needs
+    /// a second pass to scan is a label that failed, and the crowding that causes it is
+    /// invisible on a design where everything looks neatly packed.
+    ///
+    /// It only ever produces warnings. The quiet zone is blank stock, so nothing about
+    /// this reaches the ZPL, and a label that deliberately crowds a symbol still prints
+    /// exactly as drawn once the switch is off.
+    /// </summary>
+    public bool CheckQuietZones { get; set; } = true;
+
     /// <summary>Blank stock left after the last ink on continuous media, in millimeters.
     /// Without it the next label starts on the previous one's last row of dots, which is
     /// not a gap anyone can tear or cut along.</summary>

@@ -72,19 +72,25 @@ public sealed class ElementBoundsCalculator : IElementVisitor
 
     public void Visit(BarcodeElement element)
     {
+        // Measured against the rendered ink, exactly, for every case tried. The quiet
+        // zone is deliberately not in here: it is blank stock rather than symbol, it
+        // belongs on both sides rather than only after the last bar, and QuietZone is
+        // where it lives now.
         int modules = element.Symbology switch
         {
-            // EAN-13 and UPC-A are fixed-width symbologies (95 modules plus quiet zones).
-            BarcodeSymbology.Ean13 or BarcodeSymbology.UpcA => 113,
+            // EAN-13 and UPC-A are fixed-width: 95 modules whatever the data.
+            BarcodeSymbology.Ean13 or BarcodeSymbology.UpcA => 95,
 
-            // Code 39: 3 wide + 6 narrow bars plus a gap per character, start/stop included.
+            // Code 39: 3 wide and 6 narrow elements plus an inter-character gap, for the
+            // data plus the start and stop characters. The last gap is not printed.
             BarcodeSymbology.Code39 => (int)Math.Ceiling(
-                (3 * element.WideBarRatio + 7) * (element.Data.Length + 2)),
+                (3 * element.WideBarRatio + 7) * (element.Data.Length + 2)) - 1,
 
-            // Code 128: ~11 modules per symbol; digit pairs share a symbol in subset C.
-            _ => 11 * (element.Data.All(char.IsAsciiDigit)
-                ? (element.Data.Length + 1) / 2 + 2
-                : element.Data.Length + 2) + 35,
+            // Code 128: start + one symbol per character + checksum + stop(13). Digits
+            // are NOT paired: that needs subset C, and neither the offline renderer nor
+            // a printer in ^BC's default mode switches to it, so assuming they did left
+            // a 16-digit barcode's outline 132 dots short of its own ink.
+            _ => 11 * (element.Data.Length + 2) + 13,
         };
 
         int height = element.HeightDots + (element.PrintInterpretationLine ? 30 : 0);

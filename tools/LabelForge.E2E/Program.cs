@@ -590,6 +590,48 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(200);
 
+    // Quiet zone: the blank a barcode needs to scan. A neighbour that never touches the
+    // ink can still sit in it, which is exactly the mistake that looks like tidy layout.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    var scanned = new LabelForge.Core.Model.BarcodeElement
+    {
+        X = 300, Y = 120, Data = "LF-000123", HeightDots = 120, ModuleWidthDots = 3,
+    };
+    var neighbour = new LabelForge.Core.Model.BoxElement
+    {
+        X = 120, Y = 120, WidthDots = 160, HeightDots = 120, ThicknessDots = 3,
+    };
+    d.Document.Elements.Add(scanned);
+    d.Document.Elements.Add(neighbour);
+    d.Selection.Set(scanned);
+    d.NotifyDocumentEdited();
+    Pump(900);
+    Console.WriteLine(
+        $"quiet zone crowded: '{d.ValidationWarning}' (expect the box named as crowding it)");
+    Capture("designer-quiet-zone.png");
+
+    neighbour.X = 60;
+    d.NotifyDocumentEdited();
+    Pump(900);
+    Console.WriteLine(
+        $"quiet zone cleared by moving 60 dots: '{d.ValidationWarning}' (expect empty)");
+
+    scanned.X = 0;
+    d.NotifyDocumentEdited();
+    Pump(900);
+    Console.WriteLine(
+        $"flush with the stock edge: {d.ValidationWarning.Contains("runs off the label")} (expected True)");
+
+    d.CheckQuietZones = false;
+    Pump(900);
+    Console.WriteLine(
+        $"check turned off: '{d.ValidationWarning}' (expect empty), "
+        + $"ZPL untouched={d.GeneratedZpl.Contains("^FO0,120")} (expected True)");
+    d.CheckQuietZones = true;
+    d.Selection.Clear();
+    Pump(200);
+
     bool UndoLeavesNothing()
     {
         d.UndoCommand.Execute(null);

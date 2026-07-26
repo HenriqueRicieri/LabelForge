@@ -83,6 +83,15 @@ public sealed class DesignerCanvas : Control
     private static readonly Pen SuppressedPen = new(
         new SolidColorBrush(Color.FromRgb(0x6B, 0x72, 0x80)), 1.5, new DashStyle([8, 4], 0));
 
+    // Quiet zone: the blank a symbol needs around it. Drawn only for the selection, and
+    // in a fine dotted line rather than a dash, because it marks stock that has to stay
+    // empty rather than ink that will print. Turns amber when something is in it.
+    private static readonly Pen QuietZonePen = new(
+        new SolidColorBrush(Color.FromArgb(0x99, 0x25, 0x63, 0xEB)), 1, new DashStyle([1, 3], 0));
+
+    private static readonly Pen QuietZoneWarnPen = new(
+        new SolidColorBrush(Color.FromRgb(0xD9, 0x77, 0x06)), 1, new DashStyle([1, 3], 0));
+
     // Pasteboard dim: translucent surface color washed over the expanded underlay so
     // off-label content stays visible but reads as "will not print".
     private static readonly SolidColorBrush DimBrush = new(Color.FromArgb(0xBE, 0xD9, 0xD9, 0xD9));
@@ -537,6 +546,29 @@ public sealed class DesignerCanvas : Control
                 origin.Y + b.Y * scale,
                 Math.Max(b.Width * scale, 4),
                 Math.Max(b.Height * scale, 4)));
+        }
+
+        // The blank a selected symbol needs around it, so the rule is visible while it is
+        // being laid out rather than only reported after the fact.
+        if (doc.CheckQuietZones && Selection is { Count: > 0 } zoneSelection)
+        {
+            IReadOnlyList<QuietZoneFinding> findings = QuietZoneChecker.Check(doc);
+            foreach (Element element in zoneSelection.Items.Where(QuietZone.Applies))
+            {
+                QuietZoneMargin margin = QuietZone.For(element);
+                if (margin.IsEmpty)
+                {
+                    continue;
+                }
+
+                DotRect zone = margin.Around(_bounds.GetBounds(element));
+                bool crowded = findings.Any(f => ReferenceEquals(f.Code, element));
+                context.DrawRectangle(null, crowded ? QuietZoneWarnPen : QuietZonePen, new Rect(
+                    origin.X + zone.X * scale,
+                    origin.Y + zone.Y * scale,
+                    Math.Max(zone.Width * scale, 4),
+                    Math.Max(zone.Height * scale, 4)));
+            }
         }
 
         if (Selection is { Count: > 0 } selection)
