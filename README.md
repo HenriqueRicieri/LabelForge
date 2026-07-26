@@ -69,6 +69,10 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   inline `^GF` graphic field, so the saved file and the exported ZPL are self-contained. Place the
   same image twice and it is downloaded once as `~DG` and recalled with `^XG` instead of repeating
   the payload; a single placement stays inline and leaves the printer's memory alone.
+- A ZPL file holding several labels stays open: a strip names the file and lists its
+  labels with how much each one holds, so the bare printer-configuration block real files
+  start with is visible as empty and the one you want is a click away. Files in the sample
+  corpus hold up to twenty-seven.
 - An existing ZPL label can be opened as a document: File > Import ZPL parses it back into the
   model so its text, barcodes, boxes and graphics become editable elements. ZPL states positions in
   dots and never names the printer it was written for, so the import uses the density selected in

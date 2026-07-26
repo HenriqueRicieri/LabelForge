@@ -1,4 +1,4 @@
-using LabelForge.Core.Io;
+﻿using LabelForge.Core.Io;
 using LabelForge.Core.Model;
 using LabelForge.Core.Zpl;
 
@@ -136,6 +136,50 @@ public sealed class ZplDocumentImportTests
         Assert.Empty(imported.Warnings);
         Assert.Equal(3, imported.Document.Elements.Count);
         Assert.Equal(first, new ZplGenerator().Generate(imported.Document));
+    }
+
+    /// <summary>
+    /// Every block's size is reported, not just the one handed back.
+    ///
+    /// One block is all a caller gets, so without this it has no way to offer the others
+    /// or to say which are worth opening. That matters on real files: one in the corpus
+    /// holds twenty-seven labels, and an import that could not reach past the first would
+    /// be a one-way door.
+    /// </summary>
+    [Fact]
+    public void EveryBlockIsCounted_SoTheOthersCanBeOffered()
+    {
+        const string threeLabels =
+            "^XA^PW800^LL400^XZ"
+            + "^XA^PW800^LL400^FO10,10^A0N,30^FDfirst^FS^FO10,50^A0N,30^FDsecond^FS^XZ"
+            + "^XA^PW800^LL400^FO10,10^A0N,30^FDonly one^FS^XZ";
+
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(threeLabels, dpmm: 8);
+
+        Assert.Equal([0, 2, 1], result.BlockElementCounts);
+        Assert.Equal(3, result.LabelCount);
+
+        // The bare configuration block is skipped, which is why counting them matters.
+        Assert.Equal(1, result.SelectedIndex);
+    }
+
+    /// <summary>Asking for a block by number gives that one, which is what lets a caller
+    /// walk the file.</summary>
+    [Fact]
+    public void AnotherBlockCanBeAskedForByNumber()
+    {
+        const string threeLabels =
+            "^XA^PW800^LL400^XZ"
+            + "^XA^PW800^LL400^FO10,10^A0N,30^FDfirst^FS^XZ"
+            + "^XA^PW800^LL400^FO10,10^A0N,30^FDthird^FS^XZ";
+
+        ZplDocumentImportResult third = ZplDocumentImport.FromZpl(threeLabels, 8, labelIndex: 2);
+
+        Assert.Equal(2, third.SelectedIndex);
+        Assert.Equal(
+            "third",
+            Assert.IsType<TextElement>(Assert.Single(third.Document.Elements)).Text);
+        Assert.Equal([0, 1, 1], third.BlockElementCounts);
     }
 
     [Fact]

@@ -1101,9 +1101,71 @@ public partial class DesignerViewModel : ViewModelBase
     /// </summary>
     public void ImportZplDocument(string zpl, string sourceName)
     {
-        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(zpl, Document.Dpmm);
+        _importedZpl = zpl;
+        _importedName = sourceName;
+        OpenImportedBlock(ZplDocumentImport.FromZpl(zpl, Document.Dpmm), sourceName);
+    }
 
+    /// <summary>The ZPL an import came from, kept so the file's other labels stay
+    /// reachable. Real files hold several: one in the corpus holds twenty-seven, and
+    /// without this an import is a one-way door onto whichever the parser picked.</summary>
+    private string? _importedZpl;
+    private string? _importedName;
+
+    /// <summary>The other labels in the imported file, for the picker. Empty when the
+    /// file held one, which is when there is nothing to choose between.</summary>
+    public ObservableCollection<ImportedBlockViewModel> ImportedBlocks { get; } = [];
+
+    public bool HasImportedBlocks => ImportedBlocks.Count > 1;
+
+    /// <summary>
+    /// Which label of the imported file is open.
+    ///
+    /// Setting it re-reads that block and replaces the document, which is what importing
+    /// did in the first place. It is deliberately an explicit act on a strip that names
+    /// the file, rather than something reachable by accident, because it discards whatever
+    /// has been done since.
+    /// </summary>
+    [ObservableProperty]
+    public partial ImportedBlockViewModel? SelectedImportedBlock { get; set; }
+
+    partial void OnSelectedImportedBlockChanged(ImportedBlockViewModel? value)
+    {
+        if (_switchingBlock || value is null || _importedZpl is null || _importedName is null)
+        {
+            return;
+        }
+
+        OpenImportedBlock(
+            ZplDocumentImport.FromZpl(_importedZpl, Document.Dpmm, value.Index), _importedName);
+    }
+
+    private bool _switchingBlock;
+
+    private void OpenImportedBlock(ZplDocumentImportResult result, string sourceName)
+    {
         LoadDocument(result.Document, path: null);
+
+        // Rebuilt here rather than only on the first import, because the density can
+        // change between one block and the next and the counts come from the parse.
+        _switchingBlock = true;
+        try
+        {
+            ImportedBlocks.Clear();
+            for (int i = 0; i < result.BlockElementCounts.Count; i++)
+            {
+                ImportedBlocks.Add(new ImportedBlockViewModel(i, result.BlockElementCounts[i]));
+            }
+
+            SelectedImportedBlock = ImportedBlocks.FirstOrDefault(b => b.Index == result.SelectedIndex);
+        }
+        finally
+        {
+            _switchingBlock = false;
+        }
+
+        ImportedFrom = HasImportedBlocks ? sourceName : string.Empty;
+        OnPropertyChanged(nameof(HasImportedBlocks));
 
         var notes = new List<string>();
         if (result.LabelCount > 1)
@@ -1120,6 +1182,25 @@ public partial class DesignerViewModel : ViewModelBase
             ? $"Nothing in {sourceName} could be turned into elements. "
               + string.Join(" ", result.Warnings)
             : $"Imported {what} from {sourceName}. {string.Join(" ", notes)}".TrimEnd());
+    }
+
+    /// <summary>Name of the file the open label came from, while more of it is reachable.</summary>
+    [ObservableProperty]
+    public partial string ImportedFrom { get; set; } = string.Empty;
+
+    /// <summary>Lets go of the imported file, so the strip stops offering labels from
+    /// something the user has moved on from.</summary>
+    [RelayCommand]
+    private void CloseImportedFile()
+    {
+        _importedZpl = null;
+        _importedName = null;
+        _switchingBlock = true;
+        ImportedBlocks.Clear();
+        SelectedImportedBlock = null;
+        _switchingBlock = false;
+        ImportedFrom = string.Empty;
+        OnPropertyChanged(nameof(HasImportedBlocks));
     }
 
     /// <summary>

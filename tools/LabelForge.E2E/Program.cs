@@ -754,6 +754,39 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(200);
 
+    // A file with several labels stays reachable after the import. Real ones routinely
+    // hold more than one: this corpus file holds four, and one of them holds twenty-seven.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    d.ImportZplDocument(
+        LabelForge.Core.Io.ZplTextFile.Read(File.ReadAllBytes(graphicSource)).Text,
+        Path.GetFileName(graphicSource));
+    Pump(900);
+    Console.WriteLine(
+        $"imported file offers its labels: {d.ImportedBlocks.Count} blocks, "
+        + $"strip shown={d.HasImportedBlocks}, on '{d.SelectedImportedBlock}' "
+        + "(expected 4, True, the first with content)");
+    Console.WriteLine(
+        $"blocks are described: {string.Join(" | ", d.ImportedBlocks)}");
+    Capture("designer-imported-blocks.png");
+
+    // Switching opens that one instead, which is the whole point.
+    // Any block but the open one. Most of this file's are the bare configuration blocks
+    // real files start with, which is exactly why they are labelled "empty": that is the
+    // only way to tell which are worth opening before opening one.
+    int elementsBefore = d.Document.Elements.Count;
+    var other = d.ImportedBlocks.First(b => b != d.SelectedImportedBlock);
+    d.SelectedImportedBlock = other;
+    Pump(900);
+    Console.WriteLine(
+        $"switching opens another label: {elementsBefore} -> {d.Document.Elements.Count} elements, "
+        + $"now on '{d.SelectedImportedBlock}' (expected the block's own count)");
+
+    d.CloseImportedFileCommand.Execute(null);
+    Pump(300);
+    Console.WriteLine(
+        $"done with the file: strip shown={d.HasImportedBlocks} (expected False)");
+
     // Design grid: drawn and snapped to from one source, and a canvas-only change, which
     // is the case the render cache could have stopped repainting.
     d.NewDocumentCommand.Execute(null);

@@ -15,11 +15,16 @@ namespace LabelForge.Core.Io;
 /// <param name="Warnings">What did not survive, in encounter order. A ZPL file can say
 /// things this model has no room for, and the honest answer is to name them rather than
 /// hand back a label that quietly lost a field.</param>
+/// <param name="BlockElementCounts">How much each ^XA block in the file holds, in order.
+/// Reported because one block is all a caller gets back, and without this it has no way
+/// to offer the others or to say which of them are worth opening. Counted during the same
+/// pass, since every block is built anyway.</param>
 public sealed record ZplDocumentImportResult(
     LabelDocument Document,
     int LabelCount,
     int SelectedIndex,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    IReadOnlyList<int> BlockElementCounts);
 
 /// <summary>
 /// Reads a ZPL label back into the document model: the inverse of
@@ -362,10 +367,12 @@ public static class ZplDocumentImport
                 index = 0;
             }
 
+            int[] counts = _blocks.Select(b => b.Elements.Count).ToArray();
+
             var document = new LabelDocument { Dpmm = Math.Max(dpmm, 1), Markers = markers };
             if (_blocks.Count == 0 || index >= _blocks.Count)
             {
-                return new ZplDocumentImportResult(document, _blocks.Count, 0, []);
+                return new ZplDocumentImportResult(document, _blocks.Count, 0, [], counts);
             }
 
             BlockDraft block = _blocks[index];
@@ -413,7 +420,7 @@ public static class ZplDocumentImport
                     + string.Join(", ", block.IgnoredConfiguration) + ").");
             }
 
-            return new ZplDocumentImportResult(document, _blocks.Count, index, warnings);
+            return new ZplDocumentImportResult(document, _blocks.Count, index, warnings, counts);
         }
 
         private void StartBarcode(
