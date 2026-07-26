@@ -110,6 +110,10 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   Import a script file alongside and the calls it offers are completed too, read from its
   public method signatures, so `##@Abate.maturidade(COD_MATURIDADE)##` is picked rather
   than retyped. Signatures only; nothing in the file is executed.
+- Crash recovery: the open document is snapshotted as you work, and if LabelForge closes
+  unexpectedly the next start offers the unsaved changes back. It never restores by itself,
+  and a session that closes properly leaves nothing behind, so an ordinary shutdown is
+  never mistaken for a crash.
 - Save and open the native `.lfl` project format (with a recent-files menu); export ZPL, PNG, and
   PDF at exact physical size.
 - Printing over the network (TCP 9100) and through the Windows spooler (RAW datatype, the USB path).

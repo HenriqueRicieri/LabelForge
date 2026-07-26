@@ -33,6 +33,8 @@ public partial class DesignerViewModel : ViewModelBase
     private readonly TemplateSubstitutor _substitutor = new();
     private readonly Core.Media.UserMediaStore _userMediaStore;
     private readonly Core.Fields.FieldCatalogStore _fieldCatalogStore;
+    private readonly RecoveryStore _recovery;
+    private string? _lastSnapshot;
     private readonly SnapshotHistory _history = new();
     private LabelDocument? _variablesDocument;
     private CancellationTokenSource? _renderCts;
@@ -518,10 +520,12 @@ public partial class DesignerViewModel : ViewModelBase
     /// touching what the person using the app has saved.</param>
     public DesignerViewModel(
         Core.Media.UserMediaStore? userMediaStore = null,
-        Core.Fields.FieldCatalogStore? fieldCatalogStore = null)
+        Core.Fields.FieldCatalogStore? fieldCatalogStore = null,
+        RecoveryStore? recoveryStore = null)
     {
         _userMediaStore = userMediaStore ?? new Core.Media.UserMediaStore();
         _fieldCatalogStore = fieldCatalogStore ?? new Core.Fields.FieldCatalogStore();
+        _recovery = recoveryStore ?? new RecoveryStore();
         Selection.Changed += (_, _) => OnSelectionChanged();
 
         ApplyUserMedia(_userMediaStore.Load());
@@ -537,7 +541,118 @@ public partial class DesignerViewModel : ViewModelBase
 
         RecordUndo();
         ScheduleRender();
+        OfferRecovery();
     }
+
+    /// <summary>
+    /// Work left behind by a session that did not shut down, offered rather than restored.
+    ///
+    /// Never opened automatically. A snapshot is what someone was in the middle of, and
+    /// deciding for them would replace whatever they meant to open this time; the offer
+    /// costs one click and the alternative costs the wrong document.
+    /// </summary>
+    [ObservableProperty]
+    public partial string RecoveryOffer { get; set; } = string.Empty;
+
+    private Core.Io.RecoverySnapshot? _pendingRecovery;
+
+    public bool HasRecoveryOffer => _pendingRecovery is not null;
+
+    private void OfferRecovery()
+    {
+        _pendingRecovery = _recovery.FindAbandoned().FirstOrDefault();
+        if (_pendingRecovery is null)
+        {
+            return;
+        }
+
+        string origin = _pendingRecovery.OriginalPath is { } path
+            ? Path.GetFileName(path)
+            : "a label that was never saved";
+        RecoveryOffer =
+            $"LabelForge closed unexpectedly with unsaved changes to {origin} "
+            + $"({_pendingRecovery.SavedAtUtc.ToLocalTime():g}).";
+        OnPropertyChanged(nameof(HasRecoveryOffer));
+    }
+
+    /// <summary>Opens the recovered document. It deliberately arrives with no file path
+    /// when it never had one, so saving asks where it goes instead of inventing a
+    /// location, and with its original path when it had one.</summary>
+    [RelayCommand]
+    private void RecoverDocument()
+    {
+        if (_pendingRecovery is not { } snapshot)
+        {
+            return;
+        }
+
+        try
+        {
+            LoadDocument(LabelDocumentJson.Deserialize(snapshot.Lfl), snapshot.OriginalPath);
+            Notify("Recovered the unsaved changes. Save the label to keep them.");
+        }
+        catch (Exception ex)
+        {
+            Notify($"The recovered file could not be read: {ex.Message}");
+        }
+
+        DismissRecovery();
+    }
+
+    /// <summary>Throws the snapshot away. Both answers are decisions, and only an
+    /// undecided one is worth keeping for next time.</summary>
+    [RelayCommand]
+    private void DismissRecovery()
+    {
+        if (_pendingRecovery is { } snapshot)
+        {
+            _recovery.Discard(snapshot.SnapshotPath);
+        }
+
+        _pendingRecovery = null;
+        RecoveryOffer = string.Empty;
+        OnPropertyChanged(nameof(HasRecoveryOffer));
+    }
+
+    /// <summary>
+    /// Takes a snapshot if the document has moved since the last one.
+    ///
+    /// Driven by the render pass rather than a clock, because that is what already fires
+    /// on every edit and is already debounced; a timer would be a second schedule saying
+    /// the same thing. Comparing against the last snapshot keeps an idle session from
+    /// rewriting the same bytes.
+    /// </summary>
+    private void SnapshotForRecovery()
+    {
+        try
+        {
+            string lfl = SerializeDocument();
+            if (string.Equals(lfl, _lastSnapshot, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _lastSnapshot = lfl;
+            _recovery.Save(lfl, CurrentFilePath);
+        }
+        catch (Exception)
+        {
+            // The safety net failing must never take the editor with it.
+        }
+    }
+
+    /// <summary>Called when the document reaches a file of its own, and on shutdown. The
+    /// snapshot's existence is what says work was lost, so it has to go the moment that
+    /// stops being true.</summary>
+    public void ClearRecovery()
+    {
+        _lastSnapshot = null;
+        _recovery.Clear();
+    }
+
+    /// <summary>Ends the session cleanly, which is what stops the next start offering to
+    /// recover work that was never lost.</summary>
+    public void ShutDown() => _recovery.Dispose();
 
     /// <summary>Called continuously while the canvas drags or resizes: the model is
     /// already updated, so re-render and refresh the panel, but record no undo.
@@ -1731,6 +1846,7 @@ public partial class DesignerViewModel : ViewModelBase
             }
 
             GeneratedZpl = zpl;
+            SnapshotForRecovery();
             UnderlayMarginDots = marginDots;
             PlacementWarning = placementWarning;
             VariableWarning = variableWarning;

@@ -416,6 +416,10 @@ public partial class DesignerView : UserControl
             await File.WriteAllTextAsync(path, vm.SerializeDocument());
             vm.StatusText = $"Saved {Path.GetFileName(path)}";
             vm.RegisterRecentFile(path);
+
+            // The work is safe in its own file now, so the crash snapshot would only be a
+            // false alarm on the next start.
+            vm.ClearRecovery();
         }
         catch (Exception ex)
         {

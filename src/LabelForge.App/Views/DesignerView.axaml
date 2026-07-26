@@ -320,6 +320,19 @@
             </DockPanel>
         </Border>
 
+        <!-- Recovery offer: only after a session that did not shut down -->
+        <Border DockPanel.Dock="Top" Padding="10,6" Background="#FEF3C7"
+                IsVisible="{Binding HasRecoveryOffer}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Discard" Margin="6,0,0,0"
+                        Command="{Binding DismissRecoveryCommand}" />
+                <Button DockPanel.Dock="Right" Content="Recover"
+                        Command="{Binding RecoverDocumentCommand}" />
+                <TextBlock Text="{Binding RecoveryOffer}" VerticalAlignment="Center"
+                           Foreground="#78350F" TextWrapping="Wrap" />
+            </DockPanel>
+        </Border>
+
         <!-- Label setup -->
         <Border DockPanel.Dock="Top" Padding="10,8" Background="{DynamicResource AppToolbarBackground}">
             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">

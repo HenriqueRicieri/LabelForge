@@ -19,12 +19,23 @@ if (args.Contains("dark"))
     Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
 }
 
-// The user's media presets live per machine. Point the harness at a scratch file so a
-// run never touches what the person using the app has saved.
+// Media presets, field catalogs and crash snapshots all live per machine. Point every
+// one of them at scratch locations, so a harness run never touches what the person using
+// the app has saved.
 string presetsPath = Path.Combine(AppContext.BaseDirectory, "e2e-user-media.json");
+string catalogsPath = Path.Combine(AppContext.BaseDirectory, "e2e-field-catalogs.json");
+string recoveryDir = Path.Combine(AppContext.BaseDirectory, "e2e-recovery");
 File.Delete(presetsPath);
+File.Delete(catalogsPath);
+if (Directory.Exists(recoveryDir))
+{
+    Directory.Delete(recoveryDir, recursive: true);
+}
 
-var vm = new MainViewModel(new LabelForge.Core.Media.UserMediaStore(presetsPath));
+var vm = new MainViewModel(
+    new LabelForge.Core.Media.UserMediaStore(presetsPath),
+    new LabelForge.Core.Fields.FieldCatalogStore(catalogsPath),
+    new LabelForge.Core.Io.RecoveryStore(recoveryDir, "e2e"));
 var window = new MainWindow { DataContext = vm };
 window.Show();
 
@@ -742,6 +753,53 @@ if (mode == "designer")
         $"not gs1: shown={gs1Panel.IsGs1} (expected False), warning='{d.ValidationWarning}' (expect empty)");
     d.Selection.Clear();
     Pump(200);
+
+    // Crash recovery: the snapshot follows the edits, a real save clears it because the
+    // work is safe elsewhere, and a snapshot left by a dead session is offered on start.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    d.Document.Elements.Add(new LabelForge.Core.Model.TextElement
+    {
+        X = 30, Y = 30, Text = "unsaved work", FontHeightDots = 30,
+    });
+    d.NotifyDocumentEdited();
+    Pump(900);
+    string snapshot = Path.Combine(recoveryDir, "e2e.recovery.json");
+    Console.WriteLine(
+        $"snapshot written: {File.Exists(snapshot)}, holds the edit="
+        + $"{File.Exists(snapshot) && File.ReadAllText(snapshot).Contains("unsaved work")} "
+        + "(expected True/True)");
+
+    d.ClearRecovery();
+    Console.WriteLine($"cleared after a real save: {!File.Exists(snapshot)} (expected True)");
+
+    // What a dead session leaves behind: a snapshot with no lock beside it.
+    d.NotifyDocumentEdited();
+    Pump(900);
+    string remnant = Path.Combine(recoveryDir, "crashed.recovery.json");
+    File.Copy(snapshot, remnant, overwrite: true);
+
+    var recovered = new MainViewModel(
+        new LabelForge.Core.Media.UserMediaStore(presetsPath),
+        new LabelForge.Core.Fields.FieldCatalogStore(catalogsPath),
+        new LabelForge.Core.Io.RecoveryStore(recoveryDir, "second-start"));
+    Console.WriteLine(
+        $"offered on next start: {recovered.Designer.HasRecoveryOffer} (expected True), "
+        + $"'{recovered.Designer.RecoveryOffer}'");
+    recovered.Designer.RecoverDocumentCommand.Execute(null);
+    Console.WriteLine(
+        $"recovered: {recovered.Designer.Document.Elements.Count} element(s) "
+        + $"(expected 1), offer gone={!recovered.Designer.HasRecoveryOffer} (expected True), "
+        + $"remnant discarded={!File.Exists(remnant)} (expected True)");
+
+    // A session that ends properly leaves nothing, so the next start stays quiet.
+    d.ShutDown();
+    var afterCleanExit = new MainViewModel(
+        new LabelForge.Core.Media.UserMediaStore(presetsPath),
+        new LabelForge.Core.Fields.FieldCatalogStore(catalogsPath),
+        new LabelForge.Core.Io.RecoveryStore(recoveryDir, "third-start"));
+    Console.WriteLine(
+        $"quiet after a clean exit: {!afterCleanExit.Designer.HasRecoveryOffer} (expected True)");
 
     d.NewDocumentCommand.Execute(null);
     Pump(200);

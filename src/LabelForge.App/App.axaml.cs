@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using LabelForge.App.ViewModels;
@@ -17,10 +17,12 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow
-            {
-                DataContext = new MainViewModel(),
-            };
+            var main = new MainViewModel();
+            desktop.MainWindow = new MainWindow { DataContext = main };
+
+            // Ending the session removes its crash snapshot, which is the only thing that
+            // distinguishes a shutdown from a crash on the next start.
+            desktop.ShutdownRequested += (_, _) => main.Designer.ShutDown();
         }
 
         base.OnFrameworkInitializationCompleted();
