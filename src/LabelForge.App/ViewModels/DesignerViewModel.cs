@@ -1555,6 +1555,32 @@ public partial class DesignerViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// GS1 payloads whose structure will not read back as written.
+    ///
+    /// Kept apart from the encoding problems because it is a different failure. Data that
+    /// cannot be encoded produces no barcode; a payload missing a separator produces one
+    /// that scans perfectly and returns the wrong value, which is why it has to be said
+    /// out loud rather than left to whoever reads the label later.
+    /// </summary>
+    private List<string> CollectGs1Problems()
+    {
+        var problems = new List<string>();
+        foreach (BarcodeElement barcode in Document.Elements
+                     .OfType<BarcodeElement>()
+                     .Where(b => b.IsVisible &&
+                                 b.Symbology == BarcodeSymbology.Code128 &&
+                                 Core.Zpl.Gs1Payload.IsGs1(b.Data)))
+        {
+            foreach (string problem in Core.Zpl.Gs1Payload.Read(barcode.Data).Problems)
+            {
+                problems.Add($"GS1 barcode '{DisplayName(barcode)}': {problem}");
+            }
+        }
+
+        return problems;
+    }
+
+    /// <summary>
     /// Markers this label uses that its field catalog does not list.
     ///
     /// The failure being caught is a quiet one: a marker the filling system does not
@@ -1728,7 +1754,8 @@ public partial class DesignerViewModel : ViewModelBase
             // Kept apart for the diagnosis below: a crowded quiet zone never explains an
             // empty render, so it must not be offered as the reason for one.
             List<string> barcodeProblems = CollectBarcodeProblems();
-            UpdateValidationWarning([.. barcodeProblems, .. CollectQuietZoneProblems()]);
+            UpdateValidationWarning(
+                [.. barcodeProblems, .. CollectGs1Problems(), .. CollectQuietZoneProblems()]);
             UnknownFieldWarning = string.Join(" ", CollectUnknownFieldProblems());
 
             // On a failed or empty render, lead with a specific diagnosis when a

@@ -171,6 +171,40 @@ public sealed class Gs1Tests
         Assert.Equal(["01", "3102", "21"], read.Fields.Select(f => f.Code));
     }
 
+    /// <summary>
+    /// The failure the assembler exists to prevent, seen from the reading side. Written
+    /// without the separator after the batch number, the value runs on and swallows the
+    /// two fields after it, so the payload reads back as one over-long field. Nothing
+    /// about the barcode fails; it scans and returns the wrong thing.
+    /// </summary>
+    [Fact]
+    public void Read_NamesAVariableFieldThatSwallowedWhatFollowed()
+    {
+        Gs1Reading read = Gs1Payload.Read(">;>810LOTE42>:01078912345678953102001234");
+
+        Gs1Field only = Assert.Single(read.Fields);
+        Assert.Equal("10", only.Code);
+        Assert.Contains(read.Problems, p => p.Contains("separator after it is missing", StringComparison.Ordinal));
+    }
+
+    /// <summary>And the same fields assembled properly raise nothing, which is the
+    /// difference the separator makes.</summary>
+    [Fact]
+    public void Build_ProducesThePayloadThatDoesNotSwallow()
+    {
+        string data = Gs1Payload.Build(
+        [
+            new Gs1Field("10", "LOTE42"),
+            new Gs1Field("01", "07891234567895"),
+            new Gs1Field("3102", "001234"),
+        ]);
+
+        Gs1Reading read = Gs1Payload.Read(data);
+
+        Assert.Equal(["10", "01", "3102"], read.Fields.Select(f => f.Code));
+        Assert.Empty(read.Problems);
+    }
+
     private static int InkWidth(RenderResult result)
     {
         using SKBitmap? bitmap = SKBitmap.Decode(result.Png);

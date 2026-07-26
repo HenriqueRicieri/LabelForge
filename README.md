@@ -36,6 +36,13 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   millimeters. Barcode data is validated against its symbology with a clear warning when it cannot
   be encoded. A PDF417 states the shape its settings produce, and says so when the column count is
   left automatic, because that hands the shape to the printer.
+- GS1-128 support: a payload written with `>;>8` (Code 128 subset C plus FNC1, which is how
+  real labels write it) is shown broken into its application identifiers, as
+  `(01)07891234567895 (3102)001234`, and structural problems are named. The one that matters
+  is a variable-length value with nothing to terminate it, because that does not fail to
+  scan: it swallows the fields after it and returns the wrong value from a barcode that
+  looks perfect. Element footprints understand the subset escapes, so a GS1 barcode's
+  outline matches its ink instead of being nearly twice too wide.
 - Quiet zone checking: every symbology's standard asks for a blank margin around the symbol, and a
   barcode that takes a second pass to scan is a label that failed. The canvas draws that margin for
   the selected symbol and warns when a neighbour sits in it or when the symbol is flush with the

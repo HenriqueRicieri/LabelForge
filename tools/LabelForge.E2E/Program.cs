@@ -709,6 +709,42 @@ if (mode == "designer")
         $"no catalog: '{d.UnknownFieldWarning}' (expect empty), "
         + $"ZPL unchanged={d.GeneratedZpl == zplWithCatalog} (expected True)");
 
+    // GS1-128: the payload is shown broken into its identifiers, and a variable-length
+    // field with nothing after it to end it is named, because that does not fail to scan,
+    // it scans as one value with the wrong contents.
+    d.NewDocumentCommand.Execute(null);
+    d.WidthMm = 150m;
+    Pump(200);
+    var gs1 = new LabelForge.Core.Model.BarcodeElement
+    {
+        X = 40, Y = 60, Data = ">;>801078912345678953102001234",
+        HeightDots = 80, ModuleWidthDots = 2, PrintInterpretationLine = false,
+    };
+    d.Document.Elements.Add(gs1);
+    d.Selection.Set(gs1);
+    d.NotifyDocumentEdited();
+    Pump(900);
+    var gs1Panel = (BarcodePropertiesViewModel)d.SelectionProperties!;
+    Console.WriteLine(
+        $"gs1 breakdown: '{gs1Panel.Gs1Breakdown}' (expected (01) and (3102) named)");
+    Console.WriteLine(
+        $"gs1 width honours subset C: {new LabelForge.Core.Model.ElementBoundsCalculator().GetBounds(gs1).Width} dots "
+        + "(expected 378, not the 708 a character count would give)");
+    Capture("designer-gs1.png");
+
+    gs1Panel.Data = ">;>810LOTE42>:01078912345678953102001234";
+    Pump(900);
+    Console.WriteLine($"gs1 problem: '{gs1Panel.Gs1Warning}' (expect a separator warning)");
+
+    gs1Panel.Data = "PLAIN12345";
+    Pump(900);
+    Console.WriteLine(
+        $"not gs1: shown={gs1Panel.IsGs1} (expected False), warning='{d.ValidationWarning}' (expect empty)");
+    d.Selection.Clear();
+    Pump(200);
+
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
     d.FieldCatalogs[0].RemoveCommand.Execute(null);
     Pump(300);
     Console.WriteLine($"catalog removed: {d.FieldCatalogs.Count} left (expected 0)");

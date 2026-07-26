@@ -1,14 +1,19 @@
-namespace LabelForge.Core.Zpl;
+﻿namespace LabelForge.Core.Zpl;
 
 /// <param name="Code">The AI itself, as printed in brackets: "01", "10", "3102".</param>
 /// <param name="Name">What it means, in plain words.</param>
 /// <param name="Length">Length of the value in characters, or 0 when it varies.</param>
 /// <param name="NumericOnly">True when the value must be digits.</param>
+/// <param name="MaxLength">Longest a variable-length value may be, or 0 when no ceiling
+/// is carried. This is what makes a missing separator detectable at all: an unterminated
+/// value does not fail, it runs on and swallows the identifiers after it, so the whole
+/// payload reads back as one over-long field and the length is the only symptom.</param>
 public sealed record Gs1ApplicationIdentifier(
     string Code,
     string Name,
     int Length,
-    bool NumericOnly)
+    bool NumericOnly,
+    int MaxLength = 0)
 {
     /// <summary>True when the value has no fixed length, which is what decides whether a
     /// separator has to follow it.</summary>
@@ -38,7 +43,7 @@ public static class Gs1Catalog
         new("00", "Serial shipping container code (SSCC)", 18, true),
         new("01", "Global trade item number (GTIN)", 14, true),
         new("02", "GTIN of contained trade items", 14, true),
-        new("10", "Batch or lot number", 0, false),
+        new("10", "Batch or lot number", 0, false, 20),
         new("11", "Production date (YYMMDD)", 6, true),
         new("12", "Due date (YYMMDD)", 6, true),
         new("13", "Packaging date (YYMMDD)", 6, true),
@@ -46,20 +51,20 @@ public static class Gs1Catalog
         new("16", "Sell by date (YYMMDD)", 6, true),
         new("17", "Expiry date (YYMMDD)", 6, true),
         new("20", "Product variant", 2, true),
-        new("21", "Serial number", 0, false),
-        new("22", "Consumer product variant", 0, false),
-        new("30", "Count of items", 0, true),
-        new("37", "Count of trade items in a logistic unit", 0, true),
-        new("240", "Additional product identification", 0, false),
-        new("241", "Customer part number", 0, false),
-        new("251", "Reference to the source entity", 0, false),
-        new("400", "Customer purchase order number", 0, false),
-        new("401", "Consignment number (GINC)", 0, false),
+        new("21", "Serial number", 0, false, 20),
+        new("22", "Consumer product variant", 0, false, 20),
+        new("30", "Count of items", 0, true, 8),
+        new("37", "Count of trade items in a logistic unit", 0, true, 8),
+        new("240", "Additional product identification", 0, false, 30),
+        new("241", "Customer part number", 0, false, 30),
+        new("251", "Reference to the source entity", 0, false, 30),
+        new("400", "Customer purchase order number", 0, false, 30),
+        new("401", "Consignment number (GINC)", 0, false, 30),
         new("402", "Shipment number (GSIN)", 17, true),
         new("410", "Ship to global location number", 13, true),
         new("412", "Purchased from global location number", 13, true),
         new("414", "Physical location global location number", 13, true),
-        new("420", "Ship to postal code, same country", 0, false),
+        new("420", "Ship to postal code, same country", 0, false, 20),
 
         // The measurement AIs end in a decimal-place digit: 3102 is a net weight in
         // kilograms with two decimals. The family is listed rather than each member,
@@ -71,8 +76,8 @@ public static class Gs1Catalog
         new("3200", "Net weight, lb (0 decimals)", 6, true),
         new("3201", "Net weight, lb (1 decimal)", 6, true),
         new("3202", "Net weight, lb (2 decimals)", 6, true),
-        new("3920", "Amount payable (0 decimals)", 0, true),
-        new("3922", "Amount payable (2 decimals)", 0, true),
+        new("3920", "Amount payable (0 decimals)", 0, true, 15),
+        new("3922", "Amount payable (2 decimals)", 0, true, 15),
     ];
 
     public static Gs1ApplicationIdentifier? Find(string code) =>

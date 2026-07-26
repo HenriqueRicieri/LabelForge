@@ -243,6 +243,7 @@ public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel
             OnPropertyChanged(nameof(IsCode39));
             OnPropertyChanged(nameof(Warning));
             OnPropertyChanged(nameof(HasWarning));
+            NotifyGs1Changed();
         }
     }
 
@@ -256,6 +257,7 @@ public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel
             Edit(_barcode.Data, value ?? string.Empty, v => _barcode.Data = v);
             OnPropertyChanged(nameof(Warning));
             OnPropertyChanged(nameof(HasWarning));
+            NotifyGs1Changed();
         }
     }
 
@@ -288,6 +290,47 @@ public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel
     {
         get => _barcode.PrintInterpretationLine;
         set => Edit(_barcode.PrintInterpretationLine, value, v => _barcode.PrintInterpretationLine = v);
+    }
+
+    /// <summary>
+    /// True when the data is a GS1-128 payload rather than plain content, which is what
+    /// the opening FNC1 says. Only Code 128 carries one.
+    /// </summary>
+    public bool IsGs1 =>
+        _barcode.Symbology == BarcodeSymbology.Code128 &&
+        Core.Zpl.Gs1Payload.IsGs1(_barcode.Data);
+
+    /// <summary>
+    /// The payload broken into its application identifiers.
+    ///
+    /// Worth showing even when something upstream assembled the data, because that is
+    /// exactly when nobody has read it: a run of digits with no separators in it is not
+    /// something a person can check by eye, and the bracketed form is.
+    /// </summary>
+    public string Gs1Breakdown => IsGs1
+        ? string.Join(" ", Core.Zpl.Gs1Payload.Read(_barcode.Data).Fields
+            .Select(f => $"({f.Code}){f.Value}"))
+        : string.Empty;
+
+    /// <summary>
+    /// What is structurally wrong with the payload.
+    ///
+    /// The one that matters is a variable-length value with nothing after it to say where
+    /// it stops, because that does not fail: the scanner reads it and whatever follows as
+    /// one value, and the label looks perfect while carrying the wrong data.
+    /// </summary>
+    public string Gs1Warning => IsGs1
+        ? string.Join(" ", Core.Zpl.Gs1Payload.Read(_barcode.Data).Problems)
+        : string.Empty;
+
+    public bool HasGs1Warning => Gs1Warning.Length > 0;
+
+    private void NotifyGs1Changed()
+    {
+        OnPropertyChanged(nameof(IsGs1));
+        OnPropertyChanged(nameof(Gs1Breakdown));
+        OnPropertyChanged(nameof(Gs1Warning));
+        OnPropertyChanged(nameof(HasGs1Warning));
     }
 }
 

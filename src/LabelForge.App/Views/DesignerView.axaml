@@ -84,6 +84,11 @@
                                  HorizontalAlignment="Stretch" />
                 <TextBlock Text="{Binding Warning}" IsVisible="{Binding HasWarning}"
                            Foreground="#D97706" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />
+                <TextBlock Text="{Binding Gs1Breakdown}" IsVisible="{Binding IsGs1}"
+                           Opacity="0.6" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0"
+                           ToolTip.Tip="The application identifiers this payload carries" />
+                <TextBlock Text="{Binding Gs1Warning}" IsVisible="{Binding HasGs1Warning}"
+                           Foreground="#D97706" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />
                 <TextBlock Classes="propLabel" Text="Symbology" />
                 <ComboBox ItemsSource="{Binding Symbologies}"
                           SelectedItem="{Binding Symbology}"

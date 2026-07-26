@@ -124,7 +124,7 @@ public static class Gs1Payload
 
         var fields = new List<Gs1Field>();
         var problems = new List<string>();
-        string text = StripEscapes(data, out bool separated);
+        string text = StripEscapes(data, out _);
 
         int i = 0;
         while (i < text.Length)
@@ -167,10 +167,24 @@ public static class Gs1Payload
             fields.Add(new Gs1Field(code, value));
             i = end;
 
-            // A marker stands in for a value whose length is only known once the
-            // filling system substitutes it, so neither check can be applied to one.
+            // A marker stands in for a value whose length is only known once the filling
+            // system substitutes it, so none of these can be applied to one.
             if (!templated)
             {
+                // The symptom of a missing separator, and the only one there is. An
+                // unterminated variable-length value does not fail: it runs on and
+                // swallows the identifiers after it, so the payload reads back as this
+                // single over-long field. The message says what that almost always means
+                // rather than only what was measured.
+                if (ai is { IsVariableLength: true, MaxLength: > 0 } variableAi &&
+                    value.Length > variableAi.MaxLength)
+                {
+                    problems.Add(
+                        $"({code}) carries {value.Length} characters and allows at most "
+                        + $"{variableAi.MaxLength}, which usually means the separator after it is "
+                        + "missing and it has swallowed the fields that follow.");
+                }
+
                 if (ai is { IsVariableLength: false } fixedAi && value.Length != fixedAi.Length)
                 {
                     problems.Add(
@@ -181,19 +195,6 @@ public static class Gs1Payload
                 {
                     problems.Add($"({code}) should be digits only.");
                 }
-            }
-        }
-
-        // A variable-length field in the middle with nothing to end it swallows whatever
-        // follows, which scans as one wrong value rather than as a failure.
-        for (int f = 0; f < fields.Count - 1; f++)
-        {
-            if ((Gs1Catalog.Find(fields[f].Code)?.IsVariableLength ?? false) && !separated)
-            {
-                problems.Add(
-                    $"({fields[f].Code}) has no fixed length and nothing separates it from what "
-                    + "follows, so a scanner reads them as one value.");
-                break;
             }
         }
 
