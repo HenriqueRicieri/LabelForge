@@ -33,6 +33,7 @@ public partial class DesignerView : UserControl
         Canvas.DocumentEdited += (_, _) => ViewModel?.NotifyDocumentEdited();
         Canvas.LiveEdited += (_, _) => ViewModel?.NotifyDocumentPreview();
         Canvas.DeleteRequested += (_, _) => ViewModel?.DeleteSelectedCommand.Execute(null);
+        Canvas.ContextMenuRequested += OnCanvasContextMenu;
         Canvas.PlaceRequested += (x, y) => ViewModel?.PlaceAt(x, y);
         Canvas.CancelRequested += (_, _) => ViewModel?.CancelInsert();
 
@@ -42,6 +43,142 @@ public partial class DesignerView : UserControl
         ZoomOutButton.Click += (_, _) => Canvas.ZoomBy(1 / 1.25);
         ZoomInButton.Click += (_, _) => Canvas.ZoomBy(1.25);
     }
+
+    /// <summary>
+    /// Builds the canvas context menu for whatever the pointer was over.
+    ///
+    /// Two menus rather than one long one with half of it greyed out: right-clicking an
+    /// element asks about that element, and right-clicking bare stock asks what to put
+    /// there. Everything offered runs the same command the menu bar and the keyboard run,
+    /// so there is one implementation of copy and one of delete, not three.
+    /// </summary>
+    private void OnCanvasContextMenu(LabelForge.Core.Model.Element? element, int x, int y)
+    {
+        if (ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        MenuFlyout menu = element is null ? EmptyCanvasMenu(vm, x, y) : ElementMenu(vm, element);
+        if (menu.Items.Count > 0)
+        {
+            menu.ShowAt(Canvas, showAtPointer: true);
+        }
+    }
+
+    private static MenuFlyout ElementMenu(DesignerViewModel vm, LabelForge.Core.Model.Element element)
+    {
+        var menu = new MenuFlyout();
+        Add(menu, "Copy", vm.CopyCommand);
+        Add(menu, "Duplicate", vm.DuplicateCommand);
+        Add(menu, "Delete", vm.DeleteSelectedCommand);
+        menu.Items.Add(new Separator());
+        Add(menu, "Bring to Front", vm.BringToFrontCommand);
+        Add(menu, "Send to Back", vm.SendToBackCommand);
+        menu.Items.Add(new Separator());
+
+        // The two switches that are otherwise a trip to the properties panel, and the two
+        // most likely to be wanted for several elements one after another.
+        var locked = new MenuItem { Header = "Lock position", Icon = Check(element.IsLocked) };
+        locked.Click += (_, _) =>
+        {
+            element.IsLocked = !element.IsLocked;
+            vm.NotifyDocumentEdited();
+        };
+        menu.Items.Add(locked);
+
+        var suppressed = new MenuItem { Header = "Do not print", Icon = Check(element.DoNotPrint) };
+        suppressed.Click += (_, _) =>
+        {
+            element.DoNotPrint = !element.DoNotPrint;
+            vm.NotifyDocumentEdited();
+        };
+        menu.Items.Add(suppressed);
+
+        // Alignment only means something once there is more than one thing to align.
+        if (vm.SelectionCount > 1)
+        {
+            menu.Items.Add(new Separator());
+            var align = new MenuItem { Header = "Align" };
+            Add(align, "Left", vm.AlignLeftCommand);
+            Add(align, "Center", vm.AlignCenterHorizontalCommand);
+            Add(align, "Right", vm.AlignRightCommand);
+            align.Items.Add(new Separator());
+            Add(align, "Top", vm.AlignTopCommand);
+            Add(align, "Middle", vm.AlignMiddleCommand);
+            Add(align, "Bottom", vm.AlignBottomCommand);
+            align.Items.Add(new Separator());
+            Add(align, "Distribute Horizontally", vm.DistributeHorizontalCommand);
+            Add(align, "Distribute Vertically", vm.DistributeVerticalCommand);
+            menu.Items.Add(align);
+        }
+
+        return menu;
+    }
+
+    private MenuFlyout EmptyCanvasMenu(DesignerViewModel vm, int x, int y)
+    {
+        var menu = new MenuFlyout();
+
+        var pasteHere = new MenuItem
+        {
+            Header = "Paste Here",
+            IsEnabled = vm.CanPaste,
+        };
+        pasteHere.Click += (_, _) => vm.PasteAt(x, y);
+        menu.Items.Add(pasteHere);
+        Add(menu, "Paste", vm.PasteCommand);
+        Add(menu, "Select All", vm.SelectAllCommand);
+        menu.Items.Add(new Separator());
+
+        // Insert places where the click landed. Arming a tool and asking for a second
+        // click would be asking twice for something already said.
+        var insert = new MenuItem { Header = "Insert Here" };
+        InsertItem(insert, "Text", vm, vm.AddTextCommand, x, y);
+        InsertItem(insert, "Box", vm, vm.AddBoxCommand, x, y);
+        InsertItem(insert, "Line", vm, vm.AddLineCommand, x, y);
+        InsertItem(insert, "Barcode", vm, vm.AddBarcodeCommand, x, y);
+        InsertItem(insert, "QR Code", vm, vm.AddQrCommand, x, y);
+        InsertItem(insert, "Data Matrix", vm, vm.AddDataMatrixCommand, x, y);
+        InsertItem(insert, "PDF417", vm, vm.AddPdf417Command, x, y);
+        menu.Items.Add(insert);
+
+        menu.Items.Add(new Separator());
+        var fit = new MenuItem { Header = "Fit to Window" };
+        fit.Click += (_, _) => Canvas.ResetView();
+        menu.Items.Add(fit);
+
+        var actual = new MenuItem { Header = "Zoom 100%" };
+        actual.Click += (_, _) => Canvas.SetZoom(1);
+        menu.Items.Add(actual);
+
+        return menu;
+    }
+
+    private static void InsertItem(
+        MenuItem parent,
+        string header,
+        DesignerViewModel vm,
+        System.Windows.Input.ICommand arm,
+        int x,
+        int y)
+    {
+        var item = new MenuItem { Header = header };
+        item.Click += (_, _) => vm.InsertAt(arm, x, y);
+        parent.Items.Add(item);
+    }
+
+    private static void Add(MenuFlyout menu, string header, System.Windows.Input.ICommand command) =>
+        menu.Items.Add(new MenuItem { Header = header, Command = command });
+
+    private static void Add(MenuItem parent, string header, System.Windows.Input.ICommand command) =>
+        parent.Items.Add(new MenuItem { Header = header, Command = command });
+
+    /// <summary>A tick beside a switch that is on. Avalonia has no checkable menu item,
+    /// and a header that changed between "Lock" and "Unlock" would make the reader work
+    /// out the current state from the verb.</summary>
+    private static Control? Check(bool on) =>
+        on ? new TextBlock { Text = "✓" } : null;
 
     /// <summary>Pushes the canvas view (extent, viewport, offset) into the scrollbars
     /// and refreshes the zoom readout. Guarded so the resulting ValueChanged does not

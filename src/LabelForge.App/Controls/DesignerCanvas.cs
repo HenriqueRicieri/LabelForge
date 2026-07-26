@@ -275,6 +275,17 @@ public sealed class DesignerCanvas : Control
     /// <summary>Raised when the user presses Delete with a selection.</summary>
     public event EventHandler? DeleteRequested;
 
+    /// <summary>
+    /// A right-click that is not about guides, with the element under the pointer (null
+    /// on empty stock) and where the click landed in dots.
+    ///
+    /// The canvas reports rather than decides. Building the menu here would mean a second
+    /// implementation of copy, delete and the rest, sitting next to the one the keyboard
+    /// and the menu bar already use; the view has the view model and can offer exactly
+    /// those commands.
+    /// </summary>
+    public event Action<Element?, int, int>? ContextMenuRequested;
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -1038,14 +1049,34 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
-        // Right-click on the canvas: its only meaning is removing a nearby guide.
+        // Right-click. A guide within reach wins, since that menu is about something
+        // small and specific that would otherwise be unreachable; anything else is a
+        // question about the element under the pointer, or about the stock itself.
         if (pointerProps.IsRightButtonPressed)
         {
-            if (!IsPlacing && FindGuideAt(doc, p, scale, origin) is { } nearGuide)
+            if (IsPlacing)
             {
-                ShowGuideMenu(doc, nearGuide.Axis, nearGuide.Index);
+                return;
             }
 
+            if (FindGuideAt(doc, p, scale, origin) is { } nearGuide)
+            {
+                ShowGuideMenu(doc, nearGuide.Axis, nearGuide.Index);
+                return;
+            }
+
+            Element? underPointer = ElementAt(doc, dotX, dotY);
+
+            // Right-clicking something that is not selected selects it first: the menu is
+            // about what was pointed at, not about whatever happened to be selected.
+            if (underPointer is not null && !selection.Contains(underPointer))
+            {
+                selection.Set(underPointer);
+            }
+
+            ContextMenuRequested?.Invoke(
+                underPointer, (int)Math.Round(dotX), (int)Math.Round(dotY));
+            e.Handled = true;
             return;
         }
 
@@ -1124,10 +1155,7 @@ public sealed class DesignerCanvas : Control
         bool additive = e.KeyModifiers.HasFlag(KeyModifiers.Control) ||
                         e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
-        Element? hit = doc.Elements
-            .Where(el => el.IsVisible)
-            .OrderByDescending(el => el.ZOrder)
-            .FirstOrDefault(el => _bounds.GetBounds(el).Contains((int)dotX, (int)dotY));
+        Element? hit = ElementAt(doc, dotX, dotY);
 
         if (hit is null)
         {
@@ -1257,6 +1285,14 @@ public sealed class DesignerCanvas : Control
         DocumentEdited?.Invoke(this, EventArgs.Empty);
         InvalidateVisual();
     }
+
+    /// <summary>The topmost visible element under a point in dot space, which is the one
+    /// a click would reach.</summary>
+    private Element? ElementAt(LabelDocument doc, double dotX, double dotY) =>
+        doc.Elements
+            .Where(el => el.IsVisible)
+            .OrderByDescending(el => el.ZOrder)
+            .FirstOrDefault(el => _bounds.GetBounds(el).Contains((int)dotX, (int)dotY));
 
     /// <summary>Right-click on a ruler: insert a guide at the pointer (rounded to the
     /// nearest whole millimeter) or clear all guides.</summary>

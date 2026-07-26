@@ -1253,6 +1253,64 @@ public partial class DesignerViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Pastes with the copied group's top-left at a point, rather than cascading from
+    /// where the last paste landed.
+    ///
+    /// The cascade is right for repeated pastes from the keyboard, where the user has said
+    /// nothing about position. A right-click has said exactly where, so honouring it is
+    /// the whole difference between the two.
+    /// </summary>
+    public void PasteAt(int x, int y)
+    {
+        if (_clipboardElement is null)
+        {
+            return;
+        }
+
+        List<Element> clones = LabelDocumentJson.DeserializeElements(_clipboardElement);
+        if (clones.Count == 0)
+        {
+            return;
+        }
+
+        // One delta for the whole group, so the copies keep their relative layout.
+        int dx = x - clones.Min(e => e.X);
+        int dy = y - clones.Min(e => e.Y);
+        int nextZ = Document.Elements.Count == 0
+            ? 0
+            : Document.Elements.Max(e => e.ZOrder) + 1;
+
+        foreach (Element element in clones)
+        {
+            element.Id = Guid.NewGuid();
+            element.X = Math.Clamp(element.X + dx, 0, Math.Max(Document.WidthDots - 1, 0));
+            element.Y = Math.Clamp(element.Y + dy, 0, Math.Max(Document.HeightDots - 1, 0));
+            element.ZOrder = nextZ++;
+            Document.Elements.Add(element);
+        }
+
+        Selection.SetMany(clones);
+        RecordUndo();
+        ScheduleRender();
+    }
+
+    /// <summary>Selects everything that can be seen. Hidden elements are left out: a
+    /// selection is something you are about to act on, and acting on what you cannot see
+    /// is how work gets lost.</summary>
+    [RelayCommand]
+    private void SelectAll() =>
+        Selection.SetMany(Document.Elements.Where(e => e.IsVisible).OrderBy(e => e.ZOrder));
+
+    /// <summary>Arms an insert and places it in one go, for the context menu: a click has
+    /// already said where, so asking for a second one would be asking twice.</summary>
+    public void InsertAt(System.Windows.Input.ICommand armCommand, int x, int y)
+    {
+        ArgumentNullException.ThrowIfNull(armCommand);
+        armCommand.Execute(null);
+        PlaceAt(x, y);
+    }
+
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private void Duplicate()
     {

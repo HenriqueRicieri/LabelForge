@@ -754,6 +754,68 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(200);
 
+    // Right-click menus. Two of them, because the two situations are different questions:
+    // over an element it asks about that element, over bare stock it asks what to put there.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    var target = new LabelForge.Core.Model.TextElement
+    {
+        X = 120, Y = 120, Text = "right click me", FontHeightDots = 40,
+    };
+    d.Document.Elements.Add(target);
+    d.Selection.Clear();
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    // Over an element that is not selected: the menu selects it first, so it is about
+    // what was pointed at rather than about whatever was selected before.
+    Avalonia.Point overElement =
+        canvas.TranslatePoint(canvas.DotsToView(140, 140), window)!.Value;
+    window.MouseDown(overElement, MouseButton.Right);
+    window.MouseUp(overElement, MouseButton.Right);
+    Pump(400);
+    Console.WriteLine(
+        $"right click selects what it points at: {ReferenceEquals(d.SelectedElement, target)} "
+        + "(expected True)");
+    Capture("designer-context-element.png");
+    window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+    Pump(300);
+
+    // Over bare stock: no element, and the selection is left alone to be cleared by the
+    // menu's own actions rather than by opening it.
+    d.CopyCommand.Execute(null);
+    Avalonia.Point overStock = canvas.TranslatePoint(canvas.DotsToView(500, 350), window)!.Value;
+    window.MouseDown(overStock, MouseButton.Right);
+    window.MouseUp(overStock, MouseButton.Right);
+    Pump(400);
+    Capture("designer-context-canvas.png");
+    window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+    Pump(300);
+
+    // Paste at the pointer puts the copy where the click landed, not where the cascade
+    // would have taken it.
+    int beforePaste = d.Document.Elements.Count;
+    d.PasteAt(500, 350);
+    Pump(400);
+    Console.WriteLine(
+        $"paste here: {d.Document.Elements.Count - beforePaste} added at "
+        + $"{d.SelectedElement!.X},{d.SelectedElement!.Y} (expected 1 at 500,350)");
+
+    // Insert from the menu places in one step rather than arming and asking again.
+    int beforeInsert = d.Document.Elements.Count;
+    d.InsertAt(d.AddBoxCommand, 300, 250);
+    Pump(400);
+    Console.WriteLine(
+        $"insert here: {d.Document.Elements.Count - beforeInsert} added at "
+        + $"{d.SelectedElement!.X},{d.SelectedElement!.Y}, still placing={d.IsPlacing} "
+        + "(expected 1 at 300,250, False)");
+
+    d.SelectAllCommand.Execute(null);
+    Console.WriteLine(
+        $"select all: {d.SelectionCount} of {d.Document.Elements.Count} (expected all)");
+    d.Selection.Clear();
+    Pump(200);
+
     // Element outline: a dense label read as a list, which is the only practical way to
     // pick one field out of a stack of overlapping ones.
     d.NewDocumentCommand.Execute(null);

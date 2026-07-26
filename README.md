@@ -29,6 +29,11 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 - Align and distribute tools: left/center/right and top/middle/bottom (one element aligns against
   the label, several align within their own bounding box) plus horizontal/vertical distribution
   with equalized gaps.
+- Right-click menus on the canvas, different depending on what is under the pointer: on an
+  element, copy, duplicate, delete, front and back, and the lock and do-not-print switches,
+  plus align and distribute once several are selected; on bare stock, paste at the pointer,
+  select all, and an insert submenu that places the new element where you clicked instead of
+  asking for a second click. Right-clicking a ruler still offers guides.
 - An Elements list of everything on the label, front to back, for picking one field out of
   a stack of overlapping ones on a dense design. Each row shows the element's own name when
   it has one and its type and content when it does not, and carries its visibility and lock,
