@@ -238,9 +238,11 @@ public partial class DesignerView : UserControl
 
     private string Close => ViewModel?.Document.Markers.Close ?? "##";
 
-    /// <summary>Imports a field list exported by whatever system fills the markers in.
-    /// Deliberately not restricted to .csv: the sample exports were tab separated despite
-    /// the extension, and the reader does not care.</summary>
+    /// <summary>Imports a field list, or a script whose public methods can be called
+    /// from a marker. One entry point for both, because which one a file is can be seen
+    /// rather than asked. Deliberately not restricted by extension either: the sample
+    /// exports were tab separated despite being named .csv, and the reader does not
+    /// care.</summary>
     private async void OnImportFieldCatalog(object? sender, RoutedEventArgs e)
     {
         if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)
@@ -250,11 +252,14 @@ public partial class DesignerView : UserControl
 
         var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Import a field list",
+            Title = "Import a field list or a script",
             AllowMultiple = false,
             FileTypeFilter =
             [
-                new FilePickerFileType("Field lists") { Patterns = ["*.csv", "*.tsv", "*.txt"] },
+                new FilePickerFileType("Field lists and scripts")
+                {
+                    Patterns = ["*.csv", "*.tsv", "*.txt", "*.cs"],
+                },
                 new FilePickerFileType("All files") { Patterns = ["*"] },
             ],
         });
@@ -271,7 +276,7 @@ public partial class DesignerView : UserControl
         }
         catch (Exception ex)
         {
-            vm.StatusText = $"Could not read the field list: {ex.Message}";
+            vm.StatusText = $"Could not read the file: {ex.Message}";
         }
     }
 

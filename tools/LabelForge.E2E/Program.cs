@@ -667,6 +667,34 @@ if (mode == "designer")
     Pump(400);
     Capture("designer-field-catalog.png");
 
+    // A script imported beside the field list adds its calls without wiping the fields,
+    // and completion offers them ready to paste.
+    d.NewCatalogName = "Etiqueta externa (caixaria)";
+    d.ImportFieldCatalog(
+        """
+        public class Abate
+        {
+            public string maturidade(string COD_MATURIDADE)
+            {
+                return "M";
+            }
+        }
+        """,
+        "Abate");
+    Pump(400);
+    Console.WriteLine(
+        $"script import: '{d.SelectedFieldCatalog}' "
+        + "(expected 3 fields kept, 1 function added)");
+    Console.WriteLine(
+        $"call offered: {d.FieldSuggestions.Contains("##@Abate.maturidade(COD_MATURIDADE)##")} (expected True)");
+
+    // A call is a directive rather than a variable, so it is never checked against the
+    // field list; nor is a directive the catalog could not possibly list.
+    typo.Text = "##@Abate.maturidade(COD_MATURIDADE)## ##@SET_PRINTER(2)##";
+    d.NotifyDocumentEdited();
+    Pump(900);
+    Console.WriteLine($"calls and directives: '{d.UnknownFieldWarning}' (expect empty)");
+
     // An indexed list field is addressed with [n].Member and must not be flagged.
     typo.Text = "##TABELA_NUTRICIONAL[2].QUANTIDADE##";
     d.NotifyDocumentEdited();

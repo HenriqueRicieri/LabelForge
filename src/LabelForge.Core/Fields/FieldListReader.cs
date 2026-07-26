@@ -95,7 +95,12 @@ public static partial class FieldListReader
             // field, so it is left alone.
             string[] columns = line.Split('\t', ';', ',');
             name = columns[0].Trim().TrimStart('-', '*', ' ').Trim();
-            if (name.Length == 0 || name.Contains(' ', StringComparison.Ordinal))
+
+            // Only something shaped like an identifier. Prose has spaces and a line of
+            // source has punctuation; neither is a field name, and reading them as one
+            // would fill a catalog with rubbish that then matches nothing.
+            if (name.Length == 0 ||
+                !name.All(c => char.IsLetterOrDigit(c) || c is '_' or '.' or '[' or ']'))
             {
                 return null;
             }

@@ -196,25 +196,46 @@ public partial class DesignerViewModel : ViewModelBase
     /// </summary>
     public IReadOnlyList<string> FieldSuggestions =>
         SelectedFieldCatalog is { } catalog
-            ? catalog.Fields.Select(f => Document.Markers.Marker(f.Name)).ToArray()
+            ?
+            [
+                .. catalog.Fields.Select(f => Document.Markers.Marker(f.Name)),
+                .. catalog.Functions.Select(f => f.Marker(Document.Markers)),
+            ]
             : [];
 
-    /// <summary>Imports a field list, naming the catalog after the file unless the user
-    /// has typed a name. Replaces a catalog of the same name, which is what re-importing
-    /// a list that gained a field means.</summary>
+    /// <summary>
+    /// Imports a field list or a script of callable helpers, naming the catalog after
+    /// the file unless the user has typed a name.
+    ///
+    /// One entry point for both, because which one a file is can be seen rather than
+    /// asked: a script yields function signatures and a field list does not. The two
+    /// halves merge into the catalog rather than replacing it, so importing a script
+    /// beside an existing field list adds to it, and re-importing either replaces only
+    /// its own half.
+    /// </summary>
     public void ImportFieldCatalog(string text, string suggestedName)
     {
-        IReadOnlyList<Core.Fields.FieldDefinition> fields =
-            Core.Fields.FieldListReader.Read(text, Document.Markers);
-
         string name = NewCatalogName.Trim();
         if (name.Length == 0)
         {
             name = suggestedName.Trim();
         }
 
-        Core.Fields.FieldCatalogResult result =
-            _fieldCatalogStore.Add(new Core.Fields.FieldCatalog(name, fields));
+        Core.Fields.FieldCatalog? existing = _catalogs.FirstOrDefault(
+            c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        Core.Fields.FieldCatalogImport read =
+            Core.Fields.FieldCatalogImport.Read(text, Document.Markers);
+
+        // Each half replaces only itself, so importing a script beside an existing field
+        // list adds to it rather than wiping it.
+        IReadOnlyList<Core.Fields.FieldDefinition> fields =
+            read.Fields.Count > 0 ? read.Fields : existing?.Fields ?? [];
+        IReadOnlyList<Core.Fields.FieldFunction> functions =
+            read.Functions.Count > 0 ? read.Functions : existing?.Functions ?? [];
+
+        Core.Fields.FieldCatalogResult result = _fieldCatalogStore.Add(
+            new Core.Fields.FieldCatalog(name, fields) { Functions = functions });
         ApplyFieldCatalogs(result.Catalogs);
 
         if (result.Error is not null)
@@ -232,7 +253,7 @@ public partial class DesignerViewModel : ViewModelBase
         _restoring = false;
         RecordUndo("doc-catalog");
         ScheduleRender();
-        Notify($"Imported {fields.Count} fields as \"{name}\"");
+        Notify($"Imported {read.Describe()} as \"{name}\"");
     }
 
     /// <summary>Name to save the next import under; empty means "use the file's name".</summary>

@@ -1,4 +1,4 @@
-namespace LabelForge.Core.Fields;
+﻿namespace LabelForge.Core.Fields;
 
 /// <param name="Name">The field's name, without the marker delimiters.</param>
 /// <param name="Type">What the data source says the value is, verbatim and unparsed
@@ -39,6 +39,11 @@ public sealed record FieldDefinition(
 /// </summary>
 public sealed record FieldCatalog(string Name, IReadOnlyList<FieldDefinition> Fields)
 {
+    /// <summary>Callable helpers read from a script file, if one was imported alongside
+    /// the field list. Optional and defaulted, so a catalog saved before these existed
+    /// loads unchanged.</summary>
+    public IReadOnlyList<FieldFunction> Functions { get; init; } = [];
+
     public static FieldCatalog Empty { get; } = new(string.Empty, []);
 
     public bool Contains(string fieldName) =>
@@ -47,6 +52,14 @@ public sealed record FieldCatalog(string Name, IReadOnlyList<FieldDefinition> Fi
     public FieldDefinition? Find(string fieldName) =>
         Fields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.OrdinalIgnoreCase));
 
-    public override string ToString() =>
-        Fields.Count == 1 ? $"{Name} (1 field)" : $"{Name} ({Fields.Count} fields)";
+    public override string ToString()
+    {
+        string fields = Count(Fields.Count, "field");
+        return Functions.Count == 0
+            ? $"{Name} ({fields})"
+            : $"{Name} ({fields}, {Count(Functions.Count, "function")})";
+    }
+
+    private static string Count(int value, string noun) =>
+        value == 1 ? $"1 {noun}" : $"{value} {noun}s";
 }

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace LabelForge.Core.Fields;
 
@@ -80,10 +80,12 @@ public sealed class FieldCatalogStore
             return new FieldCatalogResult(Load(), "A catalog needs a name.");
         }
 
-        if (catalog.Fields.Count == 0)
+        // A catalog of only functions is legitimate: a script can be imported before the
+        // field list it belongs with. Only one with nothing at all is refused.
+        if (catalog.Fields.Count == 0 && catalog.Functions.Count == 0)
         {
             return new FieldCatalogResult(
-                Load(), "No fields were found in that file, so there is nothing to save.");
+                Load(), "Nothing was found in that file, so there is nothing to save.");
         }
 
         List<FieldCatalog> entries = Load()

@@ -435,12 +435,13 @@
                                         <StackPanel Spacing="6" Width="300">
                                             <TextBlock Text="Field catalogs" FontWeight="SemiBold" FontSize="12" />
                                             <TextBlock TextWrapping="Wrap" FontSize="11" Opacity="0.7"
-                                                       Text="A catalog is the list of fields the system that fills your markers can provide. Import the list it exports and give it your own name for this kind of label." />
+                                                       Text="A catalog is the list of fields the system that fills your markers can provide. Import the list it exports and give it your own name for this kind of label. Import a script beside it and its functions can be completed too." />
                                             <TextBlock Text="Name (optional; the file name is used if blank)"
                                                        FontSize="11" Opacity="0.8" TextWrapping="Wrap" />
                                             <TextBox Text="{Binding NewCatalogName}"
                                                      PlaceholderText="Etiqueta externa (caixaria)" />
-                                            <Button Content="Import a field list..." Click="OnImportFieldCatalog"
+                                            <Button Content="Import a field list or script..."
+                                                    Click="OnImportFieldCatalog"
                                                     HorizontalAlignment="Stretch" />
                                             <Rectangle Height="1" Fill="{DynamicResource AppSeparator}"
                                                        IsVisible="{Binding HasFieldCatalogs}" />

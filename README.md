@@ -100,6 +100,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   catalog does not list are named with a suggestion, because a mistyped marker is not
   rejected by anything downstream, it simply prints as written. The marker delimiters are
   a property of the label, not of the app, so a system that writes `{{NAME}}` works too.
+  Import a script file alongside and the calls it offers are completed too, read from its
+  public method signatures, so `##@Abate.maturidade(COD_MATURIDADE)##` is picked rather
+  than retyped. Signatures only; nothing in the file is executed.
 - Save and open the native `.lfl` project format (with a recent-files menu); export ZPL, PNG, and
   PDF at exact physical size.
 - Printing over the network (TCP 9100) and through the Windows spooler (RAW datatype, the USB path).
