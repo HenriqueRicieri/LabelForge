@@ -35,6 +35,11 @@ public partial class DesignerViewModel : ViewModelBase
     private readonly Core.Fields.FieldCatalogStore _fieldCatalogStore;
     private readonly RecoveryStore _recovery;
     private string? _lastSnapshot;
+
+    /// <summary>What the last drawn underlay was rendered from: the preview ZPL and the
+    /// size it was drawn at. Re-rendering the same thing costs the whole engine and
+    /// produces a bitmap identical to the one already on screen.</summary>
+    private string? _renderedFrom;
     private readonly SnapshotHistory _history = new();
     private LabelDocument? _variablesDocument;
     private CancellationTokenSource? _renderCts;
@@ -2006,8 +2011,12 @@ public partial class DesignerViewModel : ViewModelBase
             // what a date variable currently reads.
             DateTime now = DateTime.Now;
 
-            (string zpl, RenderResult result, int marginDots, string placementWarning,
-                    string variableWarning) =
+            // Captured before the work starts so the background task compares against a
+            // value it owns, and only the UI thread ever writes the field.
+            string? renderedFrom = _renderedFrom;
+
+            (string zpl, RenderResult? result, int marginDots, string placementWarning,
+                    string variableWarning, string renderKey) =
                 await Task.Run(
                     () =>
                     {
@@ -2044,10 +2053,25 @@ public partial class DesignerViewModel : ViewModelBase
                         // Exported and printed ZPL keeps external markers literal.
                         previewZpl = _substitutor.Substitute(
                             previewZpl, inner => VariableValues.ForPreview(document, inner, now));
+                        // Everything the drawn bitmap depends on. A clock variable makes
+                        // this differ whenever its formatted value does, which is exactly
+                        // when the picture would change, so it needs no special case.
+                        string key = FormattableString.Invariant(
+                            $"{widthMm}x{heightMm}@{dpmm}+{margin}|{previewZpl}");
+
+                        // Nothing that reaches the renderer has changed, so the bitmap on
+                        // screen is already the answer. Naming and locking an element,
+                        // and undoing back to where you were, all land here.
+                        if (string.Equals(key, renderedFrom, StringComparison.Ordinal))
+                        {
+                            return (generated, (RenderResult?)null, margin,
+                                DescribePlacement(offLabel), string.Join(" ", run.Warnings), key);
+                        }
+
                         RenderResult rendered = _renderer.Render(
                             previewZpl, widthMm + 2 * marginMm, heightMm + 2 * marginMm, dpmm);
-                        return (generated, rendered, margin, DescribePlacement(offLabel),
-                            string.Join(" ", run.Warnings));
+                        return (generated, (RenderResult?)rendered, margin,
+                            DescribePlacement(offLabel), string.Join(" ", run.Warnings), key);
                     },
                     cts.Token);
 
@@ -2063,20 +2087,23 @@ public partial class DesignerViewModel : ViewModelBase
             VariableWarning = variableWarning;
             RefreshVariables();
             RefreshOutline();
-        RefreshOutline();
 
-            Bitmap? previous = Underlay;
-            if (result.Png.Length > 0)
+            if (result is not null)
             {
-                using var stream = new MemoryStream(result.Png);
-                Underlay = new Bitmap(stream);
-            }
-            else
-            {
-                Underlay = null;
-            }
+                Bitmap? previous = Underlay;
+                if (result.Png.Length > 0)
+                {
+                    using var stream = new MemoryStream(result.Png);
+                    Underlay = new Bitmap(stream);
+                }
+                else
+                {
+                    Underlay = null;
+                }
 
-            previous?.Dispose();
+                previous?.Dispose();
+                _renderedFrom = renderKey;
+            }
 
             // Document-wide validation summary, shown near the canvas regardless of
             // what is selected.
@@ -2091,14 +2118,17 @@ public partial class DesignerViewModel : ViewModelBase
             // barcode cannot be encoded, but keep the engine's own message too: the
             // failure may have a different cause than the barcode we flagged.
             var diagnosis = new List<string>(2);
-            if ((result.Errors.Count > 0 || result.Png.Length == 0) && barcodeProblems.Count > 0)
+            if (result is not null)
             {
-                diagnosis.Add(barcodeProblems[0]);
-            }
+                if ((result.Errors.Count > 0 || result.Png.Length == 0) && barcodeProblems.Count > 0)
+                {
+                    diagnosis.Add(barcodeProblems[0]);
+                }
 
-            if (result.Errors.Count > 0)
-            {
-                diagnosis.Add(string.Join("; ", result.Errors.Take(2)));
+                if (result.Errors.Count > 0)
+                {
+                    diagnosis.Add(string.Join("; ", result.Errors.Take(2)));
+                }
             }
 
             // The rendered bitmap may be pasteboard-expanded; always report the label's

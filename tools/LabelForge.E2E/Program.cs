@@ -754,6 +754,44 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(200);
 
+    // Render caching. Observable without a test hook: a skipped render leaves the very
+    // bitmap that is already on screen, so the reference is unchanged.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    var cached = new LabelForge.Core.Model.TextElement
+    {
+        X = 60, Y = 60, Text = "cache me", FontHeightDots = 40,
+    };
+    d.Document.Elements.Add(cached);
+    d.NotifyDocumentEdited();
+    Pump(900);
+    var firstBitmap = d.Underlay;
+
+    // A name and a lock change the document but nothing the renderer is given.
+    d.Selection.Set(cached);
+    Pump(300);
+    d.SelectionProperties!.Name = "named, not redrawn";
+    Pump(900);
+    Console.WriteLine(
+        $"naming skips the render: {ReferenceEquals(d.Underlay, firstBitmap)} (expected True)");
+
+    cached.IsLocked = true;
+    d.NotifyDocumentEdited();
+    Pump(900);
+    Console.WriteLine(
+        $"locking skips the render: {ReferenceEquals(d.Underlay, firstBitmap)} (expected True)");
+
+    // Moving it does change what the renderer is given, so the bitmap must be new.
+    cached.IsLocked = false;
+    cached.X = 200;
+    d.NotifyDocumentEdited();
+    Pump(900);
+    Console.WriteLine(
+        $"moving redraws: {!ReferenceEquals(d.Underlay, firstBitmap) && d.Underlay is not null} "
+        + "(expected True)");
+    d.Selection.Clear();
+    Pump(200);
+
     // Zoom to selection: framing one field out of a dense label, which is the other half
     // of being able to find it in a list.
     d.NewDocumentCommand.Execute(null);
