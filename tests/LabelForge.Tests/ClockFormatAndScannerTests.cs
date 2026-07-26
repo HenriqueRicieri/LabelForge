@@ -1,4 +1,4 @@
-using LabelForge.Core.Model;
+﻿using LabelForge.Core.Model;
 using LabelForge.Core.Templating;
 
 namespace LabelForge.Tests;
@@ -113,7 +113,7 @@ public sealed class ClockFormatAndScannerTests
     public void Scan_SplitsLiteralsMarkersAndDirectives()
     {
         TemplateSegment[] segments =
-            TemplateScanner.Scan("Lot ##LOTE## ##@REGION(1)## end").ToArray();
+            TemplateScanner.Scan("Lot ##LOTE## ##@REGION(1)## end", MarkerSyntax.Default).ToArray();
 
         Assert.Equal(5, segments.Length);
         Assert.Equal(TemplateSegmentKind.Literal, segments[0].Kind);
@@ -130,7 +130,8 @@ public sealed class ClockFormatAndScannerTests
     [Fact]
     public void Scan_TreatsAnUnterminatedMarkerAsPlainText()
     {
-        TemplateSegment[] segments = TemplateScanner.Scan("half ##OPEN").ToArray();
+        TemplateSegment[] segments =
+            TemplateScanner.Scan("half ##OPEN", MarkerSyntax.Default).ToArray();
 
         Assert.Equal("half ##OPEN", Assert.Single(segments).Text);
         Assert.Equal(TemplateSegmentKind.Literal, segments[0].Kind);
@@ -141,6 +142,6 @@ public sealed class ClockFormatAndScannerTests
     {
         const string text = "##A##x##B@F(1)##y##@D##";
 
-        Assert.Equal(text, string.Concat(TemplateScanner.Scan(text).Select(s => s.Text)));
+        Assert.Equal(text, string.Concat(TemplateScanner.Scan(text, MarkerSyntax.Default).Select(s => s.Text)));
     }
 }

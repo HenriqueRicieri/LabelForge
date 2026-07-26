@@ -79,6 +79,24 @@ public sealed class LabelDocument
     /// speed). Part of the document so a label prints the same from any machine.</summary>
     public PrintSettings Print { get; init; } = new();
 
+    /// <summary>
+    /// How this label's template markers are written. Defaults to `##NAME##`, which is
+    /// what every label saved before this used, so nothing existing changes.
+    ///
+    /// It lives on the document rather than in the code because the delimiters belong to
+    /// whichever system fills the markers in, and that is not always the same system.
+    /// </summary>
+    public MarkerSyntax Markers { get; set; } = MarkerSyntax.Default;
+
+    /// <summary>
+    /// Name of the field catalog this label is designed against, or empty for none.
+    ///
+    /// Only the name is stored. Catalogs are per machine, like the media presets, so a
+    /// label that arrives on a machine without this one still opens and prints; it just
+    /// loses completion and the unknown-marker check until the catalog is imported.
+    /// </summary>
+    public string FieldCatalog { get; set; } = string.Empty;
+
     /// <summary>Preview sample values per template variable name (##NAME## markers).
     /// Preview-only: exported and printed ZPL keeps the literal markers. Variables
     /// without an entry fall back to the default sample.</summary>

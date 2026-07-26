@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using LabelForge.Core.Model;
@@ -203,7 +203,7 @@ public sealed class ZplGenerator : IElementVisitor
     {
         if (_preview || _document is null)
         {
-            return ZplEncoding.FieldData(text);
+            return ZplEncoding.FieldData(text, _document?.Markers);
         }
 
         FieldEncoding encoding = DynamicField.Encode(

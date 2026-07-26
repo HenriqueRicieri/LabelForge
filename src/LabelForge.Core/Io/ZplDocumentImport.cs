@@ -1,6 +1,7 @@
-using System.Globalization;
+﻿using System.Globalization;
 using LabelForge.Core.Imaging;
 using LabelForge.Core.Model;
+using LabelForge.Core.Templating;
 using LabelForge.Core.Zpl;
 
 namespace LabelForge.Core.Io;
@@ -81,10 +82,13 @@ public static class ZplDocumentImport
     /// <param name="labelIndex">Which ^XA block to import, or -1 to take the first block
     /// that holds anything. Real files routinely open with a bare configuration block,
     /// so counting from zero would hand back an empty label for the commonest shape.</param>
-    public static ZplDocumentImportResult FromZpl(string zpl, int dpmm = 8, int labelIndex = -1)
+    /// <param name="markers">Delimiters this file writes its template markers with.
+    /// Needed because a marker must survive ^FH hex escaping verbatim; see Unescape.</param>
+    public static ZplDocumentImportResult FromZpl(
+        string zpl, int dpmm = 8, int labelIndex = -1, MarkerSyntax? markers = null)
     {
         ArgumentNullException.ThrowIfNull(zpl);
-        var state = new ParseState(dpmm, labelIndex);
+        var state = new ParseState(dpmm, labelIndex, markers ?? MarkerSyntax.Default);
 
         // Downloaded graphics are defined outside the block that recalls them, so they
         // are collected up front by the same scanner the viewer and the graphic import
@@ -101,7 +105,7 @@ public static class ZplDocumentImport
 
     /// <summary>Everything one pass needs to remember. ZPL is a stream of modal
     /// commands, so an element only exists once the field that owns it is closed.</summary>
-    private sealed class ParseState(int dpmm, int labelIndex)
+    private sealed class ParseState(int dpmm, int labelIndex, MarkerSyntax markers)
     {
         /// <summary>One ^XA block's worth of findings. Every block is built, because
         /// which one is the label cannot be known until they have all been seen.</summary>
@@ -358,7 +362,7 @@ public static class ZplDocumentImport
                 index = 0;
             }
 
-            var document = new LabelDocument { Dpmm = Math.Max(dpmm, 1) };
+            var document = new LabelDocument { Dpmm = Math.Max(dpmm, 1), Markers = markers };
             if (_blocks.Count == 0 || index >= _blocks.Count)
             {
                 return new ZplDocumentImportResult(document, _blocks.Count, 0, []);
@@ -658,6 +662,21 @@ public static class ZplDocumentImport
             _current?.Elements.Add(element);
         }
 
+        /// <summary>
+        /// Applies ^FH hex escapes, skipping template markers.
+        ///
+        /// The exception is not a nicety, it is what real files require. '_' is both
+        /// ZPL's default escape character and the commonest word separator in a field
+        /// name, so in a field written "^FH^FD MA,##CODIGO_BARRAS##" the "_BA" is a
+        /// perfectly valid escape for 0xBA and decoding it turns the marker into
+        /// ##CODIGOºRRAS##. That label is not broken: the system that fills the marker in
+        /// substitutes it long before a printer sees the field, so the escape never
+        /// applies to it. Three separate corpus labels are mangled without this, one of
+        /// them in five different places.
+        ///
+        /// The generator skips markers when escaping for the same reason, so the two
+        /// sides stay symmetric and the round trip holds.
+        /// </summary>
         private string Unescape(string data)
         {
             if (!_hexEscapes || data.Length == 0)
@@ -666,18 +685,28 @@ public static class ZplDocumentImport
             }
 
             var sb = new System.Text.StringBuilder(data.Length);
-            for (int i = 0; i < data.Length; i++)
+            foreach (TemplateSegment segment in TemplateScanner.Scan(data, markers))
             {
-                if (data[i] == _hexMarker && i + 2 < data.Length &&
-                    int.TryParse(data.AsSpan(i + 1, 2), NumberStyles.HexNumber,
-                        CultureInfo.InvariantCulture, out int value))
+                if (segment.Kind != TemplateSegmentKind.Literal)
                 {
-                    sb.Append((char)value);
-                    i += 2;
+                    sb.Append(segment.Text);
+                    continue;
                 }
-                else
+
+                string text = segment.Text;
+                for (int i = 0; i < text.Length; i++)
                 {
-                    sb.Append(data[i]);
+                    if (text[i] == _hexMarker && i + 2 < text.Length &&
+                        int.TryParse(text.AsSpan(i + 1, 2), NumberStyles.HexNumber,
+                            CultureInfo.InvariantCulture, out int value))
+                    {
+                        sb.Append((char)value);
+                        i += 2;
+                    }
+                    else
+                    {
+                        sb.Append(text[i]);
+                    }
                 }
             }
 

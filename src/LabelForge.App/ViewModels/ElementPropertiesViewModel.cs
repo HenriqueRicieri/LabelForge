@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -47,6 +47,10 @@ public abstract class ElementPropertiesViewModel : ObservableObject
     }
 
     protected Element Element { get; }
+
+    /// <summary>The document being edited, for the few editors that need something the
+    /// element alone cannot answer (the density for millimetres, the marker syntax).</summary>
+    protected LabelDocument Document => _document;
 
     public abstract string TypeName { get; }
 
@@ -247,7 +251,8 @@ public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel
     }
 
     /// <summary>A design-time message when the data cannot be encoded, else empty.</summary>
-    public string Warning => Core.Zpl.BarcodeValidator.Validate(_barcode.Symbology, _barcode.Data) ?? string.Empty;
+    public string Warning => Core.Zpl.BarcodeValidator.Validate(
+        _barcode.Symbology, _barcode.Data, Document.Markers) ?? string.Empty;
 
     public bool HasWarning => Warning.Length > 0;
 

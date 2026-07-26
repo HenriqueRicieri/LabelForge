@@ -1,4 +1,4 @@
-using LabelForge.Core.Model;
+﻿using LabelForge.Core.Model;
 
 namespace LabelForge.Core.Templating;
 
@@ -10,22 +10,18 @@ namespace LabelForge.Core.Templating;
 /// </summary>
 public sealed class TemplateVariables : IElementVisitor
 {
-    private readonly string _open;
-    private readonly string _close;
+    private readonly MarkerSyntax _syntax;
     private readonly List<string> _names = [];
     private readonly HashSet<string> _seen = [];
 
-    public TemplateVariables(string open = "##", string close = "##")
-    {
-        _open = open;
-        _close = close;
-    }
+    public TemplateVariables(MarkerSyntax? syntax = null) =>
+        _syntax = syntax ?? MarkerSyntax.Default;
 
     /// <summary>Distinct variable names in the order they first appear.</summary>
     public static IReadOnlyList<string> Discover(LabelDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
-        var finder = new TemplateVariables();
+        var finder = new TemplateVariables(document.Markers);
         foreach (Element element in document.Elements)
         {
             element.Accept(finder);
@@ -34,15 +30,11 @@ public sealed class TemplateVariables : IElementVisitor
         return finder._names;
     }
 
-    /// <summary>The variable name of a marker's inner expression: the part before
-    /// the optional @FUNCTION suffix. Shared with sample-value resolution so the
-    /// panel and the substitutor agree on what a marker is called.</summary>
-    public static string NameOf(string innerExpression)
-    {
-        ArgumentNullException.ThrowIfNull(innerExpression);
-        int at = innerExpression.IndexOf('@');
-        return at < 0 ? innerExpression : innerExpression[..at];
-    }
+    /// <summary>The variable name of a marker's inner expression, under the default
+    /// syntax. Prefer <see cref="MarkerSyntax.NameOf"/> with the document's own syntax;
+    /// this overload serves the callers that have no document in hand.</summary>
+    public static string NameOf(string innerExpression) =>
+        MarkerSyntax.Default.NameOf(innerExpression);
 
     public void Visit(TextElement element) => Scan(element.Text);
 
@@ -71,14 +63,14 @@ public sealed class TemplateVariables : IElementVisitor
 
     private void Scan(string content)
     {
-        foreach (TemplateSegment segment in TemplateScanner.Scan(content, _open, _close))
+        foreach (TemplateSegment segment in TemplateScanner.Scan(content, _syntax))
         {
             if (segment.Kind != TemplateSegmentKind.Variable)
             {
                 continue;
             }
 
-            string name = NameOf(segment.Inner);
+            string name = _syntax.NameOf(segment.Inner);
             if (name.Length > 0 && _seen.Add(name))
             {
                 _names.Add(name);

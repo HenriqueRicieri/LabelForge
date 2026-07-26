@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using LabelForge.Core.Model;
 using LabelForge.Core.Templating;
@@ -52,12 +52,14 @@ public static class DynamicField
 
         // Nothing to resolve: the overwhelmingly common field, kept on the cheap path
         // and byte-identical to what the generator emitted before variables existed.
-        if (document.Variables.Count == 0 || !text.Contains(TemplateScanner.DefaultOpen, StringComparison.Ordinal))
+        if (document.Variables.Count == 0 ||
+            !text.Contains(document.Markers.Open, StringComparison.Ordinal))
         {
-            return new FieldEncoding(ZplEncoding.FieldData(text), false, false, false, NoWarnings);
+            return new FieldEncoding(
+                ZplEncoding.FieldData(text, document.Markers), false, false, false, NoWarnings);
         }
 
-        List<TemplateSegment> segments = TemplateScanner.Scan(text).ToList();
+        List<TemplateSegment> segments = TemplateScanner.Scan(text, document.Markers).ToList();
         var warnings = new List<string>();
 
         if (TrySerialize(segments, document, copyIndex, warnings, out string serialized))
@@ -93,7 +95,7 @@ public static class DynamicField
             return false;
         }
 
-        string name = TemplateVariables.NameOf(native[0].Segment.Inner);
+        string name = document.Markers.NameOf(native[0].Segment.Inner);
         VariableDefinition definition = native[0].Definition!;
 
         int dynamicParts = segments.Count(s => s.Kind != TemplateSegmentKind.Literal);
@@ -166,7 +168,7 @@ public static class DynamicField
         if (!wantsPrinterClock)
         {
             return new FieldEncoding(
-                ZplEncoding.FieldData(software),
+                ZplEncoding.FieldData(software, document.Markers),
                 UsesPrinterCounter: false,
                 UsesPrinterClock: false,
                 UsesSoftwareCounter: UsesSoftwareCounter(segments, document),
@@ -179,7 +181,7 @@ public static class DynamicField
             warnings.Add(message);
         }
 
-        string data = ZplEncoding.FieldData(withClock);
+        string data = ZplEncoding.FieldData(withClock, document.Markers);
         return new FieldEncoding(
             clockUsed ? $"^FC{ZplClockFormat.Indicator}{data}" : data,
             UsesPrinterCounter: false,
@@ -245,7 +247,7 @@ public static class DynamicField
     private static IEnumerable<string> PrinterClockNames(
         List<TemplateSegment> segments, LabelDocument document) =>
         segments.Where(s => IsPrinterClock(s, document))
-            .Select(s => TemplateVariables.NameOf(s.Inner))
+            .Select(s => document.Markers.NameOf(s.Inner))
             .Distinct(StringComparer.Ordinal);
 
     /// <summary>Printer-clock variables whose format has no ZPL equivalent, reported so
@@ -256,7 +258,7 @@ public static class DynamicField
             .Where(s => !ZplClockFormat.TryTranslate(
                 VariableValues.Find(document, s.Inner)!.ClockFormat, out _))
             .Select(s => ClockFallback(
-                TemplateVariables.NameOf(s.Inner),
+                document.Markers.NameOf(s.Inner),
                 $"the printer clock cannot express \"{VariableValues.Find(document, s.Inner)!.ClockFormat}\""))
             .Distinct(StringComparer.Ordinal);
 

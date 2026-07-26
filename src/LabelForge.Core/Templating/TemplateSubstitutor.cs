@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 
 namespace LabelForge.Core.Templating;
 
@@ -28,12 +28,16 @@ public sealed class TemplateSubstitutor
     /// (Code128 and EAN/UPC accept it; EAN computes its own check digit from 12 digits).</summary>
     public const string DefaultSampleValue = "123456789012";
 
-    public TemplateSubstitutor(string open = "##", string close = "##")
+    public TemplateSubstitutor(Model.MarkerSyntax? syntax = null)
     {
-        if (string.IsNullOrEmpty(open)) throw new ArgumentException("Delimiter required.", nameof(open));
-        if (string.IsNullOrEmpty(close)) throw new ArgumentException("Delimiter required.", nameof(close));
-        _open = open;
-        _close = close;
+        Model.MarkerSyntax resolved = syntax ?? Model.MarkerSyntax.Default;
+        if (!resolved.IsValid)
+        {
+            throw new ArgumentException("Delimiters required.", nameof(syntax));
+        }
+
+        _open = resolved.Open;
+        _close = resolved.Close;
     }
 
     /// <param name="resolve">

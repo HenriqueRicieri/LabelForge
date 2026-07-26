@@ -252,16 +252,36 @@ public sealed class DynamicVariableTests
     }
 
     [Fact]
-    public void MarkersWithUnderscores_StillGetTheFieldHexEscape()
+    public void MarkersWithUnderscores_SurviveVerbatim()
     {
-        // Atak names are full of underscores, which ZPL reserves for its own hex escape.
+        // Field names are full of underscores and ZPL reserves '_' for its own hex
+        // escape, so this used to emit ##FILIAL_5FDOCUMENTO##. That was wrong, and the
+        // real files say so: they write "^FH^FD MA,##CODIGO_BARRAS##" with the marker
+        // untouched. A marker is not data for the printer, it is a placeholder the
+        // filling system replaces first, and escaping it hands that system a name it
+        // cannot match. With nothing else in the field needing an escape, no ^FH is
+        // emitted at all.
         LabelDocument doc = TextDoc(
             "##FILIAL_DOCUMENTO##", "FILIAL_DOCUMENTO",
             new VariableDefinition { Kind = VariableKind.External });
 
         (string zpl, _) = Generate(doc);
 
-        Assert.Equal(Head + "^FO10,20^A0N,30^FH_^FD##FILIAL_5FDOCUMENTO##^FS\n^XZ", zpl);
+        Assert.Equal(Head + "^FO10,20^A0N,30^FD##FILIAL_DOCUMENTO##^FS\n^XZ", zpl);
+    }
+
+    /// <summary>Literal text around a marker is still escaped; only the marker is
+    /// exempt, so the two rules do not blur into each other.</summary>
+    [Fact]
+    public void LiteralTextAroundAMarker_IsStillEscaped()
+    {
+        LabelDocument doc = TextDoc(
+            "N_ ##FILIAL_DOCUMENTO## ^x", "FILIAL_DOCUMENTO",
+            new VariableDefinition { Kind = VariableKind.External });
+
+        (string zpl, _) = Generate(doc);
+
+        Assert.Contains("^FH_^FDN_5F ##FILIAL_DOCUMENTO## _5Ex^FS", zpl, StringComparison.Ordinal);
     }
 
     [Fact]

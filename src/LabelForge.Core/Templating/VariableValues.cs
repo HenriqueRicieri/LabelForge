@@ -1,4 +1,4 @@
-using LabelForge.Core.Model;
+﻿using LabelForge.Core.Model;
 
 namespace LabelForge.Core.Templating;
 
@@ -16,7 +16,7 @@ public static class VariableValues
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(innerExpression);
         return document.Variables.TryGetValue(
-            TemplateVariables.NameOf(innerExpression), out VariableDefinition? definition)
+            document.Markers.NameOf(innerExpression), out VariableDefinition? definition)
             ? definition
             : null;
     }
@@ -41,7 +41,7 @@ public static class VariableValues
             return definition.FormatClock(now);
         }
 
-        string name = TemplateVariables.NameOf(innerExpression);
+        string name = document.Markers.NameOf(innerExpression);
         return document.SampleValues.TryGetValue(name, out string? sample) && sample.Length > 0
             ? sample
             : null;

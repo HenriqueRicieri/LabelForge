@@ -1,4 +1,4 @@
-namespace LabelForge.Core.Templating;
+﻿namespace LabelForge.Core.Templating;
 
 public enum TemplateSegmentKind
 {
@@ -27,11 +27,14 @@ public readonly record struct TemplateSegment(TemplateSegmentKind Kind, string T
 /// </summary>
 public static class TemplateScanner
 {
-    public const string DefaultOpen = "##";
-    public const string DefaultClose = "##";
+    /// <summary>Splits text using a document's own delimiters.</summary>
+    public static IEnumerable<TemplateSegment> Scan(string text, Model.MarkerSyntax syntax)
+    {
+        ArgumentNullException.ThrowIfNull(syntax);
+        return Scan(text, syntax.Open, syntax.Close);
+    }
 
-    public static IEnumerable<TemplateSegment> Scan(
-        string text, string open = DefaultOpen, string close = DefaultClose)
+    public static IEnumerable<TemplateSegment> Scan(string text, string open, string close)
     {
         ArgumentNullException.ThrowIfNull(text);
         if (string.IsNullOrEmpty(open)) throw new ArgumentException("Delimiter required.", nameof(open));
