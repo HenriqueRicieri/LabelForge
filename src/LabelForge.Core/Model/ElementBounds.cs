@@ -87,10 +87,11 @@ public sealed class ElementBoundsCalculator : IElementVisitor
                 (3 * element.WideBarRatio + 7) * (element.Data.Length + 2)) - 1,
 
             // Code 128: start + one symbol per character + checksum + stop(13). Digits
-            // are NOT paired: that needs subset C, and neither the offline renderer nor
-            // a printer in ^BC's default mode switches to it, so assuming they did left
-            // a 16-digit barcode's outline 132 dots short of its own ink.
-            _ => 11 * (element.Data.Length + 2) + 13,
+            // are NOT paired on their own: that needs subset C, and neither the offline
+            // renderer nor a printer in ^BC's default mode switches to it unasked. The
+            // data can ask, though, and a GS1 payload always does, so the symbol count
+            // is worked out by Code128Encoding rather than assumed from the length.
+            _ => Zpl.Code128Encoding.WidthModules(element.Data),
         };
 
         int height = element.HeightDots + (element.PrintInterpretationLine ? 30 : 0);
