@@ -366,6 +366,68 @@ public sealed class DesignerCanvas : Control
         }
     }
 
+    /// <summary>
+    /// Frames the current selection, or the whole label when nothing is selected.
+    ///
+    /// Earns its place on a dense design, which is what real labels are: picking a field
+    /// out of a list of sixty and then hunting for it on a fitted view is two problems
+    /// where there should be one.
+    ///
+    /// The zoom is capped rather than filling the viewport with whatever was picked. A
+    /// single thin line would otherwise scale to something enormous, which tells you
+    /// nothing about where it sits; stopping at a readable magnification keeps its
+    /// surroundings in view, which is the reason for looking.
+    /// </summary>
+    public void ZoomToSelection()
+    {
+        if (Document is not { } doc || Bounds.Width <= 0 || Bounds.Height <= 0)
+        {
+            return;
+        }
+
+        Element[] items = Selection?.Items.ToArray() ?? [];
+        DotRect area;
+        if (items.Length == 0)
+        {
+            area = new DotRect(0, 0, doc.WidthDots, doc.HeightDots);
+        }
+        else
+        {
+            DotRect[] rects = items.Select(_bounds.GetBounds).ToArray();
+            int left = rects.Min(r => r.X);
+            int top = rects.Min(r => r.Y);
+            area = new DotRect(
+                left,
+                top,
+                Math.Max(rects.Max(r => r.X + r.Width) - left, 1),
+                Math.Max(rects.Max(r => r.Y + r.Height) - top, 1));
+        }
+
+        double viewWidth = Bounds.Width - RulerSize - 2 * FitGap;
+        double viewHeight = Bounds.Height - RulerSize - 2 * FitGap;
+        if (viewWidth <= 0 || viewHeight <= 0)
+        {
+            return;
+        }
+
+        // A margin of the framed size, so the thing you asked for is not pressed against
+        // the edges of the viewport with no context around it.
+        double margin = 0.15;
+        double scale = Math.Min(
+            viewWidth / (area.Width * (1 + 2 * margin)),
+            viewHeight / (area.Height * (1 + 2 * margin)));
+        scale = Math.Clamp(scale, 0.05, 8);
+
+        EnsureExplicitTransform();
+        _userScale = scale;
+        _viewOrigin = new Point(
+            RulerSize + FitGap + (viewWidth - area.Width * scale) / 2 - area.X * scale,
+            RulerSize + FitGap + (viewHeight - area.Height * scale) / 2 - area.Y * scale);
+
+        InvalidateVisual();
+        ViewChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     private Point ViewportCenter() =>
         new((RulerSize + Bounds.Width) / 2, (RulerSize + Bounds.Height) / 2);
 

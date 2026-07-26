@@ -29,6 +29,11 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 - Align and distribute tools: left/center/right and top/middle/bottom (one element aligns against
   the label, several align within their own bounding box) plus horizontal/vertical distribution
   with equalized gaps.
+- Zoom to selection (Ctrl+Shift+0, or from either right-click menu), which frames the
+  element you just picked instead of leaving you to find it on a fitted view.
+- Help > Keyboard and Mouse: every key and gesture the designer answers to, including the
+  ones that were previously invisible, like Alt to drag without snapping and middle-drag
+  to pan.
 - Right-click menus on the canvas, different depending on what is under the pointer: on an
   element, copy, duplicate, delete, front and back, and the lock and do-not-print switches,
   plus align and distribute once several are selected; on bare stock, paste at the pointer,

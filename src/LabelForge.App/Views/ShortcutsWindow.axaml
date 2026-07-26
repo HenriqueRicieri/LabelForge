@@ -1,0 +1,54 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LabelForge.App.ViewModels"
+        x:Class="LabelForge.App.Views.ShortcutsWindow"
+        x:DataType="vm:ShortcutsViewModel"
+        Title="Keyboard and Mouse"
+        Width="560" Height="640"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppPanelBackground}">
+
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top" Text="Keyboard and Mouse"
+                   FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Opacity="0.65" FontSize="12"
+                   Margin="0,0,0,12"
+                   Text="Everything the designer answers to. The same actions are on the menus and on the right-click menus, so nothing here is the only way to reach anything." />
+
+        <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right"
+                Margin="0,12,0,0" Click="OnClose" IsCancel="True" />
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Groups}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:ShortcutGroup">
+                        <StackPanel Margin="0,0,0,16">
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold"
+                                       Margin="0,0,0,2" />
+                            <TextBlock Text="{Binding Note}" Opacity="0.6" FontSize="11"
+                                       TextWrapping="Wrap" Margin="0,0,0,6"
+                                       IsVisible="{Binding HasNote}" />
+                            <ItemsControl ItemsSource="{Binding Entries}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:ShortcutEntry">
+                                        <Grid ColumnDefinitions="230,*" Margin="0,1">
+                                            <Border Grid.Column="0" Background="{DynamicResource AppToolbarBackground}"
+                                                    CornerRadius="4" Padding="6,2" Margin="0,0,10,0"
+                                                    HorizontalAlignment="Left">
+                                                <TextBlock Text="{Binding Keys}" FontFamily="Consolas,monospace"
+                                                           FontSize="12" />
+                                            </Border>
+                                            <TextBlock Grid.Column="1" Text="{Binding Does}"
+                                                       TextWrapping="Wrap" FontSize="12"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

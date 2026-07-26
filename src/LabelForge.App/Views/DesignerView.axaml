@@ -282,6 +282,9 @@
                         <Separator />
                         <MenuItem Header="_Graphics from a ZPL file..." Click="OnImportGraphics" />
                     </MenuItem>
+                    <MenuItem Header="_Help">
+                        <MenuItem Header="_Keyboard and Mouse..." Click="OnShowShortcuts" />
+                    </MenuItem>
                 </Menu>
                 <Button DockPanel.Dock="Right" Content="Print..." Margin="4,4">
                     <Button.Flyout>

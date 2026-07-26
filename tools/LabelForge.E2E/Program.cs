@@ -754,6 +754,70 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(200);
 
+    // Zoom to selection: framing one field out of a dense label, which is the other half
+    // of being able to find it in a list.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    var far = new LabelForge.Core.Model.TextElement
+    {
+        X = 600, Y = 380, Text = "over here", FontHeightDots = 24,
+    };
+    d.Document.Elements.Add(far);
+    d.NotifyDocumentEdited();
+    Pump(700);
+    canvas.ResetView();
+    Pump(300);
+    double fitted = canvas.GetZoom();
+    d.Selection.Set(far);
+    canvas.ZoomToSelection();
+    Pump(400);
+    double framed = canvas.GetZoom();
+    Console.WriteLine(
+        FormattableString.Invariant(
+            $"zoom to selection: {fitted:0.00}x -> {framed:0.00}x (expected closer in)"));
+
+    // The element it framed has to be on screen afterwards, which is the entire point.
+    var onScreen = canvas.DotsToView(far.X, far.Y);
+    bool inView = onScreen.X > 0 && onScreen.X < canvas.Bounds.Width &&
+                  onScreen.Y > 0 && onScreen.Y < canvas.Bounds.Height;
+    Console.WriteLine($"framed element is in view: {inView} (expected True)");
+
+    // With nothing selected it frames the label rather than doing nothing.
+    d.Selection.Clear();
+    canvas.ZoomToSelection();
+    Pump(300);
+    Console.WriteLine(
+        FormattableString.Invariant(
+            $"nothing selected frames the label: {canvas.GetZoom():0.00}x (expected a sane zoom)"));
+    Capture("designer-zoom-selection.png");
+    canvas.ResetView();
+    Pump(200);
+
+    // The keyboard and mouse reference. Shown in its own window and captured there, so
+    // what is checked is the rendered list rather than the view model behind it.
+    var shortcuts = new LabelForge.App.Views.ShortcutsWindow();
+    shortcuts.Show();
+    Pump(600);
+    var shortcutModel = new LabelForge.App.ViewModels.ShortcutsViewModel();
+    Console.WriteLine(
+        $"shortcut reference: {shortcutModel.Groups.Count} groups, "
+        + $"{shortcutModel.Groups.Sum(g => g.Entries.Count)} entries "
+        + "(expected every group populated)");
+    Console.WriteLine(
+        $"documents the new one: "
+        + $"{shortcutModel.Groups.SelectMany(g => g.Entries).Any(x => x.Keys.Contains("Shift + 0"))} "
+        + "(expected True)");
+    var shortcutFrame = shortcuts.CaptureRenderedFrame();
+    if (shortcutFrame is not null)
+    {
+        string shortcutPath = Path.Combine(AppContext.BaseDirectory, "designer-shortcuts.png");
+        shortcutFrame.Save(shortcutPath, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Console.WriteLine(shortcutPath);
+    }
+
+    shortcuts.Close();
+    Pump(300);
+
     // Right-click menus. Two of them, because the two situations are different questions:
     // over an element it asks about that element, over bare stock it asks what to put there.
     d.NewDocumentCommand.Execute(null);

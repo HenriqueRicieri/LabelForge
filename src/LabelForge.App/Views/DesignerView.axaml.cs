@@ -66,7 +66,7 @@ public partial class DesignerView : UserControl
         }
     }
 
-    private static MenuFlyout ElementMenu(DesignerViewModel vm, LabelForge.Core.Model.Element element)
+    private MenuFlyout ElementMenu(DesignerViewModel vm, LabelForge.Core.Model.Element element)
     {
         var menu = new MenuFlyout();
         Add(menu, "Copy", vm.CopyCommand);
@@ -79,6 +79,11 @@ public partial class DesignerView : UserControl
 
         // The two switches that are otherwise a trip to the properties panel, and the two
         // most likely to be wanted for several elements one after another.
+        var frame = new MenuItem { Header = "Zoom to Selection" };
+        frame.Click += (_, _) => Canvas.ZoomToSelection();
+        menu.Items.Add(frame);
+        menu.Items.Add(new Separator());
+
         var locked = new MenuItem { Header = "Lock position", Icon = Check(element.IsLocked) };
         locked.Click += (_, _) =>
         {
@@ -144,6 +149,10 @@ public partial class DesignerView : UserControl
         menu.Items.Add(insert);
 
         menu.Items.Add(new Separator());
+        var frame = new MenuItem { Header = "Zoom to Selection" };
+        frame.Click += (_, _) => Canvas.ZoomToSelection();
+        menu.Items.Add(frame);
+
         var fit = new MenuItem { Header = "Fit to Window" };
         fit.Click += (_, _) => Canvas.ResetView();
         menu.Items.Add(fit);
@@ -179,6 +188,18 @@ public partial class DesignerView : UserControl
     /// out the current state from the verb.</summary>
     private static Control? Check(bool on) =>
         on ? new TextBlock { Text = "✓" } : null;
+
+    /// <summary>Opens the keyboard and mouse reference. Modal to the window, because it
+    /// is something you consult and close rather than work beside.</summary>
+    private async void OnShowShortcuts(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner)
+        {
+            return;
+        }
+
+        await new ShortcutsWindow().ShowDialog(owner);
+    }
 
     /// <summary>Pushes the canvas view (extent, viewport, offset) into the scrollbars
     /// and refreshes the zoom readout. Guarded so the resulting ValueChanged does not
@@ -777,6 +798,11 @@ public partial class DesignerView : UserControl
                     vm.DuplicateCommand.Execute(null);
                 }
 
+                e.Handled = true;
+                break;
+
+            case Key.D0 or Key.NumPad0 when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                Canvas.ZoomToSelection();
                 e.Handled = true;
                 break;
 
