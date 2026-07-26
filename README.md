@@ -116,6 +116,11 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   never mistaken for a crash.
 - Save and open the native `.lfl` project format (with a recent-files menu); export ZPL, PNG, and
   PDF at exact physical size.
+- Two ZPL exports, because they are not the same bytes: Export ZPL writes the label the
+  code pane shows, and Export Print Job writes exactly what a print would send. A run whose
+  counter this PC numbers is one block per copy rather than one block and a quantity, and a
+  date stamped here is taken as the job is built. Both printing and this export go through
+  one builder, so a file kept as evidence cannot drift from what the printer received.
 - Printing over the network (TCP 9100) and through the Windows spooler (RAW datatype, the USB path).
 - Light and dark themes, a custom app icon, and Windows packaging via Velopack.
 

@@ -232,7 +232,10 @@
                         <MenuItem Header="_Save" Click="OnSaveFile" InputGesture="Ctrl+S" />
                         <MenuItem Header="Save _As..." Click="OnSaveFileAs" />
                         <Separator />
-                        <MenuItem Header="Export _ZPL..." Click="OnExportZpl" />
+                        <MenuItem Header="Export _ZPL..." Click="OnExportZpl"
+                                  ToolTip.Tip="The label itself, as the ZPL pane shows it" />
+                        <MenuItem Header="Export Print _Job..." Click="OnExportPrintJob"
+                                  ToolTip.Tip="Exactly the bytes a print would send: every copy of a run this PC numbers, and the timestamp taken now" />
                         <MenuItem Header="Export _PNG..." Click="OnExportPng" />
                         <MenuItem Header="Export P_DF..." Click="OnExportPdf" />
                     </MenuItem>

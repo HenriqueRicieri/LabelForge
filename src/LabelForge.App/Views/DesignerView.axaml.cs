@@ -451,6 +451,54 @@ public partial class DesignerView : UserControl
         }
     }
 
+    /// <summary>
+    /// Writes exactly the bytes a print would send.
+    ///
+    /// Distinct from Export ZPL, which writes the label the ZPL pane shows. A run whose
+    /// counter this machine expands is one block per copy rather than one block and a
+    /// quantity, and the timestamp on a date field is taken as the job is built. Those
+    /// differences are the reason this exists: for a support ticket, a diff against what
+    /// the printer actually received, or a fixture to test against later.
+    /// </summary>
+    private async void OnExportPrintJob(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export the print job",
+            DefaultExtension = "zpl",
+            SuggestedFileName = "print-job.zpl",
+            FileTypeChoices = [new FilePickerFileType("ZPL") { Patterns = ["*.zpl"] }],
+        });
+
+        if (file?.TryGetLocalPath() is not { } path)
+        {
+            return;
+        }
+
+        try
+        {
+            LabelForge.Core.Zpl.PrintJobResult job = vm.BuildPrintJob();
+            await LabelForge.Core.Io.ZplTextFile.WriteFileAsync(path, job.Zpl);
+
+            // A run that fell back from a printer-side feature says so here as well as at
+            // print time, since this file is the thing someone will read later.
+            string warnings = job.Warnings.Count > 0
+                ? " " + string.Join(" ", job.Warnings)
+                : string.Empty;
+            vm.StatusText =
+                $"Exported {Path.GetFileName(path)}: {vm.DescribeJob(job)}.{warnings}";
+        }
+        catch (Exception ex)
+        {
+            vm.StatusText = $"Could not export the print job: {ex.Message}";
+        }
+    }
+
     private async void OnExportPdf(object? sender, RoutedEventArgs e)
     {
         if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)

@@ -772,7 +772,7 @@ public partial class DesignerViewModel : ViewModelBase
         try
         {
             StatusText = $"Sending to {host}...";
-            PrintJobResult job = PrintJob.Build(Document, DateTime.Now);
+            PrintJobResult job = BuildPrintJob();
 
             // The connection phase is bounded inside SendAsync; a timeout surfaces as a
             // TimeoutException whose message already names the unreachable endpoint.
@@ -820,7 +820,7 @@ public partial class DesignerViewModel : ViewModelBase
         try
         {
             StatusText = $"Spooling to {name}...";
-            PrintJobResult job = PrintJob.Build(Document, DateTime.Now);
+            PrintJobResult job = BuildPrintJob();
             await SendToWindowsPrinterAsync(name, job.Zpl);
             StatusText = $"Sent to {name}{DescribeRun(job)}";
         }
@@ -832,6 +832,43 @@ public partial class DesignerViewModel : ViewModelBase
 
     /// <summary>Trailing summary of what a run produced, so "sent" also says how many
     /// labels went out and whether the printer or this PC numbered them.</summary>
+    /// <summary>
+    /// The exact bytes a print run sends, stamped now.
+    ///
+    /// Both printers and the print-job export call this and nothing else builds a run, so
+    /// what gets exported for a support ticket or a regression fixture cannot drift from
+    /// what the printer would receive. That is the whole value of the export: a file that
+    /// merely resembles the job is worse than no file, because it is trusted.
+    ///
+    /// It is not the same thing as the ZPL pane, and deliberately so. That shows one
+    /// label; a run whose counter this machine expands is one block per copy, and the
+    /// timestamp is taken when the job is built rather than when the canvas last drew.
+    /// </summary>
+    public PrintJobResult BuildPrintJob() => PrintJob.Build(Document, DateTime.Now);
+
+    /// <summary>What a built run contains, for the status line after an export.</summary>
+    public string DescribeJob(PrintJobResult job)
+    {
+        ArgumentNullException.ThrowIfNull(job);
+        string labels = job.Labels == 1 ? "1 label" : $"{job.Labels} labels";
+        string blocks = CountBlocks(job.Zpl) == 1 ? "one block" : $"{CountBlocks(job.Zpl)} blocks";
+        string numbering = job.CountedByPrinter ? ", serialized by the printer" : string.Empty;
+        return $"{labels} in {blocks}{numbering}";
+    }
+
+    private static int CountBlocks(string zpl)
+    {
+        int count = 0;
+        int at = zpl.IndexOf("^XA", StringComparison.Ordinal);
+        while (at >= 0)
+        {
+            count++;
+            at = zpl.IndexOf("^XA", at + 3, StringComparison.Ordinal);
+        }
+
+        return count;
+    }
+
     private string DescribeRun(PrintJobResult job)
     {
         if (job.Labels <= 1)

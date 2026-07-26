@@ -754,6 +754,40 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(200);
 
+    // Print-job export: what a print sends, which is not what the ZPL pane shows once a
+    // counter this machine expands is in play.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    d.Document.Elements.Add(new LabelForge.Core.Model.TextElement
+    {
+        X = 30, Y = 30, Text = "Lote ##SERIE##", FontHeightDots = 30,
+    });
+    d.Document.Variables["SERIE"] = new LabelForge.Core.Model.VariableDefinition
+    {
+        Kind = LabelForge.Core.Model.VariableKind.Counter,
+        CounterStart = 41,
+        CounterPadding = 4,
+        UsePrinterCounter = false,
+    };
+    d.PrintCopies = 3;
+    d.NotifyDocumentEdited();
+    Pump(900);
+    var exported = d.BuildPrintJob();
+    Console.WriteLine(
+        $"print job export: {d.DescribeJob(exported)} (expected 3 labels in 3 blocks)");
+    Console.WriteLine(
+        $"every copy numbered: {exported.Zpl.Contains("0041") && exported.Zpl.Contains("0043")} "
+        + $"(expected True), pane shows one: {d.GeneratedZpl.Contains("0043")} (expected False)");
+
+    // And the printer-counted form is one block plus a quantity, from the same builder.
+    d.Document.Variables["SERIE"].UsePrinterCounter = true;
+    d.NotifyDocumentEdited();
+    Pump(900);
+    var byPrinter = d.BuildPrintJob();
+    Console.WriteLine(
+        $"printer-counted export: {d.DescribeJob(byPrinter)} "
+        + $"^PQ3={byPrinter.Zpl.Contains("^PQ3")} (expected 3 labels in one block, True)");
+
     // Crash recovery: the snapshot follows the edits, a real save clears it because the
     // work is safe elsewhere, and a snapshot left by a dead session is offered on start.
     d.NewDocumentCommand.Execute(null);
