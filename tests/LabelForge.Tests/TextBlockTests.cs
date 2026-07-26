@@ -123,7 +123,13 @@ public sealed class TextBlockTests
             BlockWidthDots = 200, BlockMaxLines = 5,
         });
 
-        Assert.True(single.Width > 400, "an unwrapped line runs as far as it likes");
+        // Comfortably past the block's width, which is the point: an unwrapped line runs
+        // as far as it likes. The bound used to be 400, which only passed because the old
+        // average advance made this mostly-lowercase line half again too wide; measured,
+        // it is about 330 dots.
+        Assert.True(
+            single.Width > block.Width + 100,
+            $"an unwrapped line runs as far as it likes ({single.Width} vs {block.Width})");
         Assert.Equal(200, block.Width);
         Assert.True(block.Height > 30, "a wrapped block is taller than one line");
     }

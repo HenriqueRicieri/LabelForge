@@ -1,4 +1,4 @@
-namespace LabelForge.Core.Model;
+﻿namespace LabelForge.Core.Model;
 
 /// <summary>An axis-aligned rectangle in printer dots.</summary>
 public readonly record struct DotRect(int X, int Y, int Width, int Height)
@@ -43,12 +43,16 @@ public sealed class ElementBoundsCalculator : IElementVisitor
 
     public void Visit(TextElement element)
     {
-        // Font 0 average advance is roughly 0.55 of the character height.
-        int advance = element.FontWidthDots > 0
-            ? element.FontWidthDots
-            : (int)Math.Round(element.FontHeightDots * 0.55);
-        advance = Math.Max(advance, 1);
-        int naturalWidth = Math.Max(element.Text.Length, 1) * advance;
+        // Font 0 is proportional, so the width comes from the characters rather than
+        // from a count of them; TextMetrics holds the measured advances.
+        //
+        // The height stays the font size rather than the ink. The ink is 0.74 of it for
+        // capitals and 0.94 once a descender appears, so a box that hugged one string
+        // would jump the moment someone typed a "g". The font size is the line the field
+        // occupies, and it is the stable answer.
+        int naturalWidth = Math.Max(
+            TextMetrics.WidthDots(element.Text, element.FontHeightDots, element.FontWidthDots),
+            1);
 
         if (!element.IsBlock)
         {
@@ -115,25 +119,43 @@ public sealed class ElementBoundsCalculator : IElementVisitor
         int modules = 17 + 4 * version;
         int side = modules * Math.Max(element.Magnification, 1);
 
-        // BinaryKits' QR drawer paints 10 dots below the field origin (a constant,
-        // measured at 8 and 12 dpmm); mirror it so the selection box hugs the ink.
+        // BinaryKits' QR drawer paints 10 dots below the field origin. A fixed number of
+        // dots rather than a number of modules: measured across magnifications 2, 4 and 8
+        // and across symbol versions it never moved, so it is scaled by nothing.
         _result = new DotRect(element.X, element.Y + 10, side, side);
     }
 
     public void Visit(DataMatrixElement element)
     {
-        // Square ECC 200 symbol sizes by ASCII capacity (10x10 through 52x52); an
-        // estimate in the same spirit as the QR table above.
-        ReadOnlySpan<(int Modules, int Capacity)> sizes =
+        // Square ECC 200 symbols by the codewords they hold, 10x10 through 52x52.
+        ReadOnlySpan<(int Modules, int Codewords)> sizes =
         [
             (10, 3), (12, 5), (14, 8), (16, 12), (18, 18), (20, 22), (22, 30),
             (24, 36), (26, 44), (32, 62), (36, 86), (40, 114), (44, 144), (48, 174), (52, 204),
         ];
 
+        // Codewords, not characters. ECC 200's ASCII mode packs a pair of digits into one
+        // codeword, so sixteen digits cost eight and fit a symbol that holds eight; taking
+        // the character count instead picked a symbol two sizes too big and drew the
+        // outline four modules wider than the ink on every numeric code.
+        int codewords = 0;
+        for (int i = 0; i < element.Data.Length; i++)
+        {
+            bool pair = i + 1 < element.Data.Length &&
+                        char.IsAsciiDigit(element.Data[i]) &&
+                        char.IsAsciiDigit(element.Data[i + 1]);
+            if (pair)
+            {
+                i++;
+            }
+
+            codewords++;
+        }
+
         int modules = 52;
         foreach ((int m, int capacity) in sizes)
         {
-            if (element.Data.Length <= capacity)
+            if (codewords <= capacity)
             {
                 modules = m;
                 break;
