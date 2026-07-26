@@ -139,6 +139,40 @@ public partial class DesignerViewModel : ViewModelBase
     public string NewMediaSizeText => Core.Media.StockMedia.FormatSize(
         (double)WidthMm, (double)HeightMm, NewMediaContinuous);
 
+    /// <summary>
+    /// Every element on the label, front to back, so one can be found by reading rather
+    /// than by hunting for it on the canvas.
+    ///
+    /// Worth having because real labels are dense: the sample corpus runs from 38 to 60
+    /// elements, and picking the one you want out of a stack of overlapping fields with
+    /// the mouse is guesswork. Ordered front to back, matching what the canvas draws last
+    /// and what a click would therefore hit first.
+    /// </summary>
+    public ObservableCollection<ElementOutlineViewModel> Outline { get; } = [];
+
+    public bool HasOutline => Outline.Count > 0;
+
+    public string OutlineHeader => Outline.Count == 1
+        ? "Elements (1)"
+        : $"Elements ({Outline.Count})";
+
+    /// <summary>The row for the current selection, so picking in the list and picking on
+    /// the canvas are the same act seen from two places.</summary>
+    [ObservableProperty]
+    public partial ElementOutlineViewModel? SelectedOutlineRow { get; set; }
+
+    private bool _syncingOutline;
+
+    partial void OnSelectedOutlineRowChanged(ElementOutlineViewModel? value)
+    {
+        if (_syncingOutline || value is null)
+        {
+            return;
+        }
+
+        Selection.Set(value.Element);
+    }
+
     /// <summary>Template variables found on the label, with editable preview samples.
     /// Rebuilt only when the variable set or the document instance changes, so typing
     /// in a sample box never loses focus to a refresh.</summary>
@@ -672,6 +706,12 @@ public partial class DesignerViewModel : ViewModelBase
         SelectionProperties = Selection.Count == 1
             ? CreatePropertiesEditor(Selection.Primary)
             : null;
+
+        // Selecting on the canvas highlights the row, guarded so the row's own setter
+        // does not bounce the selection straight back.
+        _syncingOutline = true;
+        SelectedOutlineRow = Outline.FirstOrDefault(r => ReferenceEquals(r.Element, Selection.Primary));
+        _syncingOutline = false;
     }
 
     /// <summary>Serializes the current document in the .lfl format.</summary>
@@ -721,6 +761,7 @@ public partial class DesignerViewModel : ViewModelBase
         CurrentFilePath = path;
         NotifyPrintSettingsChanged();
         RefreshVariables();
+        RefreshOutline();
         UpdatePrinterWarning();
         _history.Clear();
         _lastRecordTicks = 0;
@@ -1570,6 +1611,7 @@ public partial class DesignerViewModel : ViewModelBase
         _lastCoalesceKey = null;
         NotifyPrintSettingsChanged();
         RefreshVariables();
+        RefreshOutline();
         UpdatePrinterWarning();
         ScheduleRender();
     }
@@ -1582,6 +1624,80 @@ public partial class DesignerViewModel : ViewModelBase
 
     /// <summary>Syncs the Variables panel with the markers on the label. Skips the
     /// rebuild when nothing changed so an open sample TextBox keeps its focus.</summary>
+    /// <summary>
+    /// Rebuilds the outline when the label's structure has actually changed.
+    ///
+    /// Compared by a signature rather than rebuilt every pass: a list that is thrown away
+    /// and remade on each render loses the row the user is pointing at, and the render
+    /// runs on every keystroke.
+    /// </summary>
+    private void RefreshOutline()
+    {
+        Element[] elements = Document.Elements.OrderByDescending(e => e.ZOrder).ToArray();
+        string signature = string.Join(
+            "|", elements.Select(e => $"{e.Id}:{OutlineLabel(e)}:{e.IsVisible}:{e.IsLocked}"));
+        if (string.Equals(signature, _outlineSignature, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _outlineSignature = signature;
+        _syncingOutline = true;
+        try
+        {
+            Outline.Clear();
+            foreach (Element element in elements)
+            {
+                Outline.Add(new ElementOutlineViewModel(element, OutlineLabel(element), OnOutlineEdited));
+            }
+
+            SelectedOutlineRow = Outline.FirstOrDefault(r => ReferenceEquals(r.Element, Selection.Primary));
+        }
+        finally
+        {
+            _syncingOutline = false;
+        }
+
+        OnPropertyChanged(nameof(HasOutline));
+        OnPropertyChanged(nameof(OutlineHeader));
+    }
+
+    private string? _outlineSignature;
+
+    /// <summary>Names a row: the user's own name when there is one, otherwise the type
+    /// and a glimpse of the content, which is what tells two of the same type apart.</summary>
+    private static string OutlineLabel(Element element)
+    {
+        if (!string.IsNullOrWhiteSpace(element.Name))
+        {
+            return element.Name;
+        }
+
+        string content = element switch
+        {
+            TextElement text => text.Text,
+            BarcodeElement barcode => barcode.Data,
+            QrCodeElement qr => qr.Data,
+            DataMatrixElement dm => dm.Data,
+            Pdf417Element pdf => pdf.Data,
+            _ => string.Empty,
+        };
+
+        content = content.ReplaceLineEndings(" ").Trim();
+        if (content.Length > 28)
+        {
+            content = content[..28] + "...";
+        }
+
+        return content.Length > 0 ? $"{DisplayName(element)}: {content}" : DisplayName(element);
+    }
+
+    private void OnOutlineEdited(Element element, string key)
+    {
+        RecordUndo($"{key}:{element.Id}");
+        ScheduleRender();
+    }
+
     private void RefreshVariables()
     {
         IReadOnlyList<string> names = TemplateVariables.Discover(Document);
@@ -1888,6 +2004,8 @@ public partial class DesignerViewModel : ViewModelBase
             PlacementWarning = placementWarning;
             VariableWarning = variableWarning;
             RefreshVariables();
+            RefreshOutline();
+        RefreshOutline();
 
             Bitmap? previous = Underlay;
             if (result.Png.Length > 0)

@@ -754,6 +754,72 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(200);
 
+    // Element outline: a dense label read as a list, which is the only practical way to
+    // pick one field out of a stack of overlapping ones.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    d.LoadDocument(
+        LabelForge.Core.Io.ZplDocumentImport.FromZpl(
+            LabelForge.Core.Io.ZplTextFile.Read(File.ReadAllBytes(graphicSource)).Text,
+            d.Document.Dpmm).Document,
+        null);
+    Pump(900);
+    Console.WriteLine(
+        $"outline: '{d.OutlineHeader}' for {d.Document.Elements.Count} elements "
+        + "(expected the same count)");
+    Console.WriteLine(
+        $"named by content: '{(d.Outline.Count > 0 ? d.Outline[0].Display : "none")}' "
+        + "(expect a type and a glimpse of its text)");
+
+    // Front to back, which is the order a click meets them.
+    var front = d.Document.Elements.OrderByDescending(e => e.ZOrder).First();
+    Console.WriteLine(
+        $"front first: {ReferenceEquals(d.Outline[0].Element, front)} (expected True)");
+
+    // Picking in the list selects on the canvas, and selecting on the canvas highlights
+    // the row: the same act seen from two places.
+    var row = d.Outline[3];
+    d.SelectedOutlineRow = row;
+    Pump(300);
+    Console.WriteLine(
+        $"list picks the element: {ReferenceEquals(d.SelectedElement, row.Element)} (expected True)");
+    d.Selection.Set(d.Outline[7].Element);
+    Pump(300);
+    Console.WriteLine(
+        $"canvas highlights the row: {ReferenceEquals(d.SelectedOutlineRow, d.Outline[7])} (expected True)");
+
+    // A name typed in the panel is what the row reads as.
+    d.Selection.Set(d.Outline[3].Element);
+    Pump(300);
+    d.SelectionProperties!.Name = "Peso liquido";
+    d.NotifyDocumentEdited();
+    Pump(900);
+    Console.WriteLine(
+        $"named row: '{d.Outline.First(r => r.Element == row.Element).Display}' (expected Peso liquido)");
+
+    // Open the list for the capture; collapsed by default so the panel stays quiet on a
+    // label small enough not to need it.
+    var outlineExpander = window.GetVisualDescendants().OfType<Expander>()
+        .FirstOrDefault(x => (x.Header as string)?.StartsWith("Elements", StringComparison.Ordinal) == true);
+    if (outlineExpander is not null)
+    {
+        outlineExpander.IsExpanded = true;
+    }
+
+    Pump(500);
+    Capture("designer-outline.png");
+
+    // Hiding from the list takes it off the canvas as well.
+    var hidden = d.Outline[0];
+    hidden.IsVisible = false;
+    Pump(900);
+    Console.WriteLine(
+        $"hidden from the list: element IsVisible={hidden.Element.IsVisible} (expected False), "
+        + $"one undo step={d.CanUndo} (expected True)");
+    hidden.IsVisible = true;
+    d.Selection.Clear();
+    Pump(200);
+
     // Print-job export: what a print sends, which is not what the ZPL pane shows once a
     // counter this machine expands is in play.
     d.NewDocumentCommand.Execute(null);

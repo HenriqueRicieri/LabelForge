@@ -83,6 +83,15 @@ public abstract class ElementPropertiesViewModel : ObservableObject
         }
     }
 
+    /// <summary>A name of the user's own, shown in the element list. Optional: without
+    /// one the list falls back to the type and a glimpse of the content, which is enough
+    /// to tell most elements apart and means nothing has to be named to be findable.</summary>
+    public string Name
+    {
+        get => Element.Name;
+        set => Edit(Element.Name, (value ?? string.Empty).Trim(), v => Element.Name = v);
+    }
+
     public string UnitSuffix => UseMm ? "mm" : "dots";
 
     public string PositionFormat => UseMm ? "0.##" : "0";

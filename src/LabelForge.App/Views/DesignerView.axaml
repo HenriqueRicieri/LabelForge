@@ -498,6 +498,34 @@
                         <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="0,6,0,0" />
                     </StackPanel>
 
+                    <!-- Everything on the label, front to back -->
+                    <Expander Header="{Binding OutlineHeader}" IsVisible="{Binding HasOutline}"
+                              Padding="0,4,0,0" HorizontalAlignment="Stretch">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Front to back, the order a click meets them. Pick one to select it on the canvas."
+                                       TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="0,0,0,4" />
+                            <ListBox ItemsSource="{Binding Outline}"
+                                     SelectedItem="{Binding SelectedOutlineRow}"
+                                     MaxHeight="240" Background="Transparent"
+                                     BorderThickness="0" Padding="0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate DataType="vm:ElementOutlineViewModel">
+                                        <DockPanel MinWidth="180">
+                                            <CheckBox DockPanel.Dock="Right" IsChecked="{Binding IsLocked}"
+                                                      Margin="2,0,0,0" ToolTip.Tip="Lock position" />
+                                            <CheckBox DockPanel.Dock="Right" IsChecked="{Binding IsVisible}"
+                                                      ToolTip.Tip="Show on the canvas" />
+                                            <TextBlock Text="{Binding Display}" FontSize="12"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip.Tip="{Binding Display}" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </StackPanel>
+                    </Expander>
+
                     <TextBlock Text="Properties" FontWeight="SemiBold" />
 
                     <TextBlock Text="Nothing selected. Click an element on the canvas. Drag on empty space to select several; Ctrl+click adds or removes."
@@ -511,6 +539,9 @@
                     <StackPanel IsVisible="{Binding IsSingleSelection}" Spacing="4">
                         <TextBlock Text="{Binding SelectionProperties.TypeName, FallbackValue=''}"
                                    FontWeight="SemiBold" Opacity="0.8" />
+                        <TextBlock Classes="propLabel" Text="Name (optional, shown in the element list)" />
+                        <TextBox Text="{Binding SelectionProperties.Name, FallbackValue=''}"
+                                 PlaceholderText="{Binding SelectionProperties.TypeName, FallbackValue=''}" />
                         <CheckBox Content="Positions in mm" FontSize="12" Margin="0,2,0,0"
                                   IsChecked="{Binding SelectionProperties.UseMm, FallbackValue=false}"
                                   ToolTip.Tip="Type X and Y in millimeters; the label model keeps dots" />

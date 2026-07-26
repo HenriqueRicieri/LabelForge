@@ -29,6 +29,10 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 - Align and distribute tools: left/center/right and top/middle/bottom (one element aligns against
   the label, several align within their own bounding box) plus horizontal/vertical distribution
   with equalized gaps.
+- An Elements list of everything on the label, front to back, for picking one field out of
+  a stack of overlapping ones on a dense design. Each row shows the element's own name when
+  it has one and its type and content when it does not, and carries its visibility and lock,
+  so a run of elements can be dealt with one after another.
 - Snapshot-based undo/redo that shares the save format, so a document that undoes correctly is
   guaranteed to save and reopen correctly. Related edits coalesce into one step by identity.
 - Element types: text, linear barcode (Code 128, Code 39, EAN-13, UPC-A), QR code, Data Matrix,
