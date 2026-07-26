@@ -142,6 +142,7 @@ public static class ZplDocumentImport
         private int _homeY;
         private int? _originX;
         private int? _originY;
+        private bool _typeset;
         private Orientation _orientation = Orientation.Normal;
         private bool _hexEscapes;
         private char _hexMarker = '_';
@@ -208,9 +209,18 @@ public static class ZplDocumentImport
                     return;
 
                 case "FO":
-                case "FT":
                     _originX = command.Int(0);
                     _originY = command.Int(1);
+                    _typeset = false;
+                    return;
+
+                case "FT":
+                    // Remembered rather than converted here: ^FT is the field's bottom
+                    // left, and how far that is from the top depends on what the field
+                    // turns out to be, which ^FD has not said yet.
+                    _originX = command.Int(0);
+                    _originY = command.Int(1);
+                    _typeset = true;
                     return;
 
                 case "FS":
@@ -662,10 +672,22 @@ public static class ZplDocumentImport
             element.Orientation = _orientation;
             element.IsReversed = _reversed;
 
+            int x = (_originX ?? 0) + _homeX;
+            int y = (_originY ?? 0) + _homeY;
+
+            // A ^FT origin is the field's bottom left, so it becomes a top left once the
+            // field is known. Reading it as ^FO puts everything low by its own height,
+            // which on real files is almost everything: ^FT outnumbers ^FO in the corpus
+            // by nearly three to one.
+            if (_typeset)
+            {
+                (x, y) = FieldTypeset.ToFieldOrigin(element, x, y);
+            }
+
             // ZPL has no negative origins, so a label home that pushes a field off the
             // top-left is clamped rather than producing a coordinate we cannot re-emit.
-            element.X = Math.Max((_originX ?? 0) + _homeX, 0);
-            element.Y = Math.Max((_originY ?? 0) + _homeY, 0);
+            element.X = Math.Max(x, 0);
+            element.Y = Math.Max(y, 0);
             _current?.Elements.Add(element);
         }
 
@@ -724,6 +746,7 @@ public static class ZplDocumentImport
         {
             _originX = null;
             _originY = null;
+            _typeset = false;
             _orientation = Orientation.Normal;
             _haveFont = false;
             _fontHeight = 0;
