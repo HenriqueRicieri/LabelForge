@@ -15,7 +15,8 @@
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <TabControl Name="MainTabs" Padding="0" Margin="0,4,0,0">
+    <TabControl Name="MainTabs" Padding="0" Margin="0,4,0,0"
+                SelectedIndex="{Binding SelectedTab}">
         <TabItem Header="Designer">
             <views:DesignerView DataContext="{Binding Designer}" />
         </TabItem>

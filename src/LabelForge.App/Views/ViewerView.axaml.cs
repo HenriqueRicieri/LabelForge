@@ -152,23 +152,30 @@ public partial class ViewerView : UserControl
             ],
         });
 
-        var file = files.FirstOrDefault();
-        if (file is null)
+        if (files.FirstOrDefault() is not { } file)
         {
             return;
         }
 
-        // Read the bytes and decide the encoding ourselves: a StreamReader's default
-        // would turn every accent of a legacy Latin-1 label into U+FFFD without a word.
-        await using var stream = await file.OpenReadAsync();
-        using var buffer = new System.IO.MemoryStream();
-        await stream.CopyToAsync(buffer);
-        var read = LabelForge.Core.Io.ZplTextFile.Read(buffer.ToArray());
-        vm.LoadZpl(
-            read.Text,
-            read.Recovered
-                ? $"Not valid UTF-8; read as {read.EncodingName}. Saving writes UTF-8."
-                : string.Empty);
+        // Usually a path, which is the form the startup argument arrives in too. A picked
+        // file that has no local path (a phone, an archive, a cloud placeholder) is still
+        // readable through the storage provider, so read its bytes rather than turn the
+        // user away; both hand the result to the view model, which words the note once.
+        if (file.TryGetLocalPath() is { } path)
+        {
+            if (vm.OpenFile(path) is null)
+            {
+                return;
+            }
+        }
+        else
+        {
+            await using System.IO.Stream stream = await file.OpenReadAsync();
+            using var buffer = new System.IO.MemoryStream();
+            await stream.CopyToAsync(buffer);
+            vm.LoadZplRead(LabelForge.Core.Io.ZplTextFile.Read(buffer.ToArray()));
+        }
+
         if (top is Window window)
         {
             window.Title = $"LabelForge - {file.Name}";

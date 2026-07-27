@@ -126,6 +126,44 @@ public partial class ViewerViewModel : ViewModelBase
         ZplText = zpl;
     }
 
+    /// <summary>
+    /// Shows a file that has already been read. The one place the inferred-encoding note is
+    /// worded, so a file opened by path and one read through the storage provider cannot
+    /// describe the same recovery two different ways.
+    /// </summary>
+    public void LoadZplRead(LabelForge.Core.Io.ZplTextRead read) =>
+        LoadZpl(
+            read.Text,
+            read.Recovered
+                ? $"Not valid UTF-8; read as {read.EncodingName}. Saving writes UTF-8."
+                : string.Empty);
+
+    /// <summary>
+    /// Opens a ZPL file by path: the file picker and a path handed to the app at startup
+    /// both end here, so neither can read a file the other way round.
+    ///
+    /// Bytes, never a StreamReader. Its lenient default turns every accent of a legacy
+    /// Latin-1 label into U+FFFD without a word, and this is the app that is supposed to
+    /// show you what the file says.
+    /// </summary>
+    /// <returns>The file's own name when it opened, or null when it could not be read.</returns>
+    public string? OpenFile(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        try
+        {
+            LoadZplRead(LabelForge.Core.Io.ZplTextFile.ReadFile(path));
+            return Path.GetFileName(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or System.Security.SecurityException or ArgumentException)
+        {
+            EncodingNote = $"Could not open {Path.GetFileName(path)}: {ex.Message}";
+            return null;
+        }
+    }
+
     partial void OnZplTextChanged(string value) => ScheduleRender();
 
     partial void OnAutoSizeChanged(bool value) => ScheduleRender();

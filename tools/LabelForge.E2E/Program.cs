@@ -1356,6 +1356,64 @@ if (mode == "designer")
     Console.WriteLine(
         $"quiet after a clean exit: {!afterCleanExit.Designer.HasRecoveryOffer} (expected True)");
 
+    // Opening a file the app was started with: a double-clicked label, "Open with", or a
+    // file dropped on the executable. The kind decides the tab, because a label is what the
+    // designer edits and a ZPL file is what the viewer reads.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    string startupLabel = Path.Combine(AppContext.BaseDirectory, "e2e-startup.lfl");
+    d.Document.Elements.Add(new LabelForge.Core.Model.TextElement
+    {
+        X = 30, Y = 30, Text = "opened at startup", FontHeightDots = 30,
+    });
+    File.WriteAllText(startupLabel, d.SerializeDocument());
+    d.NewDocumentCommand.Execute(null);
+    Pump(300);
+
+    vm.OpenStartupFile(new LabelForge.Core.Io.StartupFile(
+        startupLabel, LabelForge.Core.Io.StartupFileKind.Label));
+    Pump(600);
+    Console.WriteLine(
+        $"startup .lfl: tab={tabs.SelectedIndex} elements={d.Document.Elements.Count} "
+        + $"recent={d.RecentFiles.Contains(startupLabel)} (expected 0 1 True)");
+
+    vm.OpenStartupFile(new LabelForge.Core.Io.StartupFile(
+        FindGraphicSource(), LabelForge.Core.Io.StartupFileKind.Zpl));
+    Pump(600);
+    Console.WriteLine(
+        $"startup .zpl: tab={tabs.SelectedIndex} "
+        + $"loaded={vm.Viewer.ZplText.Contains("^XA")} (expected 1 True)");
+
+    vm.OpenStartupFile(new LabelForge.Core.Io.StartupFile(
+        @"C:\nowhere\logo.png", LabelForge.Core.Io.StartupFileKind.Unsupported));
+    Pump(300);
+    Console.WriteLine(
+        $"startup .png: tab={tabs.SelectedIndex} said={d.StatusText.Contains(".png")} "
+        + "(expected 0 True)");
+
+    // The .lfl shell association. Pointed at a scratch classes root for the same reason
+    // the media, catalog and recovery stores are pointed at scratch files: this is
+    // per-machine state, and a harness run must not touch what the user has.
+    const string scratchClasses = @"Software\LabelForge.E2E\Classes";
+    var association = new LabelForge.App.Services.FileAssociation(scratchClasses);
+    association.Register(@"C:\Program Files\LabelForge\LabelForge.App.exe");
+    string? handler = Microsoft.Win32.Registry.GetValue(
+        $@"HKEY_CURRENT_USER\{scratchClasses}\.lfl", null, null) as string;
+    string? verb = Microsoft.Win32.Registry.GetValue(
+        $@"HKEY_CURRENT_USER\{scratchClasses}\{LabelForge.App.Services.FileAssociation.ProgId}\shell\open\command",
+        null,
+        null) as string;
+    Console.WriteLine(
+        $"association: .lfl -> {handler ?? "none"}, command quotes the path="
+        + $"{verb == "\"C:\\Program Files\\LabelForge\\LabelForge.App.exe\" \"%1\""} "
+        + "(expected LabelForge.Label, True)");
+
+    association.Unregister();
+    bool gone = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(scratchClasses) is not { } left
+        || left.GetSubKeyNames().Length == 0;
+    Console.WriteLine($"association removed on uninstall: {gone} (expected True)");
+    Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\LabelForge.E2E", false);
+
     d.NewDocumentCommand.Execute(null);
     Pump(200);
     d.FieldCatalogs[0].RemoveCommand.Execute(null);

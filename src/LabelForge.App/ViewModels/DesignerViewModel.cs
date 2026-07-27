@@ -1945,21 +1945,39 @@ public partial class DesignerViewModel : ViewModelBase
     [RelayCommand]
     private void OpenRecent(string? path)
     {
-        if (string.IsNullOrEmpty(path))
+        if (!string.IsNullOrEmpty(path))
         {
-            return;
+            OpenLabelFile(path);
         }
+    }
+
+    /// <summary>
+    /// Opens a .lfl by path. The one implementation: the file picker, the recent files
+    /// menu and a path handed to the app at startup all end here, because three ways in
+    /// are three ways to disagree about what "opened" means to the recent list and to the
+    /// status line.
+    /// </summary>
+    /// <returns>True when the label opened. A caller that chose the path itself, rather
+    /// than being handed one, wants to know.</returns>
+    public bool OpenLabelFile(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         try
         {
             LoadDocument(LabelDocumentJson.Deserialize(File.ReadAllText(path)), path);
             StatusText = $"Opened {Path.GetFileName(path)}";
             RegisterRecentFile(path);
+            return true;
         }
         catch (Exception ex)
         {
             StatusText = $"Could not open: {ex.Message}";
+
+            // A path that no longer opens has no business in a menu of paths to open.
+            // Harmless for one that was never in the list.
             SyncRecentFiles(Services.RecentFilesStore.Remove(path));
+            return false;
         }
     }
 

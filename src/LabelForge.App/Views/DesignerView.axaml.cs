@@ -548,20 +548,9 @@ public partial class DesignerView : UserControl
             FileTypeFilter = [LflType],
         });
 
-        if (files.FirstOrDefault()?.TryGetLocalPath() is not { } path)
+        if (files.FirstOrDefault()?.TryGetLocalPath() is { } path)
         {
-            return;
-        }
-
-        try
-        {
-            vm.LoadDocument(LabelDocumentJson.Deserialize(await File.ReadAllTextAsync(path)), path);
-            vm.StatusText = $"Opened {Path.GetFileName(path)}";
-            vm.RegisterRecentFile(path);
-        }
-        catch (Exception ex)
-        {
-            vm.StatusText = $"Could not open: {ex.Message}";
+            vm.OpenLabelFile(path);
         }
     }
 
