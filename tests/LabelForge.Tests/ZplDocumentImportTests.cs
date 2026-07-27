@@ -401,15 +401,16 @@ public sealed class ZplDocumentImportTests
     /// <summary>
     /// The commands that look like setup but change the label are deliberately not on
     /// that list, because losing one silently would change what prints: these invert or
-    /// mirror the whole label, shift every field, serialize a field, store the format on
-    /// the printer, or redefine the characters this parser reads.
+    /// mirror the whole label, shift every field, store the format on the printer, or
+    /// redefine the characters this parser reads.
+    ///
+    /// ^SN used to be here and is now read: see <see cref="SerialNumberImportTests"/>.
     /// </summary>
     [Theory]
     [InlineData("^LRY")]
     [InlineData("^PMY")]
     [InlineData("^LS40")]
     [InlineData("^LT20")]
-    [InlineData("^SNserial,1,Y")]
     [InlineData("^DFR:FMT.ZPL")]
     [InlineData("^CC~")]
     public void CommandsThatChangeTheLabel_AreNeverTreatedAsPrinterSetup(string command)

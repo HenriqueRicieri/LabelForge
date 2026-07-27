@@ -1295,6 +1295,20 @@ if (mode == "designer")
         $"printer-counted export: {d.DescribeJob(byPrinter)} "
         + $"^PQ3={byPrinter.Zpl.Contains("^PQ3")} (expected 3 labels in one block, True)");
 
+    // And back in again: ^SN is where a serialized field's data lives, so reading it is
+    // what stops the whole field vanishing on import. The counter lands in the panel with
+    // the numbers it left with, under a name of the importer's own since ZPL never
+    // states one.
+    d.ImportZplDocument(byPrinter.Zpl, "counter.zpl");
+    Pump(900);
+    var serial = d.Variables.FirstOrDefault(
+        v => v.Kind == LabelForge.Core.Model.VariableKind.Counter);
+    Console.WriteLine(
+        $"^SN read back: {d.Document.Elements.Count} element(s), counter="
+        + $"{serial?.Name ?? "none"} start={serial?.CounterStart} "
+        + $"pad={serial?.CounterPadding} printer={serial?.UsePrinterCounter} "
+        + "(expected 1 element, SERIAL 41 4 True)");
+
     // Crash recovery: the snapshot follows the edits, a real save clears it because the
     // work is safe elsewhere, and a snapshot left by a dead session is offered on start.
     d.NewDocumentCommand.Execute(null);

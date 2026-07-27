@@ -56,7 +56,7 @@ public static class ZplDocumentImport
     private static readonly HashSet<string> Handled = new(StringComparer.Ordinal)
     {
         "XA", "XZ", "CI", "FS", "FH", "LH", "PW", "LL", "BY", "PQ", "MD", "PR",
-        "DG", "FO", "FT", "FD", "FB", "FR", "GB", "GE", "GC", "GD", "GF", "XG",
+        "DG", "FO", "FT", "FD", "FB", "FR", "SN", "GB", "GE", "GC", "GD", "GF", "XG",
         "BC", "B3", "BE", "BU", "BX", "BQ", "B7",
     };
 
@@ -80,8 +80,8 @@ public static class ZplDocumentImport
     /// Kept deliberately narrow. Commands that change what the label looks like or where
     /// it prints stay off this list even when they look like setup, because losing one of
     /// those is a real loss the user has to hear about: ^LR and ^PM invert or mirror the
-    /// whole label, ^LS and ^LT shift every field, ^SN serializes a field, ^DF stores the
-    /// format on the printer, and ^CC and ^CT redefine the characters this parser reads.
+    /// whole label, ^LS and ^LT shift every field, ^DF stores the format on the printer,
+    /// and ^CC and ^CT redefine the characters this parser reads.
     /// ^MN is the one that moved off this list conditionally rather than wholesale.
     /// Gap and mark sensing stay printer setup, because several modes are valid and the
     /// operator's matches what is loaded; continuous is different, because a roll with
@@ -102,12 +102,21 @@ public static class ZplDocumentImport
         string zpl, int dpmm = 8, int labelIndex = -1, MarkerSyntax? markers = null)
     {
         ArgumentNullException.ThrowIfNull(zpl);
-        var state = new ParseState(dpmm, labelIndex, markers ?? MarkerSyntax.Default);
+        MarkerSyntax syntax = markers ?? MarkerSyntax.Default;
+        var state = new ParseState(dpmm, labelIndex, syntax);
 
         // Downloaded graphics are defined outside the block that recalls them, so they
         // are collected up front by the same scanner the viewer and the graphic import
         // use rather than by a second pass written here.
         state.Graphics = ZplGraphicScanner.Scan(zpl);
+
+        // A ^SN counter needs a marker name of its own, and the only names it must not
+        // take are the ones the file already writes. Collected up front because a field
+        // further down the file is just as much a collision as one already read.
+        state.ReservedNames = TemplateScanner.Scan(zpl, syntax)
+            .Where(s => s.Kind == TemplateSegmentKind.Variable)
+            .Select(s => syntax.NameOf(s.Inner))
+            .ToHashSet(StringComparer.Ordinal);
 
         foreach (ZplCommand command in ZplCommandReader.Read(zpl))
         {
@@ -121,6 +130,11 @@ public static class ZplDocumentImport
     /// commands, so an element only exists once the field that owns it is closed.</summary>
     private sealed class ParseState(int dpmm, int labelIndex, MarkerSyntax markers)
     {
+        /// <summary>What a counter recovered from ^SN is called, after ZPL's own name for
+        /// the command. A second one that is not the same counter gets a number after it.</summary>
+        private const string SerialVariableName = "SERIAL";
+
+
         /// <summary>One ^XA block's worth of findings. Every block is built, because
         /// which one is the label cannot be known until they have all been seen.</summary>
         private sealed class BlockDraft
@@ -134,6 +148,11 @@ public static class ZplDocumentImport
             /// <summary>Printer setup seen and deliberately left behind, kept apart from
             /// the warnings so the list of real losses stays worth reading.</summary>
             public SortedSet<string> IgnoredConfiguration { get; } = new(StringComparer.Ordinal);
+
+            /// <summary>Counters recovered from ^SN, by the marker name standing in for
+            /// each one in the field it came from.</summary>
+            public Dictionary<string, VariableDefinition> Variables { get; } =
+                new(StringComparer.Ordinal);
 
             public int? WidthDots { get; set; }
 
@@ -188,6 +207,10 @@ public static class ZplDocumentImport
         private TextJustification _justification = TextJustification.Left;
 
         public ZplGraphicScan Graphics { get; set; } = new([], [], []);
+
+        /// <summary>Marker names the file already writes, which a recovered ^SN counter
+        /// must not take for itself.</summary>
+        public HashSet<string> ReservedNames { get; set; } = new(StringComparer.Ordinal);
 
         public void Apply(ZplCommand command)
         {
@@ -321,6 +344,10 @@ public static class ZplDocumentImport
                     Field(Unescape(command.Parameters));
                     return;
 
+                case "SN":
+                    Serialize(command);
+                    return;
+
                 case "GB":
                     Graphic(command);
                     return;
@@ -444,6 +471,13 @@ public static class ZplDocumentImport
             {
                 block.Elements[i].ZOrder = i;
                 document.Elements.Add(block.Elements[i]);
+            }
+
+            // Only this block's counters: a variable belongs to the markers that name it,
+            // and the fields of the blocks not taken are not on the document either.
+            foreach ((string name, VariableDefinition definition) in block.Variables)
+            {
+                document.Variables[name] = definition;
             }
 
             // Sizing comes after the elements, because a file that does not state a size
@@ -642,6 +676,69 @@ public static class ZplDocumentImport
             }
 
             Warn("Field data arrived with no font or barcode in force and was dropped.");
+        }
+
+        /// <summary>
+        /// ^SN is field data the printer advances per copy, so it closes the field exactly
+        /// the way ^FD does and the element is whichever type is pending: the manual puts
+        /// both alphanumeric and barcode fields in scope, and the generator emits it in
+        /// place of ^FD rather than beside it.
+        ///
+        /// Read without this the field produces nothing at all, since ^SN is where its data
+        /// lives, so a serialized field did not merely lose its numbering, it vanished.
+        ///
+        /// The number becomes a counter variable and a marker takes its place in the text,
+        /// which is the model C3 already built: what comes back out is ^SN again, at the
+        /// same value, step and padding. A ^SN whose value carries trailing text cannot,
+        /// because the printer advances the end of the field and our own eligibility rule
+        /// says so; that one regenerates as a counter numbered here, and DynamicField
+        /// states the reason on every render rather than this repeating it in other words.
+        /// </summary>
+        private void Serialize(ZplCommand command)
+        {
+            SerialNumberField serial = ZplSerialNumber.Read(command);
+            if (serial.Counter is not { } counter)
+            {
+                Field(serial.Prefix);
+                return;
+            }
+
+            Field(serial.Prefix + markers.Marker(NameFor(counter)) + serial.Suffix);
+        }
+
+        /// <summary>
+        /// The marker name a recovered counter is given, reusing one when the numbers match.
+        ///
+        /// Two ^SN fields started at the same value with the same step advance in lockstep,
+        /// which is one counter seen in two places rather than two counters. Reusing the
+        /// variable is what the Variables panel should show, and both fields still
+        /// regenerate the ^SN they came from.
+        /// </summary>
+        private string NameFor(VariableDefinition counter)
+        {
+            if (_current is not { } block)
+            {
+                return SerialVariableName;
+            }
+
+            foreach ((string existing, VariableDefinition definition) in block.Variables)
+            {
+                if (definition.CounterStart == counter.CounterStart &&
+                    definition.CounterStep == counter.CounterStep &&
+                    definition.CounterPadding == counter.CounterPadding)
+                {
+                    return existing;
+                }
+            }
+
+            string name = SerialVariableName;
+            for (int i = 2; block.Variables.ContainsKey(name) || ReservedNames.Contains(name); i++)
+            {
+                name = SerialVariableName + i.ToString(CultureInfo.InvariantCulture);
+            }
+
+            block.Variables[name] = counter;
+            return name;
         }
 
         /// <summary>^BQ carries the error correction level and input mode in front of the
