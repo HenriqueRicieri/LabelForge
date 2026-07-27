@@ -248,7 +248,8 @@ public sealed class ZplGenerator : IElementVisitor
     };
 
     public void Visit(BoxElement element) =>
-        Line($"{Fo(element)}^GB{element.WidthDots},{element.HeightDots},{element.ThicknessDots},B^FS");
+        Line($"{Fo(element)}^GB{element.WidthDots},{element.HeightDots},"
+             + $"{element.ThicknessDots},{Colour(element.IsWhite)}^FS");
 
     public void Visit(LineElement element)
     {
@@ -257,8 +258,12 @@ public sealed class ZplGenerator : IElementVisitor
         (int w, int h) = element.IsVertical
             ? (element.ThicknessDots, element.LengthDots)
             : (element.LengthDots, element.ThicknessDots);
-        Line($"{Fo(element)}^GB{w},{h},{element.ThicknessDots},B^FS");
+        Line($"{Fo(element)}^GB{w},{h},{element.ThicknessDots},{Colour(element.IsWhite)}^FS");
     }
+
+    /// <summary>^GB's colour parameter. White paints the stock clear, which is how a
+    /// label erases an area; see <see cref="LineElement.IsWhite"/>.</summary>
+    private static string Colour(bool isWhite) => isWhite ? "W" : "B";
 
     public void Visit(BarcodeElement element)
     {

@@ -219,6 +219,19 @@ public sealed class LineElement : Element
     /// <summary>Line thickness in dots.</summary>
     public int ThicknessDots { get; set; } = 2;
 
+    /// <summary>
+    /// Draw in white rather than black (^GB's colour parameter). On monochrome stock
+    /// that means erase: the shape paints white over whatever was drawn before it, which
+    /// is how real labels clear an area before dropping a graphic into it.
+    ///
+    /// Not the same thing as <see cref="Element.IsReversed"/>, and the difference shows
+    /// on blank stock: ^FR inverts the ink it lands on, so over white it prints black,
+    /// while white paints white and so prints nothing at all. Only the graphic primitives
+    /// take a colour, which is why this sits here and on <see cref="BoxElement"/> rather
+    /// than on <see cref="Element"/>.
+    /// </summary>
+    public bool IsWhite { get; set; }
+
     public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
 }
 
@@ -231,6 +244,9 @@ public sealed class BoxElement : Element
 
     /// <summary>Border thickness in dots.</summary>
     public int ThicknessDots { get; set; } = 2;
+
+    /// <inheritdoc cref="LineElement.IsWhite"/>
+    public bool IsWhite { get; set; }
 
     public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
 }

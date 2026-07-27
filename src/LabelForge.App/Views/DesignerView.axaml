@@ -197,6 +197,8 @@
                 <NumericUpDown Value="{Binding Thickness}" Minimum="1" Maximum="200"
                                Increment="1" FormatString="0" />
                 <CheckBox Content="Vertical" IsChecked="{Binding IsVertical}" Margin="0,4,0,0" />
+                <CheckBox Content="White (erase)" IsChecked="{Binding IsWhite}"
+                          ToolTip.Tip="Draws in white, which clears whatever was drawn under it. Over blank stock it prints nothing." />
             </StackPanel>
         </DataTemplate>
 
@@ -211,6 +213,8 @@
                 <TextBlock Classes="propLabel" Text="Border thickness (dots)" />
                 <NumericUpDown Value="{Binding Thickness}" Minimum="1" Maximum="200"
                                Increment="1" FormatString="0" />
+                <CheckBox Content="White (erase)" IsChecked="{Binding IsWhite}" Margin="0,4,0,0"
+                          ToolTip.Tip="Draws in white, which clears whatever was drawn under it. Over blank stock it prints nothing." />
             </StackPanel>
         </DataTemplate>
 

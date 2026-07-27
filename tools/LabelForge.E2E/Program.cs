@@ -566,6 +566,31 @@ if (mode == "designer")
     Pump(500);
     Capture("designer-imported-label.png");
 
+    // The two ways an imported label used to come back wrong, both written the way the
+    // corpus writes them: a white ^GB clearing the area in front of a graphic, and a ^FH
+    // escape naming a code page byte rather than a code point.
+    d.ImportZplDocument(
+        "^XA\n^FO40,40^GB0,60,200,W^FS\n^FO40,40^GB200,60,60,B^FS\n"
+        + "^FO40,140^A0N,40^FH^FDMinist_82rio^FS\n^XZ",
+        "erase-and-escape.zpl");
+    Pump(900);
+    var erase = (LabelForge.Core.Model.LineElement)d.Document.Elements[0];
+    Console.WriteLine(
+        $"white erase stays white: IsWhite={erase.IsWhite}, ZPL says "
+        + $"'{(d.GeneratedZpl.Contains(",W^FS") ? ",W" : ",B")}' (expected True/,W)");
+    Console.WriteLine(
+        "outline names it: "
+        + $"'{d.Outline.First(r => ReferenceEquals(r.Element, erase)).Display}' "
+        + "(expected White line, since it draws nothing the eye can find)");
+    Console.WriteLine(
+        $"hex escape reads its code page: "
+        + $"'{((LabelForge.Core.Model.TextElement)d.Document.Elements[2]).Text}' "
+        + "(expected Ministerio with an accented e)");
+
+    d.Selection.Clear();
+    Pump(400);
+    Capture("designer-erase-and-escape.png");
+
     // Element flags: a locked element resists canvas gestures, a "do not print" one stays
     // on the canvas with its own outline and leaves the exported ZPL.
     d.NewDocumentCommand.Execute(null);

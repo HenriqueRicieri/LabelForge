@@ -243,7 +243,9 @@ public sealed class FieldCatalogTests
     }
 
     /// <summary>And the literal text of the same field still is unescaped, so the two
-    /// rules cannot blur into each other.</summary>
+    /// rules cannot blur into each other. 0x82 is code page 850's accented e, which is
+    /// what the printer's own default makes of that byte; the ^FH section of
+    /// <see cref="EncodingTests"/> is where that rule lives.</summary>
     [Fact]
     public void HexEscaping_StillAppliesOutsideAMarker()
     {
@@ -251,7 +253,7 @@ public sealed class FieldCatalogTests
             .FromZpl("^XA^FO10,10^A0N,30^FH^FDMinist_82rio ##SIF_DIPOA##^FS^XZ", 8)
             .Document.Elements));
 
-        Assert.Equal("Ministrio ##SIF_DIPOA##", text.Text);
+        Assert.Equal("Ministério ##SIF_DIPOA##", text.Text);
     }
 
     /// <summary>

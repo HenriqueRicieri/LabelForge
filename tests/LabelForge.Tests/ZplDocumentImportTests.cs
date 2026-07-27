@@ -45,6 +45,13 @@ public sealed class ZplDocumentImportTests
         {
             X = 560, Y = 30, IsVertical = true, LengthDots = 150, ThicknessDots = 5,
         });
+        document.Elements.Add(new BoxElement
+        {
+            // The white erase real labels put in front of a graphic; read as black it
+            // paints a slab over what it was there to reveal.
+            X = 300, Y = 200, WidthDots = 120, HeightDots = 60, ThicknessDots = 60,
+            IsWhite = true,
+        });
         document.Elements.Add(new BarcodeElement
         {
             X = 20, Y = 200, Symbology = BarcodeSymbology.Code128, Data = "ABC-123",

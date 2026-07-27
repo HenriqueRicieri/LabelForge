@@ -600,6 +600,14 @@ public sealed class LinePropertiesViewModel : ElementPropertiesViewModel
         get => _line.IsVertical;
         set => Edit(_line.IsVertical, value, v => _line.IsVertical = v);
     }
+
+    /// <summary>Draws the bar in white, which on monochrome stock erases what is under
+    /// it. Invisible over blank stock, because that is exactly what it prints.</summary>
+    public bool IsWhite
+    {
+        get => _line.IsWhite;
+        set => Edit(_line.IsWhite, value, v => _line.IsWhite = v);
+    }
 }
 
 public sealed class BoxPropertiesViewModel : ElementPropertiesViewModel
@@ -627,5 +635,12 @@ public sealed class BoxPropertiesViewModel : ElementPropertiesViewModel
     {
         get => _box.ThicknessDots;
         set => Edit(_box.ThicknessDots, Math.Max((int)value, 1), v => _box.ThicknessDots = v);
+    }
+
+    /// <inheritdoc cref="LinePropertiesViewModel.IsWhite"/>
+    public bool IsWhite
+    {
+        get => _box.IsWhite;
+        set => Edit(_box.IsWhite, value, v => _box.IsWhite = v);
     }
 }

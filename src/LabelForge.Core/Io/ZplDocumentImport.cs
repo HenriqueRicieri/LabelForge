@@ -165,6 +165,11 @@ public static class ZplDocumentImport
         private int? _qrMagnification;
         private Pdf417Element? _pdf417;
 
+        /// <summary>The ^CI in force. Zero is the printer's own default, and most real
+        /// labels never say otherwise, which is why the default has to be right rather
+        /// than merely documented.</summary>
+        private int _internationalSet;
+
         // ^FB state, field-level like the font.
         private int _blockWidth;
         private int _blockMaxLines = 1;
@@ -183,6 +188,15 @@ public static class ZplDocumentImport
                 ResetField();
                 _homeX = 0;
                 _homeY = 0;
+                return;
+            }
+
+            // Read before the preamble guard below, because ^CI is a printer mode rather
+            // than part of a label: it can be set outside any ^XA block and it stays set
+            // across the ones that follow.
+            if (command.Code == "CI")
+            {
+                _internationalSet = command.Int(0);
                 return;
             }
 
@@ -557,29 +571,46 @@ public static class ZplDocumentImport
         }
 
         /// <summary>^GB is a box, and a box whose border fills it is how ZPL draws a
-        /// line. Reading it back as a line loses nothing: both generate the same bytes.</summary>
+        /// line. Reading it back as a line loses nothing: both generate the same bytes.
+        /// The colour parameter is carried through, because a white ^GB is how these
+        /// labels clear an area and reading it as black paints over what it was meant
+        /// to reveal.</summary>
         private void Graphic(ZplCommand command)
         {
             int width = command.Int(0);
             int height = command.Int(1);
             int thickness = Math.Max(command.Int(2, 1), 1);
-
-            if (string.Equals(command.Arg(3), "W", StringComparison.OrdinalIgnoreCase))
-            {
-                Warn("A white ^GB became black: the model is monochrome black on white.");
-            }
+            bool isWhite = string.Equals(command.Arg(3), "W", StringComparison.OrdinalIgnoreCase);
 
             if (height <= thickness && width > 0)
             {
-                Add(new LineElement { IsVertical = false, LengthDots = width, ThicknessDots = thickness });
+                Add(new LineElement
+                {
+                    IsVertical = false,
+                    LengthDots = width,
+                    ThicknessDots = thickness,
+                    IsWhite = isWhite,
+                });
             }
             else if (width <= thickness && height > 0)
             {
-                Add(new LineElement { IsVertical = true, LengthDots = height, ThicknessDots = thickness });
+                Add(new LineElement
+                {
+                    IsVertical = true,
+                    LengthDots = height,
+                    ThicknessDots = thickness,
+                    IsWhite = isWhite,
+                });
             }
             else
             {
-                Add(new BoxElement { WidthDots = width, HeightDots = height, ThicknessDots = thickness });
+                Add(new BoxElement
+                {
+                    WidthDots = width,
+                    HeightDots = height,
+                    ThicknessDots = thickness,
+                    IsWhite = isWhite,
+                });
             }
 
             ResetField();
@@ -694,6 +725,13 @@ public static class ZplDocumentImport
         /// <summary>
         /// Applies ^FH hex escapes, skipping template markers.
         ///
+        /// An escape names a byte in the code page ^CI selected, not a Unicode code
+        /// point, and the two part company above 0x7F: 312.zpl writes "Minist_82rio",
+        /// where 0x82 is code page 850's accented e, and reading the number as a code
+        /// point yields a C1 control character instead. Consecutive escapes are decoded
+        /// as one run because under ^CI28 a letter costs several bytes; a single-byte
+        /// code page reads the same either way. See <see cref="ZplCodePage"/>.
+        ///
         /// The exception is not a nicety, it is what real files require. '_' is both
         /// ZPL's default escape character and the commonest word separator in a field
         /// name, so in a field written "^FH^FD MA,##CODIGO_BARRAS##" the "_BA" is a
@@ -714,8 +752,30 @@ public static class ZplDocumentImport
             }
 
             var sb = new System.Text.StringBuilder(data.Length);
+            var run = new List<byte>();
+
+            void FlushRun()
+            {
+                if (run.Count == 0)
+                {
+                    return;
+                }
+
+                if (!ZplCodePage.IsModelled(_internationalSet))
+                {
+                    Warn($"^CI{_internationalSet} selects a character encoding this reader "
+                         + $"does not model; hex-escaped text was read as code page "
+                         + $"{ZplCodePage.Default} and may show the wrong characters.");
+                }
+
+                sb.Append(ZplCodePage.Decode(run.ToArray(), _internationalSet));
+                run.Clear();
+            }
+
             foreach (TemplateSegment segment in TemplateScanner.Scan(data, markers))
             {
+                // A marker is not data for the printer, so it ends any run of bytes.
+                FlushRun();
                 if (segment.Kind != TemplateSegmentKind.Literal)
                 {
                     sb.Append(segment.Text);
@@ -729,16 +789,18 @@ public static class ZplDocumentImport
                         int.TryParse(text.AsSpan(i + 1, 2), NumberStyles.HexNumber,
                             CultureInfo.InvariantCulture, out int value))
                     {
-                        sb.Append((char)value);
+                        run.Add((byte)value);
                         i += 2;
                     }
                     else
                     {
+                        FlushRun();
                         sb.Append(text[i]);
                     }
                 }
             }
 
+            FlushRun();
             return sb.ToString();
         }
 

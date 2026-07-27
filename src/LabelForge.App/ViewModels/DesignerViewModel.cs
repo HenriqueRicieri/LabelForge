@@ -2315,6 +2315,9 @@ public partial class DesignerViewModel : ViewModelBase
         return string.Join("; ", parts);
     }
 
+    /// <summary>What an unnamed element is called, in the outline and in the placement
+    /// warnings alike. A white shape says so: it paints the stock clear, so it draws
+    /// nothing the eye can find, and the outline is where someone goes looking for it.</summary>
     private static string DisplayName(Element element) =>
         !string.IsNullOrEmpty(element.Name) ? element.Name : element switch
         {
@@ -2324,7 +2327,9 @@ public partial class DesignerViewModel : ViewModelBase
             DataMatrixElement => "Data Matrix",
             Pdf417Element => "PDF417",
             ImageElement => "Image",
+            LineElement { IsWhite: true } => "White line",
             LineElement => "Line",
+            BoxElement { IsWhite: true } => "White box",
             BoxElement => "Box",
             _ => "Element",
         };

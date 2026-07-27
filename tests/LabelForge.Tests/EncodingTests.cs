@@ -234,4 +234,114 @@ public sealed class EncodingTests
         Assert.NotEmpty(result.Png);
         Assert.Empty(result.Errors);
     }
+
+    // ---- ^FH escapes name a byte, not a code point ------------------------------------
+    //
+    // The other half of the encoding story, and the one inside ^FD. A ^FH escape is a
+    // byte in whatever code page ^CI selected, so "Minist_82rio" is "Ministerio" with an
+    // accent under the printer's default and something else entirely under ^CI27 or
+    // ^CI28. Reading the number as a code point produced a C1 control character, which is
+    // what mangled three separate corpus labels.
+
+    [Theory]
+    [InlineData(0, new byte[] { 0x82 }, "é")]
+    [InlineData(13, new byte[] { 0x82 }, "é")]
+    [InlineData(13, new byte[] { 0xA1, 0x87 }, "íç")]
+    [InlineData(27, new byte[] { 0xE9 }, "é")]
+    [InlineData(28, new byte[] { 0xC3, 0xA9 }, "é")]
+    public void CodePage_DecodesAByteRunTheWayItsInternationalSetSaysTo(
+        int internationalSet, byte[] bytes, string expected)
+    {
+        Assert.Equal(expected, ZplCodePage.Decode(bytes, internationalSet));
+    }
+
+    /// <summary>The byte 0x82 is the accented e in 850 and a low quote in 1252, which is
+    /// the pair that makes the distinction worth modelling at all.</summary>
+    [Fact]
+    public void CodePage_ReadsTheSameByteDifferentlyUnder1252()
+    {
+        Assert.Equal("‚", ZplCodePage.Decode([0x82], 27));
+        Assert.NotEqual(ZplCodePage.Decode([0x82], 27), ZplCodePage.Decode([0x82], 0));
+    }
+
+    [Fact]
+    public void Import_DecodesAnEscapeThroughThePrintersDefaultCodePage()
+    {
+        // The shape 312.zpl is written in, with no ^CI anywhere in the file.
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA\n^FO20,20^A0N,40^FH^FDMinist_82rio^FS\n^XZ");
+
+        var text = Assert.IsType<TextElement>(Assert.Single(result.Document.Elements));
+        Assert.Equal("Ministério", text.Text);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public void Import_DecodesAMultiByteEscapeRunAsOneCharacterUnderUtf8()
+    {
+        // ^CI28 spends two bytes on the accent, so the escapes have to be decoded
+        // together; one at a time gives two replacement characters.
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA^CI28\n^FO20,20^A0N,40^FH^FDMinist_C3_A9rio^FS\n^XZ");
+
+        var text = Assert.IsType<TextElement>(Assert.Single(result.Document.Elements));
+        Assert.Equal("Ministério", text.Text);
+    }
+
+    [Fact]
+    public void Import_HonoursACodePageSetOutsideTheLabelBlock()
+    {
+        // ^CI is a printer mode: it can be sent in the preamble and it stays set.
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^CI27\n^XA\n^FO20,20^A0N,40^FH^FDcaf_E9^FS\n^XZ");
+
+        Assert.Equal("café", ((TextElement)Assert.Single(result.Document.Elements)).Text);
+    }
+
+    [Fact]
+    public void Import_SaysSoWhenTheCodePageIsOneItCannotRead()
+    {
+        // ^CI29 is UTF-16 big endian. Nothing in the corpus uses it, and reading a byte
+        // run as 850 is a guess, so the guess is reported rather than made silently.
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA^CI29\n^FO20,20^A0N,40^FH^FDx_82^FS\n^XZ");
+
+        Assert.Contains("^CI29", Assert.Single(result.Warnings), StringComparison.Ordinal);
+    }
+
+    /// <summary>'_' is both ZPL's escape character and the commonest separator in a field
+    /// name, so a marker has to come through untouched whatever the code page.</summary>
+    [Fact]
+    public void Import_LeavesAMarkerAloneEvenWhenItsBytesWouldDecode()
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA\n^FO20,20^A0N,40^FH^FDMA,##CODIGO_BARRAS##^FS\n^XZ");
+
+        Assert.Equal(
+            "MA,##CODIGO_BARRAS##",
+            ((TextElement)Assert.Single(result.Document.Elements)).Text);
+    }
+
+    /// <summary>
+    /// The reason the default is code page 850 rather than anything else: it is what the
+    /// offline renderer reads an escape as, and the canvas is that renderer. Importing a
+    /// label and regenerating it has to draw the same glyph, or the designer would show a
+    /// different letter than the file it opened.
+    /// </summary>
+    [Fact]
+    public void ImportedEscape_RendersAsTheSamePictureItCameFrom()
+    {
+        const string source = "^XA\n^FO20,20^A0N,40^FH^FDMinist_82rio^FS\n^XZ";
+
+        ZplDocumentImportResult imported = ZplDocumentImport.FromZpl(source, dpmm: 8);
+        string regenerated = new ZplGenerator().Generate(imported.Document);
+
+        var renderer = new BinaryKitsRenderer();
+        RenderResult before = renderer.Render(source, 100, 20, 8);
+        RenderResult after = renderer.Render(regenerated, 100, 20, 8);
+
+        Assert.Empty(before.Errors);
+        Assert.Empty(after.Errors);
+        Assert.True(before.Png.SequenceEqual(after.Png), "the accent did not survive the round trip");
+    }
 }
