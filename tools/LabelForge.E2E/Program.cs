@@ -615,6 +615,19 @@ if (mode == "designer")
         + "(expected the baseline option)");
     Capture("designer-anchors.png");
 
+    // A file that states no ^PW/^LL is measured from what it draws, rather than being
+    // floated on a default that silently drops whatever hangs past it.
+    d.ImportZplDocument(
+        "^XA\n^FO0,0^GB320,1600,4,B^FS\n^FO40,1500^A0N,30^FDpast the old default^FS\n^XZ",
+        "unsized.zpl");
+    Pump(900);
+    Console.WriteLine(
+        $"unsized file measured: {d.WidthMm}x{d.HeightMm}mm (expected 40x200)");
+    Console.WriteLine(
+        $"and the low field still prints: {d.GeneratedZpl.Contains("past the old default")} "
+        + $"(expected True), status says so: "
+        + $"{d.StatusText.Contains("measured from what the label draws")} (expected True)");
+
     // Element flags: a locked element resists canvas gestures, a "do not print" one stays
     // on the canvas with its own outline and leaves the exported ZPL.
     d.NewDocumentCommand.Execute(null);

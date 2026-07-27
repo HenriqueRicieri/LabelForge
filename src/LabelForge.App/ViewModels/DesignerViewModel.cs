@@ -1173,6 +1173,14 @@ public partial class DesignerViewModel : ViewModelBase
             notes.Add($"Label {result.SelectedIndex + 1} of {result.LabelCount} in the file.");
         }
 
+        // Ahead of the warnings, because it is the one thing the user most likely has to
+        // act on: a size nobody stated is the size we worked out, and only they know the
+        // stock. It is kept out of the warning list itself, which is for real losses.
+        if (result.MeasuredSize is { } measured)
+        {
+            notes.Add(measured);
+        }
+
         notes.AddRange(result.Warnings);
 
         string what = result.Document.Elements.Count == 1

@@ -19,12 +19,21 @@ namespace LabelForge.Core.Io;
 /// Reported because one block is all a caller gets back, and without this it has no way
 /// to offer the others or to say which of them are worth opening. Counted during the same
 /// pass, since every block is built anyway.</param>
+/// <param name="MeasuredSize">Set when the file stated no size and one was measured from
+/// its content, describing what was worked out; null when the file said so itself.
+///
+/// Deliberately not a warning. `^PW` and `^LL` are optional and real files leave them out
+/// - 28 of the 29 in the sample corpus state neither - so putting this in the warning list
+/// would fire on nearly every import and bury the entries that name real losses. It is the
+/// same kind of thing as an inferred text encoding, and it is reported the same way: beside
+/// the result, for the caller to state once.</param>
 public sealed record ZplDocumentImportResult(
     LabelDocument Document,
     int LabelCount,
     int SelectedIndex,
     IReadOnlyList<string> Warnings,
-    IReadOnlyList<int> BlockElementCounts);
+    IReadOnlyList<int> BlockElementCounts,
+    string? MeasuredSize = null);
 
 /// <summary>
 /// Reads a ZPL label back into the document model: the inverse of
@@ -400,16 +409,6 @@ public static class ZplDocumentImport
             }
 
             BlockDraft block = _blocks[index];
-            if (block.WidthDots is { } width && width > 0)
-            {
-                document.WidthMm = (double)width / document.Dpmm;
-            }
-
-            if (block.HeightDots is { } height && height > 0)
-            {
-                document.HeightMm = (double)height / document.Dpmm;
-            }
-
             document.Print.Copies = block.Print.Copies;
             document.Print.DarknessDelta = block.Print.DarknessDelta;
             document.Print.SpeedIps = block.Print.SpeedIps;
@@ -419,6 +418,10 @@ public static class ZplDocumentImport
                 block.Elements[i].ZOrder = i;
                 document.Elements.Add(block.Elements[i]);
             }
+
+            // Sizing comes after the elements, because a file that does not state a size
+            // is measured from what it draws.
+            string? measured = Size(document, block);
 
             if (block.IsContinuous)
             {
@@ -444,7 +447,78 @@ public static class ZplDocumentImport
                     + string.Join(", ", block.IgnoredConfiguration) + ").");
             }
 
-            return new ZplDocumentImportResult(document, _blocks.Count, index, warnings, counts);
+            return new ZplDocumentImportResult(
+                document, _blocks.Count, index, warnings, counts, measured);
+        }
+
+        /// <summary>
+        /// Sets the label's size, and says so when the file did not.
+        ///
+        /// `^PW` and `^LL` are optional, and real files leave them out: 28 of the 29 in
+        /// the sample corpus state neither, because a label sent to a printer already set
+        /// up for its stock has no reason to. A fixed default is a guess, and one that
+        /// comes out too small is not a cosmetic problem: everything past the edge is off
+        /// the label, so it stops printing and leaves the generated ZPL. Ten of those
+        /// files draw past a 150 mm default and lost the difference.
+        ///
+        /// Measuring the content is the smallest claim that loses nothing, and it works
+        /// in both directions: 603.zpl comes out 45 by 16 mm, which is what its own drawn
+        /// border says it is, rather than being floated on a page six times its size.
+        /// Each axis is decided on its own, since a file can state one and not the other.
+        /// </summary>
+        /// <returns>What to tell the user, or null when the file stated its own size.</returns>
+        private static string? Size(LabelDocument document, BlockDraft block)
+        {
+            bool hasWidth = block.WidthDots is > 0;
+            bool hasHeight = block.HeightDots is > 0;
+            if (hasWidth)
+            {
+                document.WidthMm = (double)block.WidthDots!.Value / document.Dpmm;
+            }
+
+            if (hasHeight)
+            {
+                document.HeightMm = (double)block.HeightDots!.Value / document.Dpmm;
+            }
+
+            if (hasWidth && hasHeight)
+            {
+                return null;
+            }
+
+            // Nothing drawn is nothing to measure, so an empty block keeps the default
+            // rather than collapsing to no label at all.
+            if (LabelExtent.MeasureMm(
+                    document.Elements, document.Dpmm, document.Markers) is not { } extent)
+            {
+                return null;
+            }
+
+            if (!hasWidth)
+            {
+                document.WidthMm = extent.WidthMm;
+            }
+
+            if (!hasHeight)
+            {
+                document.HeightMm = extent.HeightMm;
+            }
+
+            string missing = (hasWidth, hasHeight) switch
+            {
+                (true, false) => "no label length (^LL)",
+                (false, true) => "no label width (^PW)",
+                _ => "no label size (^PW, ^LL)",
+            };
+
+            return string.Format(
+                CultureInfo.CurrentCulture,
+                "The file states {0}, so it was measured from what the label draws: "
+                + "{1:0.#} by {2:0.#} mm at {3:0} dpi. Set the real size if you know it.",
+                missing,
+                document.WidthMm,
+                document.HeightMm,
+                document.Dpmm * 25.4);
         }
 
         private void StartBarcode(
