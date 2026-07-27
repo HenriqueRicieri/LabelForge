@@ -232,9 +232,12 @@ public sealed class ZplGenerator : IElementVisitor
 
     public void Visit(TextElement element)
     {
+        // The font designator is part of the command name, not an argument: ^A0 and ^AD
+        // are the same command asking for different fonts.
+        string name = $"^A{char.ToUpperInvariant(element.Font)}{element.Orientation.Letter()}";
         string font = element.FontWidthDots > 0
-            ? $"^A0{element.Orientation.Letter()},{element.FontHeightDots},{element.FontWidthDots}"
-            : $"^A0{element.Orientation.Letter()},{element.FontHeightDots}";
+            ? $"{name},{element.FontHeightDots},{element.FontWidthDots}"
+            : $"{name},{element.FontHeightDots}";
 
         // A plain line emits no ^FB at all, so a label that never asked for a block is
         // byte-for-byte what it always was.

@@ -160,6 +160,7 @@ public static class ZplDocumentImport
         // Font state. ^BY is not here on purpose: in ZPL it is a format-level default
         // that outlives the field that set it.
         private bool _haveFont;
+        private char _font = ZplFont.Scalable;
         private int _fontHeight;
         private int _fontWidth;
 
@@ -359,20 +360,31 @@ public static class ZplDocumentImport
                     return;
             }
 
-            if (command.Code.Length > 0 && command.Code[0] == 'A')
+            if (command.Code.Length > 1 && command.Code[0] == 'A')
             {
-                // ^A carries its font designator in the command itself. v1 models one
-                // scalable font, so a different one is a real loss and is reported.
-                if (command.Code[1] is not '0')
+                // ^A carries its font designator in the command name rather than in an
+                // argument, so ^AD is the same command as ^A0 asking for another font.
+                char font = char.ToUpperInvariant(command.Code[1]);
+                if (!ZplFont.IsSupported(font))
                 {
-                    Warn($"Font {command.Prefix}{command.Code} became the scalable font 0: "
-                         + "this version models one font.");
+                    // A font this printer was given rather than born with: it lives in
+                    // the printer's memory, so there is nothing here to draw it with.
+                    Warn($"Font {command.Prefix}{command.Code} is not one of the printer's "
+                         + $"built-in fonts, so the scalable font {ZplFont.Scalable} was used "
+                         + "instead. Text in it will be a different width than it prints.");
+                    font = ZplFont.Scalable;
                 }
 
                 _haveFont = true;
+                _font = font;
                 _orientation = ToOrientation(command.Arg(0));
-                _fontHeight = command.Int(1, 30);
-                _fontWidth = command.Int(2);
+
+                // A bitmapped font with no size asked for is its own cell, which is what
+                // the printer falls back to; the scalable font has no cell to fall back
+                // on, so it keeps the model's own default.
+                FontCell? cell = ZplFont.Cell(font, dpmm);
+                _fontHeight = command.Int(1, cell?.HeightDots ?? 30);
+                _fontWidth = command.Int(2, cell is null ? 0 : cell.Value.WidthDots);
                 return;
             }
 
@@ -602,6 +614,7 @@ public static class ZplDocumentImport
                 Add(new TextElement
                 {
                     Text = data,
+                    Font = _font,
                     FontHeightDots = _fontHeight,
                     FontWidthDots = _fontWidth,
                     BlockWidthDots = _blockWidth,
@@ -881,6 +894,7 @@ public static class ZplDocumentImport
             _typeset = false;
             _orientation = Orientation.Normal;
             _haveFont = false;
+            _font = ZplFont.Scalable;
             _fontHeight = 0;
             _fontWidth = 0;
             _symbology = null;

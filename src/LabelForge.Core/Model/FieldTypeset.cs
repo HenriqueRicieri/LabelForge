@@ -33,10 +33,20 @@ namespace LabelForge.Core.Model;
 public static class FieldTypeset
 {
     /// <summary>
-    /// How much of the font size sits above the baseline, measured against the renderer at
-    /// heights of 30, 40, 50 and 80: each one lands on the measured shift exactly.
+    /// How much of the scalable font's size sits above the baseline, measured against the
+    /// offline renderer at heights of 30, 40, 50 and 80: each one lands on the measured
+    /// shift exactly.
+    ///
+    /// The manual and Labelary both say three quarters, and a printer is right, but this
+    /// number positions the box the canvas draws and the canvas is the offline render. The
+    /// difference is 1.4 dots at a 40 dot font and it reaches nothing that prints, because
+    /// a `^FT` field is emitted as the `^FT` it came in as rather than converted.
     /// </summary>
     public const double AscentRatio = 0.715;
+
+    /// <summary>See <see cref="TextMetrics"/>: only OCR-A and OCR-B have cells that vary
+    /// with the printhead, so the 203 dpi matrix keeps this a function of the element.</summary>
+    private const int Dpmm203 = 8;
 
     /// <summary>
     /// The renderer paints a QR ten dots below its field origin, and `^FT` puts the same
@@ -112,6 +122,16 @@ public static class FieldTypeset
     {
         return element switch
         {
+            // A bitmapped font's baseline is published rather than proportional: the
+            // manual states it per font and Labelary draws it there to the dot, so it is
+            // read from the cell instead of from a ratio that only fits font 0.
+            TextElement text when ZplFont.Cell(text.Font, Dpmm203) is { } cell => (
+                box.Width,
+                cell.HeightDots * ZplFont.Magnification(
+                    text.Font, text.FontHeightDots, vertical: true, Dpmm203),
+                (cell.HeightDots - cell.BaselineDots) * ZplFont.Magnification(
+                    text.Font, text.FontHeightDots, vertical: true, Dpmm203)),
+
             TextElement text => (
                 box.Width,
                 text.FontHeightDots,

@@ -76,7 +76,45 @@ public static class TextMetrics
         Ratios.TryGetValue(character, out double ratio) ? ratio : DefaultRatio;
 
     /// <summary>
-    /// Width of a string in dots.
+    /// How wide a text field is, in dots, whichever font draws it.
+    ///
+    /// The two kinds of font are measured differently because they are different things.
+    /// The scalable font is proportional, so its width is the sum of the characters'
+    /// advances; a bitmapped font is fixed pitch, so its width is a count of cells and
+    /// the characters do not enter into it. See <see cref="ZplFont"/> for where those
+    /// cells come from and how far the offline renderer can be trusted to draw them.
+    /// </summary>
+    public static int WidthDots(TextElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+
+        if (ZplFont.Cell(element.Font, Dpmm203) is not { } cell)
+        {
+            return WidthDots(element.Text, element.FontHeightDots, element.FontWidthDots);
+        }
+
+        // A bitmapped font prints in whole multiples of its cell, so the requested size
+        // is read back as the multiple the printer will actually use. The width follows
+        // the height when no width was asked for, which is what ^A does.
+        int requested = element.FontWidthDots > 0
+            ? element.FontWidthDots
+            : cell.WidthDots * ZplFont.Magnification(
+                element.Font, element.FontHeightDots, vertical: true, Dpmm203);
+
+        return ZplFont.WidthDots(
+            element.Font,
+            element.Text.Length,
+            ZplFont.Magnification(element.Font, requested, vertical: false, Dpmm203));
+    }
+
+    /// <summary>The cells of every font but OCR-A and OCR-B are the same number of dots
+    /// on every printhead, and those two are the ones a designer is least likely to
+    /// resize; asking for the 203 dpi matrix keeps this a pure function of the element.
+    /// See <see cref="ZplFont.Cell"/>, which takes the density for callers that have it.</summary>
+    private const int Dpmm203 = 8;
+
+    /// <summary>
+    /// Width of a string in the scalable font, in dots.
     /// </summary>
     /// <param name="fontHeightDots">The ^A0 character height.</param>
     /// <param name="fontWidthDots">The ^A0 character width, or 0 to let it follow the

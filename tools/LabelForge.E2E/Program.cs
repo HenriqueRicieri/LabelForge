@@ -615,6 +615,32 @@ if (mode == "designer")
         + "(expected the baseline option)");
     Capture("designer-anchors.png");
 
+    // The printer's built-in fonts. A bitmapped font rides in the command name and only
+    // prints whole multiples of its own cell, so the panel edits that multiple.
+    d.ImportZplDocument(
+        "^XA\n^FO20,20^ADN^FDcell size^FS\n^FO20,80^ADN,36,20^FDdouble^FS\n"
+        + "^FO20,160^AGN^FDbig^FS\n^FO20,260^A0N,30^FDscalable^FS\n^XZ",
+        "fonts.zpl");
+    Pump(900);
+    Console.WriteLine(
+        "fonts read per field: "
+        + $"{string.Join(", ", d.Document.Elements.OfType<LabelForge.Core.Model.TextElement>().Select(t => $"{t.Font}@{t.FontHeightDots}x{t.FontWidthDots}"))} "
+        + "(expected D@18x10, D@36x20, G@60x40, 0@30x0)");
+    Console.WriteLine(
+        $"and written back by name: ^AD count={Count(d.GeneratedZpl, "^AD")}, "
+        + $"^AG count={Count(d.GeneratedZpl, "^AG")}, ^A0 count={Count(d.GeneratedZpl, "^A0")} "
+        + "(expected 2/1/1)");
+
+    d.Selection.Set(d.Document.Elements[1]);
+    Pump(300);
+    var textPanel = (LabelForge.App.ViewModels.TextPropertiesViewModel)d.SelectionProperties!;
+    Console.WriteLine(
+        $"panel offers the multiple: {textPanel.Magnification}x, "
+        + $"scalable={textPanel.IsScalableFont}, font='{textPanel.SelectedFont}' "
+        + "(expected 2x, False, the D option)");
+    Console.WriteLine($"and says what the preview can promise: '{textPanel.FontNote}'");
+    Capture("designer-fonts.png");
+
     // A file that states no ^PW/^LL is measured from what it draws, rather than being
     // floated on a default that silently drops whatever hangs past it.
     d.ImportZplDocument(

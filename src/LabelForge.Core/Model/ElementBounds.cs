@@ -60,16 +60,16 @@ public sealed class ElementBoundsCalculator : IElementVisitor
 
     public void Visit(TextElement element)
     {
-        // Font 0 is proportional, so the width comes from the characters rather than
-        // from a count of them; TextMetrics holds the measured advances.
+        // Font 0 is proportional, so its width comes from the characters rather than from
+        // a count of them; TextMetrics holds the measured advances. The bitmapped fonts
+        // are the opposite: fixed pitch, so their width is arithmetic on the count, and
+        // ZplFont holds the manual's cells (confirmed against Labelary to the dot).
         //
         // The height stays the font size rather than the ink. The ink is 0.74 of it for
         // capitals and 0.94 once a descender appears, so a box that hugged one string
         // would jump the moment someone typed a "g". The font size is the line the field
         // occupies, and it is the stable answer.
-        int naturalWidth = Math.Max(
-            TextMetrics.WidthDots(element.Text, element.FontHeightDots, element.FontWidthDots),
-            1);
+        int naturalWidth = Math.Max(TextMetrics.WidthDots(element), 1);
 
         if (!element.IsBlock)
         {

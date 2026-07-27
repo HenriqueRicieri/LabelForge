@@ -46,12 +46,26 @@
                                  FilterMode="Custom" MinimumPrefixLength="0"
                                  AttachedToVisualTree="OnFieldBoxAttached"
                                  HorizontalAlignment="Stretch" />
-                <TextBlock Classes="propLabel" Text="Font height (dots)" />
+                <TextBlock Classes="propLabel" Text="Font" />
+                <ComboBox ItemsSource="{Binding Fonts}" SelectedItem="{Binding SelectedFont}"
+                          HorizontalAlignment="Stretch" />
+                <TextBlock Text="{Binding FontNote}" FontSize="11" Opacity="0.7"
+                           TextWrapping="Wrap" />
+                <TextBlock Classes="propLabel" Text="Font height (dots)"
+                           IsVisible="{Binding IsScalableFont}" />
                 <NumericUpDown Value="{Binding FontHeight}" Minimum="6" Maximum="600"
-                               Increment="2" FormatString="0" />
-                <TextBlock Classes="propLabel" Text="Font width (dots, 0 = auto)" />
+                               Increment="2" FormatString="0"
+                               IsVisible="{Binding IsScalableFont}" />
+                <TextBlock Classes="propLabel" Text="Font width (dots, 0 = auto)"
+                           IsVisible="{Binding IsScalableFont}" />
                 <NumericUpDown Value="{Binding FontWidth}" Minimum="0" Maximum="600"
-                               Increment="2" FormatString="0" />
+                               Increment="2" FormatString="0"
+                               IsVisible="{Binding IsScalableFont}" />
+                <TextBlock Classes="propLabel" Text="Size (times the font's own cell)"
+                           IsVisible="{Binding !IsScalableFont}" />
+                <NumericUpDown Value="{Binding Magnification}" Minimum="1" Maximum="10"
+                               Increment="1" FormatString="0"
+                               IsVisible="{Binding !IsScalableFont}" />
                 <TextBlock Classes="propLabel" Text="Block width (dots, 0 = single line)"
                            Margin="0,8,0,0" />
                 <NumericUpDown Value="{Binding BlockWidth}" Minimum="0" Maximum="9999"

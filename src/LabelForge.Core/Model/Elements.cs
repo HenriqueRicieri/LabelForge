@@ -18,7 +18,20 @@ public sealed class TextElement : Element
 {
     public string Text { get; set; } = string.Empty;
 
-    /// <summary>Character height in dots.</summary>
+    /// <summary>
+    /// Which built-in printer font draws this text, as ZPL's own designator: '0' for the
+    /// scalable font, 'A' to 'H' for the bitmapped ones. See <see cref="ZplFont"/> for
+    /// the cells and for which of them the offline preview draws faithfully.
+    ///
+    /// The distinction that matters is not cosmetic. The scalable font takes any height
+    /// and width in dots; a bitmapped font only prints whole multiples of its own cell,
+    /// one to ten, and is fixed pitch, so its width follows from the character count
+    /// rather than from the characters.
+    /// </summary>
+    public char Font { get; set; } = ZplFont.Scalable;
+
+    /// <summary>Character height in dots. For a bitmapped font the printer rounds this
+    /// down to a whole multiple of the font's cell.</summary>
     public int FontHeightDots { get; set; } = 30;
 
     /// <summary>Character width in dots. If 0, the printer derives it from the height.</summary>

@@ -27,6 +27,26 @@ public sealed record AnchorOption(FieldAnchor Value, string Label)
     public override string ToString() => Label;
 }
 
+/// <summary>One of the printer's built-in fonts, named the way someone picking one would
+/// recognise it rather than by its ZPL letter alone.</summary>
+public sealed record FontOption(char Value, string Label)
+{
+    public static IReadOnlyList<FontOption> All { get; } =
+    [
+        new('0', "0 - scalable (default)"),
+        new('A', "A - 9 x 5, smallest"),
+        new('B', "B - 11 x 7, capitals only"),
+        new('C', "C - 18 x 10"),
+        new('D', "D - 18 x 10"),
+        new('E', "E - OCR-B"),
+        new('F', "F - 26 x 13"),
+        new('G', "G - 60 x 40, largest"),
+        new('H', "H - OCR-A"),
+    ];
+
+    public override string ToString() => Label;
+}
+
 /// <summary>
 /// Base of the per-type property editors shown in the designer's panel. Each editor
 /// wraps the selected element directly (getters read the model, setters write it) and
@@ -205,6 +225,83 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
     {
         get => _text.Text;
         set => Edit(_text.Text, value ?? string.Empty, v => _text.Text = v);
+    }
+
+    public IReadOnlyList<FontOption> Fonts { get; } = FontOption.All;
+
+    /// <summary>Which of the printer's built-in fonts draws this field.</summary>
+    public FontOption SelectedFont
+    {
+        get => Fonts.FirstOrDefault(f => f.Value == char.ToUpperInvariant(_text.Font)) ?? Fonts[0];
+        set => Edit(_text.Font, value?.Value ?? ZplFont.Scalable, v =>
+        {
+            _text.Font = v;
+
+            // A bitmapped font only prints whole multiples of its cell, so landing on one
+            // is not a preference: an in-between size is a size the printer will not use.
+            if (ZplFont.Cell(v, Document.Dpmm) is { } cell)
+            {
+                int magnification = ZplFont.Magnification(
+                    v, _text.FontHeightDots, vertical: true, Document.Dpmm);
+                _text.FontHeightDots = cell.HeightDots * magnification;
+                _text.FontWidthDots = cell.WidthDots * magnification;
+            }
+
+            OnPropertyChanged(nameof(FontHeight));
+            OnPropertyChanged(nameof(FontWidth));
+            OnPropertyChanged(nameof(IsScalableFont));
+            OnPropertyChanged(nameof(Magnification));
+            OnPropertyChanged(nameof(FontNote));
+        });
+    }
+
+    /// <summary>Drives which size editor the panel shows: free dots for the scalable
+    /// font, whole multiples of the cell for a bitmapped one.</summary>
+    public bool IsScalableFont => ZplFont.IsScalable(char.ToUpperInvariant(_text.Font));
+
+    /// <summary>The bitmapped size, as the multiple of the cell the printer will use.</summary>
+    public decimal Magnification
+    {
+        get => ZplFont.Magnification(_text.Font, _text.FontHeightDots, vertical: true, Document.Dpmm);
+        set
+        {
+            if (ZplFont.Cell(_text.Font, Document.Dpmm) is not { } cell)
+            {
+                return;
+            }
+
+            int times = Math.Clamp((int)value, 1, ZplFont.MaxMagnification);
+            Edit(_text.FontHeightDots, cell.HeightDots * times, v =>
+            {
+                _text.FontHeightDots = v;
+                _text.FontWidthDots = cell.WidthDots * times;
+                OnPropertyChanged(nameof(FontHeight));
+                OnPropertyChanged(nameof(FontWidth));
+                OnPropertyChanged(nameof(FontNote));
+            });
+        }
+    }
+
+    /// <summary>What the panel says under the font picker. The renderer half is not a
+    /// disclaimer for its own sake: the canvas is that render, and a designer that let it
+    /// pretend would be worse than one that says which fonts it can show truly.</summary>
+    public string FontNote
+    {
+        get
+        {
+            char font = char.ToUpperInvariant(_text.Font);
+            if (ZplFont.Cell(font, Document.Dpmm) is not { } cell)
+            {
+                return "Scalable: any height and width in dots.";
+            }
+
+            string size = $"Fixed pitch, {cell.HeightDots} x {cell.WidthDots} dots per "
+                          + $"character at 1x, up to {ZplFont.MaxMagnification}x.";
+            return ZplFont.RendersFaithfully(font)
+                ? size
+                : size + " The preview draws this font at a slightly different width than"
+                       + " it prints; the ZPL is correct.";
+        }
     }
 
     public decimal FontHeight

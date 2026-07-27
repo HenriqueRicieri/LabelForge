@@ -59,6 +59,13 @@ public sealed class ZplDocumentImportTests
             X = 560, Y = 260, Text = "Typeset", FontHeightDots = 34,
             Anchor = FieldAnchor.Baseline,
         });
+        document.Elements.Add(new TextElement
+        {
+            // A bitmapped font, whose designator rides in the command name rather than
+            // in an argument.
+            X = 560, Y = 300, Text = "Bitmapped", Font = 'D',
+            FontHeightDots = 36, FontWidthDots = 20,
+        });
         document.Elements.Add(new BarcodeElement
         {
             X = 20, Y = 200, Symbology = BarcodeSymbology.Code128, Data = "ABC-123",
