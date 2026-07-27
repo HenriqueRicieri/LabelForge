@@ -13,14 +13,24 @@ namespace LabelForge.Core.Model;
 /// glyph and then ten and taking a ninth of the difference, which cancels the run's own
 /// side bearings and leaves the pitch a repeated glyph really costs.
 ///
-/// It describes the font the offline renderer draws with, and that is a choice rather
-/// than a convenience, because Labelary draws the same font differently. Two things
-/// decided it. The canvas shows the offline render, so an outline agreeing with something
-/// else would visibly not fit the text under it. And Labelary's own numbers do not survive
-/// inspection for this font: it gives '%', '+', '-', '=' and '@' one shared advance of
-/// 0.90 em and '&lt;' and '&gt;' another of 0.99, both wider than its own 'W' at 0.81,
-/// which is what a renderer does when it has no metrics for a glyph rather than what a
-/// typeface does. For the bitmapped fonts, where the manual publishes the numbers and no
+/// It describes one specific typeface, and it can only be a fact because that typeface is
+/// pinned. ZPL names font 0 unambiguously, but font 0 is a file inside the printer, so the
+/// preview substitutes something, and it used to substitute whatever the machine had
+/// installed: two machines drew the same label 22 per cent apart. The table would then have
+/// been a description of one developer's font folder. <see cref="Rendering.PreviewFont"/>
+/// pins it, and this table is measured against what it pins.
+///
+/// The typeface was chosen against Labelary, which renders what a printer prints, so the
+/// preview is as close to the printed label as a redistributable font gets: 4.5 per cent
+/// mean error over eight strings, against 15.5 for the Arial one machine had been falling
+/// back to.
+///
+/// Labelary is still not the source for these numbers, and that split is deliberate. Its
+/// own font 0 metrics do not survive inspection: it gives '%', '+', '-', '=' and '@' one
+/// shared advance of 0.90 em and '&lt;' and '&gt;' another of 0.99, both wider than its own
+/// 'W' at 0.81, which is what a renderer does when it has no metrics for a glyph rather
+/// than what a typeface does. The canvas draws the offline render, so the table has to
+/// describe that. For the bitmapped fonts, where the manual publishes the numbers and no
 /// font file is involved, Labelary is exact and <see cref="ZplFont"/> follows it instead.
 ///
 /// None of this reaches the printer: a field's width is never stated in the ZPL, only its
@@ -32,27 +42,80 @@ public static class TextMetrics
     /// <summary>Advance as a fraction of the font size, grouped by the value measured.</summary>
     private static readonly (double Ratio, string Characters)[] Measured =
     [
-        (0.194, "'"),
-        (0.228, "|"),
-        (0.231, " ,./I\\ijlÍí"),
-        (0.275, "!()-:;[]`ft"),
-        (0.300, "º"),
-        (0.303, "ª"),
-        (0.319, "*r{}"),
-        (0.389, "\""),
-        (0.400, "°"),
-        (0.408, "z"),
-        (0.411, "1"),
-        (0.456, "#$023456789J_aceksvxyáàâãäçéê"),
-        (0.481, "+<=>"),
-        (0.503, "?FLTZbdghnopquóôõöúüñ"),
-        (0.547, "EPSVXYÉÊ"),
-        (0.592, "&ABCDHKNRUÁÀÂÃÄÇÚÜÑ"),
-        (0.639, "GOQwÓÔÕÖ"),
-        (0.683, "M"),
-        (0.731, "%m"),
-        (0.775, "W"),
-        (0.803, "@"),
+        (0.123, "'"),
+        (0.197, ","),
+        (0.203, ";"),
+        (0.224, "j"),
+        (0.230, " "),
+        (0.231, "il"),
+        (0.234, ":"),
+        (0.236, "í"),
+        (0.244, "|"),
+        (0.246, "!"),
+        (0.248, "-"),
+        (0.250, "I[]Í"),
+        (0.262, "/"),
+        (0.264, "."),
+        (0.268, "\""),
+        (0.297, "t"),
+        (0.304, "r"),
+        (0.307, "{}"),
+        (0.308, "`"),
+        (0.314, "("),
+        (0.317, "f"),
+        (0.318, ")"),
+        (0.369, "\\"),
+        (0.371, "^"),
+        (0.373, "°"),
+        (0.397, "ª"),
+        (0.404, "_º"),
+        (0.416, "y"),
+        (0.422, "?"),
+        (0.428, "v"),
+        (0.432, "*"),
+        (0.439, "xz"),
+        (0.446, "<"),
+        (0.451, "k"),
+        (0.457, "s"),
+        (0.461, ">"),
+        (0.463, "cç"),
+        (0.469, "eéê"),
+        (0.477, "L"),
+        (0.478, "=aáàâãä"),
+        (0.481, "F"),
+        (0.482, "h"),
+        (0.484, "Jnuúüñ"),
+        (0.494, "$0123456789bgp"),
+        (0.496, "d"),
+        (0.498, "+EÉÊ"),
+        (0.500, "q"),
+        (0.502, "oóôõö"),
+        (0.519, "S"),
+        (0.523, "Z"),
+        (0.529, "T"),
+        (0.531, "R"),
+        (0.535, "Y"),
+        (0.545, "&K"),
+        (0.547, "B"),
+        (0.549, "#"),
+        (0.551, "X"),
+        (0.554, "P"),
+        (0.561, "V"),
+        (0.563, "UÚÜ"),
+        (0.567, "CÇ"),
+        (0.571, "D"),
+        (0.576, "AÁÀÂÃÄ"),
+        (0.590, "~"),
+        (0.592, "G"),
+        (0.602, "OQÓÔÕÖ"),
+        (0.619, "NÑ"),
+        (0.621, "H"),
+        (0.633, "%"),
+        (0.651, "w"),
+        (0.754, "m"),
+        (0.756, "M"),
+        (0.762, "W"),
+        (0.769, "@"),
     ];
 
     /// <summary>Anything the table does not name: accented letters and the rest of

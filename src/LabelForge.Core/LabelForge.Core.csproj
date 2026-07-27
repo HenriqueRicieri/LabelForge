@@ -12,6 +12,11 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Media\zebra-media-catalog.json" />
+
+    <!-- The typeface the preview draws ZPL's scalable font 0 with. Embedded rather than
+         left to the machine: see Rendering/PreviewFont. SIL OFL 1.1, notice in
+         THIRD-PARTY-NOTICES.md and the licence beside the font. -->
+    <EmbeddedResource Include="Rendering\Fonts\RobotoCondensed-Regular.ttf" />
   </ItemGroup>
 
 </Project>

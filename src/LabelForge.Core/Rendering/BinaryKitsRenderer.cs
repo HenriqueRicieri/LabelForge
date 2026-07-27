@@ -33,14 +33,29 @@ public sealed class BinaryKitsRenderer : IZplRenderer
     /// Default drawer options tuned for label fidelity. Crucially, the "smart"
     /// character substitutions are disabled so literal text such as Atak template
     /// markers (for example "##FILIAL_DOCUMENTO##") renders exactly as written.
+    ///
+    /// The font loader is the other load-bearing setting. Left alone, the engine picks a
+    /// substitute for ZPL's font 0 from whatever the machine has installed, and two
+    /// machines disagreed about the width of the same label by 22 per cent. Pinning it
+    /// makes every machine draw the same picture, which is what lets
+    /// <see cref="Model.TextMetrics"/> be a fact rather than a local observation. See
+    /// <see cref="PreviewFont"/> for the measurement that chose the typeface.
     /// </summary>
-    public static DrawerOptions CreateDefaultOptions() => new()
+    public static DrawerOptions CreateDefaultOptions()
     {
-        OpaqueBackground = true,
-        Antialias = true,
-        ReplaceDashWithEnDash = false,
-        ReplaceUnderscoreWithEnSpace = false,
-    };
+        var options = new DrawerOptions
+        {
+            OpaqueBackground = true,
+            Antialias = true,
+            ReplaceDashWithEnDash = false,
+            ReplaceUnderscoreWithEnSpace = false,
+        };
+
+        // Asked by ZPL designator ("0", "A", ...), not by family name, so this depends on
+        // nothing about what fonts are called or which are installed.
+        options.FontManager.FontLoader = PreviewFont.Resolve;
+        return options;
+    }
 
     public RenderResult Render(string zpl, double widthMm, double heightMm, int dpmm, int labelIndex = 0)
     {

@@ -11,6 +11,25 @@ It must be reviewed and completed before any public release.
 - SkiaSharp and HarfBuzzSharp (2D graphics and text shaping). License: MIT.
 - ZXing.Net (barcode encoding). License: Apache-2.0.
 
+## Bundled font
+
+- Roboto Condensed Regular, bundled as
+  `src/LabelForge.Core/Rendering/Fonts/RobotoCondensed-Regular.ttf` and embedded in
+  LabelForge.Core. License: SIL Open Font License 1.1, copied verbatim beside the font as
+  `Rendering/Fonts/OFL.txt`. Copyright 2011 The Roboto Project Authors.
+
+  Why it is bundled: the offline preview has to draw ZPL's scalable font 0 with something,
+  because font 0 is a file resident in the printer rather than on a PC. Left to the machine,
+  the renderer substituted whatever happened to be installed, and two machines drew the same
+  label 22 per cent apart. Every text footprint in the designer is measured from that render,
+  so the typeface is pinned and shipped. See `Rendering/PreviewFont` for the measurement that
+  chose this one over the alternatives.
+
+  OFL 1.1 permits bundling and redistribution with software, including commercially. The two
+  conditions that matter here are both met: the font is not sold on its own, and the license
+  travels with it. The Reserved Font Name clause applies only to modified versions; this file
+  is unmodified upstream, and it must stay that way or it has to be renamed.
+
 ## SixLabors.ImageSharp license position
 
 SixLabors.ImageSharp 3.1.12 is on the runtime path, pulled transitively by
