@@ -229,6 +229,52 @@
                                Increment="1" FormatString="0" />
                 <CheckBox Content="White (erase)" IsChecked="{Binding IsWhite}" Margin="0,4,0,0"
                           ToolTip.Tip="Draws in white, which clears whatever was drawn under it. Over blank stock it prints nothing." />
+                <TextBlock Classes="propLabel" Text="Corner rounding (0-8)" />
+                <NumericUpDown Value="{Binding CornerRoundness}" Minimum="0" Maximum="8"
+                               Increment="1" FormatString="0"
+                               ToolTip.Tip="0 is square corners, 8 the heaviest rounding. The radius is that many eighths of half the shorter side, so it keeps its proportion as the box is resized." />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:EllipsePropertiesViewModel">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="propLabel" Text="Width (dots)" />
+                <NumericUpDown Value="{Binding EllipseWidth}" Minimum="3" Maximum="4095"
+                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="Height (dots)" />
+                <NumericUpDown Value="{Binding EllipseHeight}" Minimum="3" Maximum="4095"
+                               Increment="10" FormatString="0" />
+                <Button Content="Make it a circle" Command="{Binding MakeCircleCommand}"
+                        HorizontalAlignment="Stretch"
+                        ToolTip.Tip="Matches the height to the width. A circle is an ellipse with equal sides; ZPL's own ^GC draws exactly that." />
+                <TextBlock Classes="propLabel" Text="Border thickness (dots)" />
+                <NumericUpDown Value="{Binding Thickness}" Minimum="1" Maximum="200"
+                               Increment="1" FormatString="0"
+                               ToolTip.Tip="Grows inward from the outline. At half the shorter side the shape is solid." />
+                <CheckBox Content="White (erase)" IsChecked="{Binding IsWhite}" Margin="0,4,0,0"
+                          ToolTip.Tip="Draws in white, which clears whatever was drawn under it. Over blank stock it prints nothing." />
+                <TextBlock Text="{Binding WhiteNote}" IsVisible="{Binding HasWhiteNote}"
+                           Foreground="#D97706" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:DiagonalPropertiesViewModel">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="propLabel" Text="Width (dots)" />
+                <NumericUpDown Value="{Binding DiagonalWidth}" Minimum="3" Maximum="5000"
+                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="Height (dots)" />
+                <NumericUpDown Value="{Binding DiagonalHeight}" Minimum="3" Maximum="5000"
+                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="Thickness (dots)" />
+                <NumericUpDown Value="{Binding Thickness}" Minimum="1" Maximum="200"
+                               Increment="1" FormatString="0" />
+                <TextBlock Text="{Binding ThicknessNote}" IsVisible="{Binding HasThicknessNote}"
+                           Foreground="#D97706" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />
+                <CheckBox Content="Leans right (/)" IsChecked="{Binding LeansRight}" Margin="0,4,0,0"
+                          ToolTip.Tip="On: bottom-left up to top-right. Off: top-left down to bottom-right." />
+                <CheckBox Content="White (erase)" IsChecked="{Binding IsWhite}"
+                          ToolTip.Tip="Draws in white, which clears whatever was drawn under it. Over blank stock it prints nothing." />
             </StackPanel>
         </DataTemplate>
 
@@ -294,6 +340,8 @@
                         <MenuItem Header="_Text" Command="{Binding AddTextCommand}" />
                         <MenuItem Header="_Box" Command="{Binding AddBoxCommand}" />
                         <MenuItem Header="_Line" Command="{Binding AddLineCommand}" />
+                        <MenuItem Header="_Ellipse" Command="{Binding AddEllipseCommand}" />
+                        <MenuItem Header="Dia_gonal Line" Command="{Binding AddDiagonalCommand}" />
                         <MenuItem Header="Ba_rcode" Command="{Binding AddBarcodeCommand}" />
                         <MenuItem Header="_QR Code" Command="{Binding AddQrCommand}" />
                         <MenuItem Header="_Data Matrix" Command="{Binding AddDataMatrixCommand}" />
@@ -596,9 +644,11 @@
                                        Increment="1"
                                        FormatString="{Binding SelectionProperties.PositionFormat, FallbackValue=0}"
                                        Minimum="-9999" />
-                        <TextBlock Classes="propLabel" Text="Rotation" />
+                        <TextBlock Classes="propLabel" Text="Rotation"
+                                   IsVisible="{Binding SelectionProperties.CanRotate, FallbackValue=False}" />
                         <ComboBox ItemsSource="{Binding SelectionProperties.Orientations, FallbackValue={x:Null}}"
                                   SelectedItem="{Binding SelectionProperties.SelectedOrientation, FallbackValue={x:Null}}"
+                                  IsVisible="{Binding SelectionProperties.CanRotate, FallbackValue=False}"
                                   HorizontalAlignment="Stretch" />
                         <TextBlock Classes="propLabel" Text="Position names" />
                         <ComboBox ItemsSource="{Binding SelectionProperties.Anchors, FallbackValue={x:Null}}"
@@ -719,6 +769,14 @@
                 <Button Classes="tool" Classes.armed="{Binding IsLineArmed}"
                         Command="{Binding AddLineCommand}" ToolTip.Tip="Add line">
                     <PathIcon Data="M2.2,12.4 L12.4,2.2 L13.8,3.6 L3.6,13.8 Z" />
+                </Button>
+                <Button Classes="tool" Classes.armed="{Binding IsEllipseArmed}"
+                        Command="{Binding AddEllipseCommand}" ToolTip.Tip="Add ellipse or circle">
+                    <PathIcon Data="F1 M8,2.6 C11.9,2.6 14.4,4.9 14.4,8 C14.4,11.1 11.9,13.4 8,13.4 C4.1,13.4 1.6,11.1 1.6,8 C1.6,4.9 4.1,2.6 8,2.6 Z M8,4.4 C5.1,4.4 3.4,5.9 3.4,8 C3.4,10.1 5.1,11.6 8,11.6 C10.9,11.6 12.6,10.1 12.6,8 C12.6,5.9 10.9,4.4 8,4.4 Z" />
+                </Button>
+                <Button Classes="tool" Classes.armed="{Binding IsDiagonalArmed}"
+                        Command="{Binding AddDiagonalCommand}" ToolTip.Tip="Add diagonal line">
+                    <PathIcon Data="M2,2.6 L3.4,2.6 L3.4,13.4 L2,13.4 Z M2,12 L14,12 L14,13.4 L2,13.4 Z M2.9,11.1 L12.6,2.4 L13.6,3.5 L3.9,12.2 Z" />
                 </Button>
                 <Button Classes="tool" Classes.armed="{Binding IsBarcodeArmed}"
                         Command="{Binding AddBarcodeCommand}" ToolTip.Tip="Add barcode">

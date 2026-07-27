@@ -147,6 +147,8 @@ public partial class DesignerView : UserControl
         InsertItem(insert, "Text", vm, vm.AddTextCommand, x, y);
         InsertItem(insert, "Box", vm, vm.AddBoxCommand, x, y);
         InsertItem(insert, "Line", vm, vm.AddLineCommand, x, y);
+        InsertItem(insert, "Ellipse", vm, vm.AddEllipseCommand, x, y);
+        InsertItem(insert, "Diagonal Line", vm, vm.AddDiagonalCommand, x, y);
         InsertItem(insert, "Barcode", vm, vm.AddBarcodeCommand, x, y);
         InsertItem(insert, "QR Code", vm, vm.AddQrCommand, x, y);
         InsertItem(insert, "Data Matrix", vm, vm.AddDataMatrixCommand, x, y);

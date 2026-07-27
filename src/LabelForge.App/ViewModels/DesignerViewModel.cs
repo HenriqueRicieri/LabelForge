@@ -1019,6 +1019,8 @@ public partial class DesignerViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsTextArmed));
         OnPropertyChanged(nameof(IsBoxArmed));
         OnPropertyChanged(nameof(IsLineArmed));
+        OnPropertyChanged(nameof(IsEllipseArmed));
+        OnPropertyChanged(nameof(IsDiagonalArmed));
         OnPropertyChanged(nameof(IsBarcodeArmed));
         OnPropertyChanged(nameof(IsQrArmed));
         OnPropertyChanged(nameof(IsDataMatrixArmed));
@@ -1031,6 +1033,10 @@ public partial class DesignerViewModel : ViewModelBase
     public bool IsBoxArmed => ArmedTool == "Box";
 
     public bool IsLineArmed => ArmedTool == "Line";
+
+    public bool IsEllipseArmed => ArmedTool == "Ellipse";
+
+    public bool IsDiagonalArmed => ArmedTool == "Diagonal";
 
     public bool IsBarcodeArmed => ArmedTool == "Barcode";
 
@@ -1055,6 +1061,17 @@ public partial class DesignerViewModel : ViewModelBase
     [RelayCommand]
     private void AddLine() => ArmInsert("Line",
         () => new LineElement { LengthDots = 240, ThicknessDots = 3 });
+
+    [RelayCommand]
+    private void AddEllipse() => ArmInsert("Ellipse",
+        () => new EllipseElement { WidthDots = 200, HeightDots = 140, ThicknessDots = 3 });
+
+    /// <summary>Thickness starts at 3 rather than at ZPL's default of 1, because the
+    /// offline renderer draws a one-dot diagonal as nothing at all and a new element that
+    /// appears to have failed is a bad first impression of a working command.</summary>
+    [RelayCommand]
+    private void AddDiagonal() => ArmInsert("Diagonal",
+        () => new DiagonalLineElement { WidthDots = 200, HeightDots = 140, ThicknessDots = 3 });
 
     [RelayCommand]
     private void AddBarcode() => ArmInsert("Barcode",
@@ -1582,6 +1599,9 @@ public partial class DesignerViewModel : ViewModelBase
         ImageElement image => new ImagePropertiesViewModel(image, Document, OnPanelEdited),
         LineElement line => new LinePropertiesViewModel(line, Document, OnPanelEdited),
         BoxElement box => new BoxPropertiesViewModel(box, Document, OnPanelEdited),
+        EllipseElement ellipse => new EllipsePropertiesViewModel(ellipse, Document, OnPanelEdited),
+        DiagonalLineElement diagonal =>
+            new DiagonalPropertiesViewModel(diagonal, Document, OnPanelEdited),
         _ => null,
     };
 
@@ -2339,6 +2359,11 @@ public partial class DesignerViewModel : ViewModelBase
             LineElement => "Line",
             BoxElement { IsWhite: true } => "White box",
             BoxElement => "Box",
+            EllipseElement { IsWhite: true } => "White ellipse",
+            EllipseElement e when e.WidthDots == e.HeightDots => "Circle",
+            EllipseElement => "Ellipse",
+            DiagonalLineElement { IsWhite: true } => "White diagonal",
+            DiagonalLineElement => "Diagonal line",
             _ => "Element",
         };
 

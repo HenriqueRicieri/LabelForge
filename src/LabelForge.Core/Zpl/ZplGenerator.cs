@@ -258,9 +258,32 @@ public sealed class ZplGenerator : IElementVisitor
         _ => "L",
     };
 
-    public void Visit(BoxElement element) =>
+    public void Visit(BoxElement element)
+    {
+        // The rounding index is emitted only when there is some, so a box that never
+        // asked for it generates the bytes it always did. Same rule ^FB follows.
+        string rounding = element.CornerRoundness > 0
+            ? $",{Math.Clamp(element.CornerRoundness, 0, 8)}"
+            : string.Empty;
+
         Line($"{Fo(element)}^GB{element.WidthDots},{element.HeightDots},"
+             + $"{element.ThicknessDots},{Colour(element.IsWhite)}{rounding}^FS");
+    }
+
+    /// <summary>
+    /// An ellipse, always as ^GE even when its sides are equal and ZPL's own ^GC would
+    /// draw it. The two are pixel-identical, so choosing between them by shape would only
+    /// mean the command flipping as a resize handle passes through square, and it would
+    /// break the round trip for a foreign label that wrote ^GE with equal sides.
+    /// </summary>
+    public void Visit(EllipseElement element) =>
+        Line($"{Fo(element)}^GE{element.WidthDots},{element.HeightDots},"
              + $"{element.ThicknessDots},{Colour(element.IsWhite)}^FS");
+
+    public void Visit(DiagonalLineElement element) =>
+        Line($"{Fo(element)}^GD{element.WidthDots},{element.HeightDots},"
+             + $"{element.ThicknessDots},{Colour(element.IsWhite)},"
+             + $"{(element.LeansRight ? "R" : "L")}^FS");
 
     public void Visit(LineElement element)
     {

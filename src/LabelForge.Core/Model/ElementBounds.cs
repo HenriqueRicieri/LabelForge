@@ -27,7 +27,14 @@ public sealed class ElementBoundsCalculator : IElementVisitor
 
         // ZPL rotates fields around the origin; approximating the rotated footprint
         // as a width/height swap at the same origin is close enough for selection.
-        return element.Orientation is Orientation.Rotated90 or Orientation.Rotated270
+        //
+        // Only for the fields it rotates, though. The graphic primitives take no
+        // orientation argument at all, so swapping their sides described a shape the ink
+        // never took: a 200 by 100 box set to 90 degrees drew 200 by 100 and measured
+        // 100 by 200, which is a selection outline, a snap target and a measured label
+        // length all wrong at once. See FieldRotation.
+        return FieldRotation.Applies(element) &&
+               element.Orientation is Orientation.Rotated90 or Orientation.Rotated270
             ? bounds with { Width = bounds.Height, Height = bounds.Width }
             : bounds;
     }
@@ -204,4 +211,22 @@ public sealed class ElementBoundsCalculator : IElementVisitor
 
     public void Visit(BoxElement element) =>
         _result = new DotRect(0, 0, element.WidthDots, element.HeightDots);
+
+    // The ellipse is inscribed in the box it declares: measured against the rendered ink
+    // it is exactly WidthDots by HeightDots from the field origin, at every thickness
+    // tried, and rounding the corners of a ^GB does not move its edges either.
+    public void Visit(EllipseElement element) =>
+        _result = new DotRect(0, 0, element.WidthDots, element.HeightDots);
+
+    public void Visit(DiagonalLineElement element)
+    {
+        // The declared box, which is what ^GD means by its width and height and what a
+        // printer draws inside. The offline renderer overshoots it horizontally by up to
+        // the line thickness, which is a stroke cap rather than the command: the height is
+        // exact at every thickness, and the overshoot grows one dot per dot of thickness
+        // on the axis Skia strokes along. Following that artifact would make the label's
+        // own measured extent wrong, so the footprint stays the box; DiagonalLineTests
+        // pins the artifact so it is not mistaken for a bug later.
+        _result = new DotRect(0, 0, element.WidthDots, element.HeightDots);
+    }
 }

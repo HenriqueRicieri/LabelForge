@@ -261,5 +261,88 @@ public sealed class BoxElement : Element
     /// <inheritdoc cref="LineElement.IsWhite"/>
     public bool IsWhite { get; set; }
 
+    /// <summary>
+    /// How much the corners are rounded, on ^GB's own scale of 0 (square) to 8. Not a
+    /// radius: the manual states the radius as `(index / 8) * (shorter side / 2)`, so the
+    /// same index keeps its proportion as the box is resized, which is why the parameter
+    /// is an index rather than a length in the first place.
+    ///
+    /// Zero emits no fifth parameter at all, so a box that never asked for rounding
+    /// generates exactly the bytes it always did.
+    ///
+    /// Nothing to do with <see cref="LabelDocument.CornerRadiusMm"/>, which describes the
+    /// die cut of the stock and never reaches the ZPL. This one is ink.
+    /// </summary>
+    public int CornerRoundness { get; set; }
+
+    public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// An ellipse outline (^GE), which is also how a circle is drawn: give it equal sides.
+///
+/// ZPL has a separate ^GC for circles, taking only a diameter, and it is deliberately not
+/// a second element type here. Measured against the offline renderer, `^GE d,d,t,c` and
+/// `^GC d,t,c` produce pixel-identical output at every size tried, so a circle is an
+/// ellipse whose sides match and modelling it twice would only mean a resize handle
+/// silently switching commands as it passes through square. Import reads both.
+/// </summary>
+public sealed class EllipseElement : Element
+{
+    /// <summary>Ellipse width in dots. ZPL accepts 3 to 4095 and replaces anything
+    /// larger with 4095.</summary>
+    public int WidthDots { get; set; } = 100;
+
+    public int HeightDots { get; set; } = 100;
+
+    /// <summary>Border thickness in dots, growing inward from the outline.</summary>
+    public int ThicknessDots { get; set; } = 2;
+
+    /// <summary>
+    /// <inheritdoc cref="LineElement.IsWhite" path="/summary/node()" />
+    /// </summary>
+    /// <remarks>
+    /// The offline preview cannot show this one. Measured: the renderer draws a white ^GE
+    /// as nothing at all, at every thickness, while it honours white on ^GB, ^GD and even
+    /// ^GC drawing the very same circle. So it is the command it does not implement rather
+    /// than the shape. A printer erases as asked, so the flag is kept and the properties
+    /// panel says the preview cannot be trusted on it, the same call ^FB's line cap made.
+    /// </remarks>
+    public bool IsWhite { get; set; }
+
+    public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// A diagonal line (^GD), stated as the box it crosses corner to corner rather than as two
+/// points. That is ZPL's own shape for it and it is what makes the element resize like
+/// every other one: drag the box, the diagonal follows.
+/// </summary>
+public sealed class DiagonalLineElement : Element
+{
+    /// <summary>Width of the box the diagonal crosses, in dots.</summary>
+    public int WidthDots { get; set; } = 100;
+
+    public int HeightDots { get; set; } = 100;
+
+    /// <summary>
+    /// Line thickness in dots.
+    ///
+    /// Defaults to 2 rather than to ZPL's own 1 because the offline renderer draws a
+    /// one-dot diagonal as nothing whatsoever, measured. A printer draws it, so an
+    /// imported line keeps whatever thickness it stated and the panel warns instead of the
+    /// canvas quietly showing an empty label; but a diagonal created here starts at a
+    /// thickness that can be seen.
+    /// </summary>
+    public int ThicknessDots { get; set; } = 2;
+
+    /// <summary>Which way the line leans: true for ^GD's "R", running from the bottom-left
+    /// corner up to the top-right ("/"), false for "L", top-left down to bottom-right
+    /// ("\").</summary>
+    public bool LeansRight { get; set; } = true;
+
+    /// <inheritdoc cref="LineElement.IsWhite"/>
+    public bool IsWhite { get; set; }
+
     public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
 }

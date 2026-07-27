@@ -61,6 +61,16 @@ public sealed class TemplateVariables : IElementVisitor
         // No textual content.
     }
 
+    public void Visit(EllipseElement element)
+    {
+        // No textual content.
+    }
+
+    public void Visit(DiagonalLineElement element)
+    {
+        // No textual content.
+    }
+
     private void Scan(string content)
     {
         foreach (TemplateSegment segment in TemplateScanner.Scan(content, _syntax))

@@ -1,4 +1,4 @@
-namespace LabelForge.Core.Model;
+﻿namespace LabelForge.Core.Model;
 
 /// <summary>
 /// Maps a resize gesture (target footprint in dots) onto each element type's real
@@ -9,6 +9,13 @@ namespace LabelForge.Core.Model;
 /// </summary>
 public static class ElementResizer
 {
+    /// <summary>Smallest side ^GE and ^GD accept.</summary>
+    public const int MinShapeSideDots = 3;
+
+    /// <summary>Largest side ^GE accepts; a printer replaces anything above it. ^GD runs
+    /// much further, so this one is the ellipse's alone.</summary>
+    public const int MaxEllipseSideDots = 4095;
+
     private static readonly ElementBoundsCalculator Bounds = new();
 
     public static void Resize(Element element, int targetWidth, int targetHeight)
@@ -24,6 +31,19 @@ public static class ElementResizer
 
             case LineElement line:
                 line.LengthDots = Math.Max(line.IsVertical ? targetHeight : targetWidth, 1);
+                break;
+
+            case EllipseElement ellipse:
+                // ZPL's own range for ^GE: below 3 there is no shape left, and anything
+                // above 4095 the printer replaces with 4095, so a handle dragged past
+                // that would keep moving while the ink stopped.
+                ellipse.WidthDots = Math.Clamp(targetWidth, MinShapeSideDots, MaxEllipseSideDots);
+                ellipse.HeightDots = Math.Clamp(targetHeight, MinShapeSideDots, MaxEllipseSideDots);
+                break;
+
+            case DiagonalLineElement diagonal:
+                diagonal.WidthDots = Math.Max(targetWidth, MinShapeSideDots);
+                diagonal.HeightDots = Math.Max(targetHeight, MinShapeSideDots);
                 break;
 
             case TextElement text:

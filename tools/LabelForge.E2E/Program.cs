@@ -274,6 +274,106 @@ if (mode == "designer")
         Console.WriteLine("pdf417 panel: no Pdf417PropertiesViewModel (expected one)");
     }
 
+    // The graphic primitives ZPL has always had and this designer never offered: the
+    // ellipse (which is also how a circle is drawn), the diagonal line, and the corner
+    // rounding ^GB takes.
+    int beforeEllipse = d.Document.Elements.Count;
+    d.AddEllipseCommand.Execute(null);
+    d.PlaceAt(560, 300);
+    Pump(700);
+    Console.WriteLine(
+        $"ellipse add: {d.Document.Elements.Count - beforeEllipse} added, "
+        + $"selected type ok={d.SelectedElement is LabelForge.Core.Model.EllipseElement} (expected 1/True)");
+    Console.WriteLine($"ellipse in ZPL: {d.GeneratedZpl.Contains("^GE200,140,3,B")} (expected True)");
+
+    if (d.SelectionProperties is EllipsePropertiesViewModel ellipse)
+    {
+        Console.WriteLine(
+            $"ellipse panel: '{ellipse.TypeName}', circle={ellipse.IsCircle} (expected Ellipse/False)");
+
+        ellipse.MakeCircleCommand.Execute(null);
+        Pump(700);
+        Console.WriteLine(
+            $"made a circle: '{ellipse.TypeName}', circle={ellipse.IsCircle}, "
+            + $"in ZPL={d.GeneratedZpl.Contains("^GE200,200,3,B")} (expected Circle/True/True)");
+
+        // The one thing the canvas cannot show: the offline renderer draws no white ^GE,
+        // measured, so the panel has to say so rather than let the preview pretend.
+        ellipse.IsWhite = true;
+        Pump(500);
+        Console.WriteLine(
+            $"white ellipse warns: {ellipse.HasWhiteNote} (expected True), "
+            + $"prints anyway={d.GeneratedZpl.Contains("^GE200,200,3,W")} (expected True)");
+        ellipse.IsWhite = false;
+        Pump(300);
+    }
+    else
+    {
+        Console.WriteLine("ellipse panel: no EllipsePropertiesViewModel (expected one)");
+    }
+
+    int beforeDiagonal = d.Document.Elements.Count;
+    d.AddDiagonalCommand.Execute(null);
+    d.PlaceAt(560, 120);
+    Pump(700);
+    Console.WriteLine(
+        $"diagonal add: {d.Document.Elements.Count - beforeDiagonal} added, "
+        + $"selected type ok={d.SelectedElement is LabelForge.Core.Model.DiagonalLineElement} (expected 1/True)");
+    Console.WriteLine($"diagonal in ZPL: {d.GeneratedZpl.Contains("^GD200,140,3,B,R")} (expected True)");
+
+    if (d.SelectionProperties is DiagonalPropertiesViewModel diagonal)
+    {
+        diagonal.LeansRight = false;
+        Pump(500);
+        Console.WriteLine(
+            $"diagonal leans left: {d.GeneratedZpl.Contains("^GD200,140,3,B,L")} (expected True)");
+
+        // A one-dot diagonal prints and the preview cannot draw it, so the panel says so
+        // instead of the thickness being quietly clamped to what the canvas can show.
+        diagonal.Thickness = 1;
+        Pump(500);
+        Console.WriteLine(
+            $"one-dot diagonal warns: {diagonal.HasThicknessNote} (expected True), "
+            + $"kept at 1={d.GeneratedZpl.Contains("^GD200,140,1,B,L")} (expected True)");
+        diagonal.Thickness = 3;
+        Pump(300);
+    }
+    else
+    {
+        Console.WriteLine("diagonal panel: no DiagonalPropertiesViewModel (expected one)");
+    }
+
+    d.AddBoxCommand.Execute(null);
+    d.PlaceAt(300, 120);
+    Pump(500);
+    if (d.SelectionProperties is BoxPropertiesViewModel roundedBox)
+    {
+        // Nothing is emitted below a rounding of 1, so every label saved before this
+        // generates the bytes it always did.
+        Console.WriteLine(
+            $"square box stays square in ZPL: {d.GeneratedZpl.Contains("^GB240,140,3,B^FS")} (expected True)");
+        roundedBox.CornerRoundness = 5;
+        Pump(700);
+        Console.WriteLine(
+            $"rounded box in ZPL: {d.GeneratedZpl.Contains("^GB240,140,3,B,5^FS")} (expected True)");
+    }
+    else
+    {
+        Console.WriteLine("box panel: no BoxPropertiesViewModel (expected one)");
+    }
+
+    Capture("designer-primitives.png");
+
+    // Everything drawn above has to survive a save and a reload, since a new element type
+    // that is not registered for the .lfl looks perfect until the file is reopened.
+    var withPrimitives = LabelForge.Core.Io.LabelDocumentJson.Deserialize(d.SerializeDocument());
+    Console.WriteLine(
+        $"primitives round trip: "
+        + $"{withPrimitives.Elements.OfType<LabelForge.Core.Model.EllipseElement>().Count()} ellipse, "
+        + $"{withPrimitives.Elements.OfType<LabelForge.Core.Model.DiagonalLineElement>().Count()} diagonal, "
+        + $"rounding={withPrimitives.Elements.OfType<LabelForge.Core.Model.BoxElement>().Max(b => b.CornerRoundness)} "
+        + "(expected 1/1/5)");
+
     d.Document.Elements.Add(new LabelForge.Core.Model.TextElement
     {
         X = 20, Y = 20, Text = "Lot ##LOTE##", FontHeightDots = 30,

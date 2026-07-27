@@ -95,7 +95,9 @@ public static class FieldTypeset
         (int width, int height, int anchorAboveBottom) = extent;
         int aboveAnchor = height - anchorAboveBottom;
 
-        return element.Orientation switch
+        // A field ZPL does not turn is placed as though it were upright, whatever
+        // orientation the element carries, because that is what the printer draws.
+        return !FieldRotation.Applies(element) ? (0, aboveAnchor) : element.Orientation switch
         {
             Orientation.Rotated90 => (anchorAboveBottom, 0),
             Orientation.Rotated180 => (width, anchorAboveBottom),

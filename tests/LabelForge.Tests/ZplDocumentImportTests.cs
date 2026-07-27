@@ -52,6 +52,32 @@ public sealed class ZplDocumentImportTests
             X = 300, Y = 200, WidthDots = 120, HeightDots = 60, ThicknessDots = 60,
             IsWhite = true,
         });
+        document.Elements.Add(new BoxElement
+        {
+            // A rounded box, whose fifth ^GB argument only appears when it is asked for.
+            X = 300, Y = 270, WidthDots = 160, HeightDots = 90, ThicknessDots = 3,
+            CornerRoundness = 5,
+        });
+        document.Elements.Add(new EllipseElement
+        {
+            X = 20, Y = 450, WidthDots = 180, HeightDots = 110, ThicknessDots = 4,
+        });
+        document.Elements.Add(new EllipseElement
+        {
+            // Equal sides, which is a circle. It has to come back as ^GE rather than as
+            // the ^GC that draws the same dots, or the bytes change.
+            X = 220, Y = 450, WidthDots = 90, HeightDots = 90, ThicknessDots = 2,
+            IsWhite = true,
+        });
+        document.Elements.Add(new DiagonalLineElement
+        {
+            X = 340, Y = 450, WidthDots = 150, HeightDots = 100, ThicknessDots = 4,
+        });
+        document.Elements.Add(new DiagonalLineElement
+        {
+            X = 520, Y = 450, WidthDots = 150, HeightDots = 100, ThicknessDots = 6,
+            LeansRight = false, IsWhite = true,
+        });
         document.Elements.Add(new TextElement
         {
             // Placed by its baseline, which is how nearly every real label is written
@@ -341,11 +367,14 @@ public sealed class ZplDocumentImportTests
     [Fact]
     public void WarningsBelongToTheBlockThatWasImported()
     {
-        const string zpl = "^XA\n^CO0\n^XZ\n^XA\n^FO0,0^GE10,10,1,B^FS\n^FO0,0^A0N,30^FDx^FS\n^XZ";
+        // ^GS is the graphic symbol command, which draws from the printer's own symbol
+        // font and is genuinely not modelled here. It stands in for the unmodelled case
+        // that ^GE used to, now that the ellipse is a real element.
+        const string zpl = "^XA\n^CO0\n^XZ\n^XA\n^FO0,0^GSN,50,50^FS\n^FO0,0^A0N,30^FDx^FS\n^XZ";
 
         ZplDocumentImportResult result = ZplDocumentImport.FromZpl(zpl);
 
-        Assert.Contains(result.Warnings, w => w.Contains("^GE", StringComparison.Ordinal));
+        Assert.Contains(result.Warnings, w => w.Contains("^GS", StringComparison.Ordinal));
         Assert.DoesNotContain(result.Warnings, w => w.Contains("^CO", StringComparison.Ordinal));
     }
 
@@ -395,10 +424,10 @@ public sealed class ZplDocumentImportTests
     public void UnmodelledCommands_AreReportedRatherThanDroppedSilently()
     {
         ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
-            "^XA\n^FO0,0^GE100,100,2,B^FS\n^FO0,0^A0N,30^FDkeep^FS\n^XZ");
+            "^XA\n^FO0,0^GSN,50,50^FS\n^FO0,0^A0N,30^FDkeep^FS\n^XZ");
 
         Assert.Single(result.Document.Elements);
-        Assert.Contains(result.Warnings, w => w.Contains("^GE", StringComparison.Ordinal));
+        Assert.Contains(result.Warnings, w => w.Contains("^GS", StringComparison.Ordinal));
     }
 
     [Fact]

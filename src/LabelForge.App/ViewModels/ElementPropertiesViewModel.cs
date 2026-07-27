@@ -137,6 +137,11 @@ public abstract class ElementPropertiesViewModel : ObservableObject
     private int ToDots(decimal value) =>
         UseMm ? Units.MmToDots((double)value, _document.Dpmm) : (int)value;
 
+    /// <summary>Whether to offer a rotation at all. ZPL's graphic primitives take no
+    /// orientation argument, so the control would be one that cannot do anything; see
+    /// <see cref="FieldRotation"/>.</summary>
+    public bool CanRotate => FieldRotation.Applies(Element);
+
     public OrientationOption SelectedOrientation
     {
         get => Orientations.First(o => o.Value == Element.Orientation);
@@ -771,4 +776,155 @@ public sealed class BoxPropertiesViewModel : ElementPropertiesViewModel
         get => _box.IsWhite;
         set => Edit(_box.IsWhite, value, v => _box.IsWhite = v);
     }
+
+    /// <summary>^GB's rounding index, 0 to 8. An index rather than a radius because that
+    /// is what the command takes, and because it keeps its proportion as the box is
+    /// resized: the radius is the index eighths of half the shorter side.</summary>
+    public decimal CornerRoundness
+    {
+        get => _box.CornerRoundness;
+        set => Edit(
+            _box.CornerRoundness, Math.Clamp((int)value, 0, 8), v => _box.CornerRoundness = v);
+    }
+}
+
+public sealed partial class EllipsePropertiesViewModel : ElementPropertiesViewModel
+{
+    private readonly EllipseElement _ellipse;
+
+    public EllipsePropertiesViewModel(
+        EllipseElement element, LabelDocument document, Action<string> edited)
+        : base(element, document, edited) => _ellipse = element;
+
+    public override string TypeName => IsCircle ? "Circle" : "Ellipse";
+
+    public decimal EllipseWidth
+    {
+        get => _ellipse.WidthDots;
+        set
+        {
+            Edit(_ellipse.WidthDots, Clamp(value), v => _ellipse.WidthDots = v);
+            NotifyShape();
+        }
+    }
+
+    public decimal EllipseHeight
+    {
+        get => _ellipse.HeightDots;
+        set
+        {
+            Edit(_ellipse.HeightDots, Clamp(value), v => _ellipse.HeightDots = v);
+            NotifyShape();
+        }
+    }
+
+    public decimal Thickness
+    {
+        get => _ellipse.ThicknessDots;
+        set => Edit(_ellipse.ThicknessDots, Math.Max((int)value, 1), v => _ellipse.ThicknessDots = v);
+    }
+
+    /// <summary>True when the two sides match, which is all a circle is: ZPL's own ^GC
+    /// draws exactly this shape and nothing more.</summary>
+    public bool IsCircle => _ellipse.WidthDots == _ellipse.HeightDots;
+
+    /// <inheritdoc cref="LinePropertiesViewModel.IsWhite"/>
+    public bool IsWhite
+    {
+        get => _ellipse.IsWhite;
+        set
+        {
+            Edit(_ellipse.IsWhite, value, v => _ellipse.IsWhite = v);
+            OnPropertyChanged(nameof(WhiteNote));
+            OnPropertyChanged(nameof(HasWhiteNote));
+        }
+    }
+
+    /// <summary>The one thing on this panel the canvas cannot show. Measured rather than
+    /// assumed: the offline renderer draws a white ^GE as nothing at any thickness, while
+    /// it honours white on ^GB, ^GD and even ^GC drawing the very same circle. A printer
+    /// erases as asked, so the panel says so instead of the canvas pretending either way.</summary>
+    public string WhiteNote => IsWhite
+        ? "A white ellipse prints (it clears what is under it), but the preview cannot "
+          + "show it: the offline renderer does not draw ^GE in white."
+        : string.Empty;
+
+    public bool HasWhiteNote => IsWhite;
+
+    /// <summary>Makes the height match the width, since dragging two boxes to the same
+    /// number by hand is the fiddliest way to ask for a circle.</summary>
+    [RelayCommand]
+    private void MakeCircle() => EllipseHeight = _ellipse.WidthDots;
+
+    private void NotifyShape()
+    {
+        OnPropertyChanged(nameof(IsCircle));
+        OnPropertyChanged(nameof(TypeName));
+    }
+
+    private static int Clamp(decimal value) => Math.Clamp(
+        (int)value, ElementResizer.MinShapeSideDots, ElementResizer.MaxEllipseSideDots);
+}
+
+public sealed class DiagonalPropertiesViewModel : ElementPropertiesViewModel
+{
+    private readonly DiagonalLineElement _diagonal;
+
+    public DiagonalPropertiesViewModel(
+        DiagonalLineElement element, LabelDocument document, Action<string> edited)
+        : base(element, document, edited) => _diagonal = element;
+
+    public override string TypeName => "Diagonal line";
+
+    public decimal DiagonalWidth
+    {
+        get => _diagonal.WidthDots;
+        set => Edit(
+            _diagonal.WidthDots,
+            Math.Max((int)value, ElementResizer.MinShapeSideDots),
+            v => _diagonal.WidthDots = v);
+    }
+
+    public decimal DiagonalHeight
+    {
+        get => _diagonal.HeightDots;
+        set => Edit(
+            _diagonal.HeightDots,
+            Math.Max((int)value, ElementResizer.MinShapeSideDots),
+            v => _diagonal.HeightDots = v);
+    }
+
+    public decimal Thickness
+    {
+        get => _diagonal.ThicknessDots;
+        set
+        {
+            Edit(_diagonal.ThicknessDots, Math.Max((int)value, 1), v => _diagonal.ThicknessDots = v);
+            OnPropertyChanged(nameof(ThicknessNote));
+            OnPropertyChanged(nameof(HasThicknessNote));
+        }
+    }
+
+    /// <summary>True for ^GD's "R": bottom-left up to top-right.</summary>
+    public bool LeansRight
+    {
+        get => _diagonal.LeansRight;
+        set => Edit(_diagonal.LeansRight, value, v => _diagonal.LeansRight = v);
+    }
+
+    /// <inheritdoc cref="LinePropertiesViewModel.IsWhite"/>
+    public bool IsWhite
+    {
+        get => _diagonal.IsWhite;
+        set => Edit(_diagonal.IsWhite, value, v => _diagonal.IsWhite = v);
+    }
+
+    /// <summary>A one-dot diagonal prints and the preview draws nothing for it, measured.
+    /// Worth saying rather than clamping: the label is right and the canvas is not.</summary>
+    public string ThicknessNote => _diagonal.ThicknessDots < 2
+        ? "At one dot this line prints but the preview cannot draw it. Two or more shows "
+          + "on the canvas."
+        : string.Empty;
+
+    public bool HasThicknessNote => _diagonal.ThicknessDots < 2;
 }

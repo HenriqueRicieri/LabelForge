@@ -112,5 +112,15 @@ public static class LabelExtent
         {
             // As above.
         }
+
+        public void Visit(EllipseElement element)
+        {
+            // As above.
+        }
+
+        public void Visit(DiagonalLineElement element)
+        {
+            // As above.
+        }
     }
 }

@@ -56,7 +56,7 @@ public static class ZplDocumentImport
     private static readonly HashSet<string> Handled = new(StringComparer.Ordinal)
     {
         "XA", "XZ", "CI", "FS", "FH", "LH", "PW", "LL", "BY", "PQ", "MD", "PR",
-        "DG", "FO", "FT", "FD", "FB", "FR", "GB", "GF", "XG",
+        "DG", "FO", "FT", "FD", "FB", "FR", "GB", "GE", "GC", "GD", "GF", "XG",
         "BC", "B3", "BE", "BU", "BX", "BQ", "B7",
     };
 
@@ -323,6 +323,21 @@ public static class ZplDocumentImport
 
                 case "GB":
                     Graphic(command);
+                    return;
+
+                case "GE":
+                    Ellipse(command.Int(0), command.Int(1), command);
+                    return;
+
+                case "GC":
+                    // A circle is an ellipse with equal sides, measured pixel-identical
+                    // against the renderer, so it needs no type of its own. Its arguments
+                    // are shifted by one: diameter, thickness, colour.
+                    Ellipse(command.Int(0, 3), command.Int(0, 3), command, argumentOffset: 1);
+                    return;
+
+                case "GD":
+                    Diagonal(command);
                     return;
 
                 case "GF":
@@ -697,9 +712,68 @@ public static class ZplDocumentImport
                     HeightDots = height,
                     ThicknessDots = thickness,
                     IsWhite = isWhite,
+
+                    // A rounded ^GB stays a box; the index is part of what it draws.
+                    // Read even for a line, since a thin ^GB carrying one is legal, and
+                    // the line branch above drops it: rounding a bar one dot tall is
+                    // nothing a printer can show.
+                    CornerRoundness = Math.Clamp(command.Int(4), 0, 8),
                 });
             }
 
+            ResetField();
+        }
+
+        /// <summary>
+        /// ^GE (width, height, thickness, colour) and ^GC (diameter, thickness, colour),
+        /// which draw the same dots when the sides match, so both land on one element.
+        /// </summary>
+        /// <param name="argumentOffset">How far the thickness and colour sit into the
+        /// argument list: 2 for ^GE, which states two sides, and 1 for ^GC's diameter.</param>
+        private void Ellipse(int width, int height, ZplCommand command, int argumentOffset = 2)
+        {
+            Add(new EllipseElement
+            {
+                WidthDots = Math.Max(width, ElementResizer.MinShapeSideDots),
+                HeightDots = Math.Max(height, ElementResizer.MinShapeSideDots),
+                ThicknessDots = Math.Max(command.Int(argumentOffset, 1), 1),
+                IsWhite = string.Equals(
+                    command.Arg(argumentOffset + 1), "W", StringComparison.OrdinalIgnoreCase),
+            });
+
+            ResetField();
+        }
+
+        /// <summary>^GD width, height, thickness, colour, lean. The lean is "R" for a line
+        /// running bottom-left to top-right and "L" for the other one, and ZPL's default
+        /// is R.</summary>
+        private void Diagonal(ZplCommand command)
+        {
+            var diagonal = new DiagonalLineElement
+            {
+                WidthDots = Math.Max(
+                    command.Int(0, ElementResizer.MinShapeSideDots),
+                    ElementResizer.MinShapeSideDots),
+                HeightDots = Math.Max(
+                    command.Int(1, ElementResizer.MinShapeSideDots),
+                    ElementResizer.MinShapeSideDots),
+
+                // Kept at what the file said rather than raised to what the preview can
+                // draw: a printer prints a one-dot diagonal, so quietly thickening it
+                // would change the label. The warning is what carries the difference.
+                ThicknessDots = Math.Max(command.Int(2, 1), 1),
+                IsWhite = string.Equals(command.Arg(3), "W", StringComparison.OrdinalIgnoreCase),
+                LeansRight = !string.Equals(command.Arg(4), "L", StringComparison.OrdinalIgnoreCase),
+            };
+
+            if (diagonal.ThicknessDots < 2)
+            {
+                Warn("A one-dot diagonal line (^GD) prints, but the offline preview draws "
+                     + "nothing for it. It is on the label and will come out; the canvas "
+                     + "cannot show it.");
+            }
+
+            Add(diagonal);
             ResetField();
         }
 

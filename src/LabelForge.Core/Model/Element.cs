@@ -32,6 +32,8 @@ public enum FieldAnchor
 [JsonDerivedType(typeof(ImageElement), "image")]
 [JsonDerivedType(typeof(LineElement), "line")]
 [JsonDerivedType(typeof(BoxElement), "box")]
+[JsonDerivedType(typeof(EllipseElement), "ellipse")]
+[JsonDerivedType(typeof(DiagonalLineElement), "diagonal")]
 public abstract class Element
 {
     /// <summary>Stable identity for selection, undo, and serialization. Settable so
@@ -111,4 +113,6 @@ public interface IElementVisitor
     void Visit(ImageElement element);
     void Visit(LineElement element);
     void Visit(BoxElement element);
+    void Visit(EllipseElement element);
+    void Visit(DiagonalLineElement element);
 }
