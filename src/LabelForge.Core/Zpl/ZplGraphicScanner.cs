@@ -127,6 +127,101 @@ public static partial class ZplGraphicScanner
     [GeneratedRegex(@"(?<cmd>~DG|\^XG)(?<gname>[^,\^~\r\n]{1,128}),", RegexOptions.IgnoreCase)]
     private static partial Regex GraphicNameReference();
 
+    /// <summary>
+    /// Reduces every graphic's payload to the data itself, dropping the framing the file
+    /// wrote around it: the whitespace it wraps and indents with, and the "//" comment
+    /// lines that follow it.
+    ///
+    /// Graphic data runs from the end of the command's header to the next ^ or ~, so
+    /// anything a file writes in that gap lands inside the payload. A printer does not
+    /// care, since it consumes the byte count the header declared and ignores the rest,
+    /// and this reader does not either, since it skips whitespace and drops characters
+    /// that are not part of the format. BinaryKits does: one tab or one comment makes it
+    /// throw on the whole ~DG, so the graphic is never stored and every ^XG that recalls
+    /// it draws nothing at all, with a single diagnostic to say so.
+    ///
+    /// That is not a rare shape. The corpus writes comments after a download routinely
+    /// ("//CHAMADA", "// SISBI IMAGEM"), which cost 160.zpl its only stamp and
+    /// NOVASUINO.zpl all six of its logos; 440.zpl ends a payload with two tab
+    /// characters, which cost it one. Line breaks are the one piece of framing the engine
+    /// already copes with, and they are removed here too because it makes no difference
+    /// to it and one rule is easier to keep true than two.
+    ///
+    /// The comment half is skipped for a :B64: or :Z64: payload, because "//" is a legal
+    /// pair of base64 characters and cutting there would corrupt the image. Whitespace
+    /// still goes, which is what decoding the base64 needs anyway.
+    /// </summary>
+    public static string CompactGraphicData(string zpl)
+    {
+        if (string.IsNullOrEmpty(zpl))
+        {
+            return zpl;
+        }
+
+        var sb = new System.Text.StringBuilder(zpl.Length);
+        int copied = 0;
+        foreach (Match match in GraphicDataHeader().Matches(zpl))
+        {
+            int start = match.Index + match.Length;
+            if (start < copied)
+            {
+                // A header inside a payload already dealt with is not a real one.
+                continue;
+            }
+
+            int end = start + PayloadLength(zpl, start);
+            string payload = zpl[start..end];
+            string compacted = Compact(payload);
+            if (string.Equals(compacted, payload, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            sb.Append(zpl, copied, start - copied).Append(compacted);
+            copied = end;
+        }
+
+        return copied == 0 ? zpl : sb.Append(zpl, copied, zpl.Length - copied).ToString();
+    }
+
+    /// <summary>The header of either command that carries graphic data: ~DG's download
+    /// and ^GF's inline field.</summary>
+    [GeneratedRegex(
+        @"~DG[^,\^~\r\n]{1,128},\s*\d+\s*,\s*\d+\s*,"
+        + @"|\^GF[ABC]?,\d+,\d+,\d+,",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex GraphicDataHeader();
+
+    private static string Compact(string payload)
+    {
+        bool base64 = payload.Contains(":B64:", StringComparison.OrdinalIgnoreCase)
+                      || payload.Contains(":Z64:", StringComparison.OrdinalIgnoreCase);
+
+        var sb = new System.Text.StringBuilder(payload.Length);
+        for (int i = 0; i < payload.Length; i++)
+        {
+            char c = payload[i];
+            if (char.IsWhiteSpace(c))
+            {
+                continue;
+            }
+
+            if (!base64 && c == '/' && i + 1 < payload.Length && payload[i + 1] == '/')
+            {
+                while (i < payload.Length && payload[i] is not ('\r' or '\n'))
+                {
+                    i++;
+                }
+
+                continue;
+            }
+
+            sb.Append(c);
+        }
+
+        return sb.ToString();
+    }
+
     /// <summary>Strips the device prefix and .GRF suffix so "R:LOGO.GRF", "E:LOGO.GRF"
     /// and "LOGO" are one graphic. Zebra defaults an unqualified name to R: and .GRF,
     /// which is why the corpus writes the bare form and drivers write the long one.</summary>
@@ -262,11 +357,17 @@ public static partial class ZplGraphicScanner
     }
 
     /// <summary>Graphic data runs to the next command. Hex, the compression scheme and
-    /// the base64 envelopes all avoid ^ and ~, so those two characters end the payload.</summary>
-    private static string ReadPayload(string zpl, int start)
+    /// the base64 envelopes all avoid ^ and ~, so those two characters end the payload.
+    /// The framing a file writes around the data comes out here rather than being left
+    /// for the decoder to drop: "//CHAMADA" is four hex digits and two repeat counts to
+    /// anything reading it as graphic data, and only the row count saves it today.</summary>
+    private static string ReadPayload(string zpl, int start) =>
+        Compact(zpl.Substring(start, PayloadLength(zpl, start)));
+
+    private static int PayloadLength(string zpl, int start)
     {
         int end = zpl.AsSpan(start).IndexOfAny('^', '~');
-        return end < 0 ? zpl[start..] : zpl.Substring(start, end);
+        return end < 0 ? zpl.Length - start : end;
     }
 
     /// <summary>^XG magnification is 1 to 10; an absent or unreadable value means 1.</summary>

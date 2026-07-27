@@ -254,6 +254,77 @@ public sealed class GraphicImportTests
         Assert.Same(zpl, ZplGraphicScanner.QualifyGraphicNames(zpl));
     }
 
+    // ---- Framing written around a graphic's data --------------------------------------
+    //
+    // Graphic data runs from the header to the next command, so whatever a file writes in
+    // that gap is inside the payload. The corpus writes comments there routinely and one
+    // file ends a payload with tabs. A printer does not care and neither does this reader,
+    // but BinaryKits throws on the whole download and every ^XG of it then draws nothing.
+
+    /// <summary>The shapes real files write: a comment after the download (160.zpl,
+    /// 311.zpl, 312.zpl and every one of NOVASUINO.zpl's six logos) and a payload ending
+    /// in tab characters (440.zpl). Remove the repair and all of these draw nothing.</summary>
+    [Theory]
+    [InlineData("\r\n\r\n// CHAMADA\r\n")]
+    [InlineData("\r\n\t\t")]
+    [InlineData("  \r\n// LOGO  \r\n  ")]
+    public void Renderer_DrawsAGraphicWhoseDataIsFollowedByFraming(string framing)
+    {
+        // 32 x 4 of solid black, then whatever the file wrote after it.
+        string solid = string.Concat(Enumerable.Repeat("FFFFFFFF", 4));
+        string zpl = $"~DGLOGO,16,4,{solid}{framing}\n^XA\n^FO0,0^XGLOGO,1,1^FS\n^XZ";
+
+        RenderResult result = new BinaryKitsRenderer().Render(zpl, 20, 12, 8);
+
+        Assert.Empty(result.Errors);
+        Assert.Equal(128, BlackPixels(result.Png));
+    }
+
+    [Fact]
+    public void CompactGraphicData_KeepsOnlyTheData()
+    {
+        string zpl = $"~DGLOGO,16,4,{Checker}\r\n\r\n// CHAMADA\r\n\t\t"
+                     + "\n^XA\n^FO0,0^XGLOGO,1,1^FS\n^FD## NOT A // COMMENT ##^FS\n^XZ";
+
+        string compacted = ZplGraphicScanner.CompactGraphicData(zpl);
+
+        Assert.Contains($"~DGLOGO,16,4,{Checker}^XA", compacted, StringComparison.Ordinal);
+
+        // Only the payload is touched: a "//" anywhere else is the caller's text.
+        Assert.Contains("^FD## NOT A // COMMENT ##^FS", compacted, StringComparison.Ordinal);
+    }
+
+    /// <summary>"//" is a legal pair of base64 characters, so cutting there would corrupt
+    /// the image. Whitespace still goes, which is what decoding the base64 needs.</summary>
+    [Fact]
+    public void CompactGraphicData_LeavesABase64PayloadIntact()
+    {
+        const string zpl = "^XA^FO0,0^GFA,16,16,4,:B64:AP//AAD//wAA:1234^FS^XZ";
+
+        Assert.Equal(zpl, ZplGraphicScanner.CompactGraphicData(zpl));
+    }
+
+    [Fact]
+    public void CompactGraphicData_LeavesZplWithoutGraphicsAlone()
+    {
+        const string zpl = "^XA\n^FO10,10^A0N,30^FDhello // world^FS\n^XZ";
+
+        Assert.Same(zpl, ZplGraphicScanner.CompactGraphicData(zpl));
+    }
+
+    /// <summary>The reader gets the same treatment, so a payload it hands to the decoder
+    /// is data and nothing else. "//CHAMADA" is four hex digits and two repeat counts to
+    /// anything reading it as graphic data; only the row count saves it today.</summary>
+    [Fact]
+    public void Scan_LeavesTheFramingOutOfThePayload()
+    {
+        string zpl = $"~DGLOGO,16,4,{Checker}\r\n\r\n//CHAMADA\r\n^XA\n^FO0,0^XGLOGO,1,1^FS\n^XZ";
+
+        ZplGraphicDefinition definition = Assert.Single(ZplGraphicScanner.Scan(zpl).Definitions);
+
+        Assert.Equal(Checker, definition.Data);
+    }
+
     /// <summary>
     /// The whole point of the feature, end to end: take a label somebody else's driver
     /// wrote, pull its graphic into a document, generate our own ZPL from that document,
