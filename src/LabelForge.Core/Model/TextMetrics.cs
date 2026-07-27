@@ -9,44 +9,50 @@ namespace LabelForge.Core.Model;
 /// nearly half again too wide and "iiiii" almost three times too wide, which is what a
 /// selection outline and every snap target were built on.
 ///
-/// The table is measured rather than derived, character by character, from a run of ten
-/// of each glyph so the run's own side bearings matter little and the pitch is what a
-/// repeated glyph really costs. It describes the font the offline renderer draws with,
-/// which is the right thing to match: the canvas shows that render, so an outline that
-/// agreed with a printer's font instead would disagree with what is on screen.
+/// The table is measured rather than derived, character by character, by rendering one
+/// glyph and then ten and taking a ninth of the difference, which cancels the run's own
+/// side bearings and leaves the pitch a repeated glyph really costs.
+///
+/// It describes the font the offline renderer draws with, and that is a choice rather
+/// than a convenience, because Labelary draws the same font differently. Two things
+/// decided it. The canvas shows the offline render, so an outline agreeing with something
+/// else would visibly not fit the text under it. And Labelary's own numbers do not survive
+/// inspection for this font: it gives '%', '+', '-', '=' and '@' one shared advance of
+/// 0.90 em and '&lt;' and '&gt;' another of 0.99, both wider than its own 'W' at 0.81,
+/// which is what a renderer does when it has no metrics for a glyph rather than what a
+/// typeface does. For the bitmapped fonts, where the manual publishes the numbers and no
+/// font file is involved, Labelary is exact and <see cref="ZplFont"/> follows it instead.
+///
+/// None of this reaches the printer: a field's width is never stated in the ZPL, only its
+/// text. It decides the selection outline, the snap targets, how long a continuous label
+/// is measured to be, and whether a field is reported as running off the edge.
 /// </summary>
 public static class TextMetrics
 {
     /// <summary>Advance as a fraction of the font size, grouped by the value measured.</summary>
     private static readonly (double Ratio, string Characters)[] Measured =
     [
-        (0.17, " "),
-        (0.19, "'"),
-        (0.22, "Iil.,"),
-        (0.23, "j/"),
-        (0.26, "():;!"),
-        (0.27, "t-[]"),
-        (0.28, "f"),
-        (0.31, "r"),
-        (0.32, "*"),
-        (0.38, "\""),
-        (0.40, "1"),
-        (0.41, "z"),
-        (0.45, "Jaceksvxy023456789#"),
-        (0.46, "_"),
-        (0.47, "+=<>"),
-        (0.49, "FLbdghnpqu?"),
-        (0.50, "TZo"),
-        (0.54, "EPS"),
-        (0.55, "VXY"),
-        (0.58, "BCDHKNRU"),
-        (0.59, "A&"),
-        (0.63, "GOQ"),
-        (0.64, "w"),
-        (0.67, "M"),
-        (0.72, "m%"),
-        (0.77, "W"),
-        (0.80, "@"),
+        (0.194, "'"),
+        (0.228, "|"),
+        (0.231, " ,./I\\ijlÍí"),
+        (0.275, "!()-:;[]`ft"),
+        (0.300, "º"),
+        (0.303, "ª"),
+        (0.319, "*r{}"),
+        (0.389, "\""),
+        (0.400, "°"),
+        (0.408, "z"),
+        (0.411, "1"),
+        (0.456, "#$023456789J_aceksvxyáàâãäçéê"),
+        (0.481, "+<=>"),
+        (0.503, "?FLTZbdghnopquóôõöúüñ"),
+        (0.547, "EPSVXYÉÊ"),
+        (0.592, "&ABCDHKNRUÁÀÂÃÄÇÚÜÑ"),
+        (0.639, "GOQwÓÔÕÖ"),
+        (0.683, "M"),
+        (0.731, "%m"),
+        (0.775, "W"),
+        (0.803, "@"),
     ];
 
     /// <summary>Anything the table does not name: accented letters and the rest of

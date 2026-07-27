@@ -14,12 +14,14 @@ public sealed class TextMetricsTests
 {
     /// <summary>
     /// Text width against rendered ink. Font 0 is proportional, so the cases are chosen
-    /// to span the range a single average hid: narrow lowercase, capitals, digits, and
-    /// the widest glyphs in the font.
+    /// to span the range a single average hid: narrow lowercase, capitals, digits, the
+    /// widest glyphs in the font, and the accented letters real labels are full of.
     ///
-    /// The tolerance is a few dots rather than zero because a run's outer side bearings
-    /// are not part of any glyph's advance. Under the old constant the same cases were
-    /// out by up to 160 per cent.
+    /// The relationship asserted is the true one rather than a tolerance in dots. The box
+    /// is the sum of the characters' advances; the ink is that less the side bearings of
+    /// the first and last glyph, which no advance includes. So the box is never narrower
+    /// than the ink - an outline that cut text off would be the failure that matters - and
+    /// never wider than it by more than a fifth of one character, at any font size.
     /// </summary>
     [Theory]
     [InlineData("HELLO", 40, 0)]
@@ -29,6 +31,8 @@ public sealed class TextMetricsTests
     [InlineData("12345", 40, 0)]
     [InlineData("Mixed Case 123", 40, 0)]
     [InlineData("DESCRICAO DO PRODUTO", 30, 0)]
+    [InlineData("Indústria Brasileira", 30, 0)]
+    [InlineData("CNPJ: 64.435.574/0001-75", 30, 0)]
     [InlineData("HELLO", 20, 0)]
     [InlineData("HELLO", 80, 0)]
     [InlineData("HELLO", 40, 20)]
@@ -43,8 +47,9 @@ public sealed class TextMetricsTests
 
         int ink = InkWidth(element);
         int bounds = new ElementBoundsCalculator().GetBounds(element).Width;
+        int em = width > 0 ? width : height;
 
-        Assert.InRange(bounds, ink - 6, ink + 6);
+        Assert.InRange(bounds, ink, ink + (em / 5));
     }
 
     /// <summary>The proportions are what a single constant cannot express: the widest
@@ -54,10 +59,22 @@ public sealed class TextMetricsTests
     {
         Assert.True(TextMetrics.Ratio('W') > 3 * TextMetrics.Ratio('i'));
         Assert.True(TextMetrics.Ratio('H') > TextMetrics.Ratio('h'));
+    }
 
-        // Anything unnamed, including the accented letters real labels are full of,
-        // lands between a lowercase and a capital rather than at either extreme.
-        Assert.Equal(TextMetrics.DefaultRatio, TextMetrics.Ratio('ç'));
+    /// <summary>Accented letters are measured rather than defaulted, and they land on
+    /// the letter they decorate: a Brazilian label is mostly these, so leaving them at an
+    /// average was the same mistake the single constant made, one layer down.</summary>
+    [Theory]
+    [InlineData('á', 'a')]
+    [InlineData('é', 'e')]
+    [InlineData('ó', 'o')]
+    [InlineData('Á', 'A')]
+    [InlineData('Ç', 'C')]
+    [InlineData('Ú', 'U')]
+    public void AnAccentedLetterCostsWhatItsLetterCosts(char accented, char plain)
+    {
+        Assert.Equal(TextMetrics.Ratio(plain), TextMetrics.Ratio(accented));
+        Assert.NotEqual(TextMetrics.DefaultRatio, TextMetrics.Ratio(accented));
     }
 
     /// <summary>An explicit width stretches the font rather than making it fixed pitch,
