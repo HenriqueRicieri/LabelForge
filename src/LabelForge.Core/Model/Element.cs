@@ -2,6 +2,20 @@ using System.Text.Json.Serialization;
 
 namespace LabelForge.Core.Model;
 
+/// <summary>Which point of a field its origin names, and so which ZPL command places
+/// it. ZPL has exactly these two, and they are not interchangeable; see
+/// <see cref="FieldTypeset"/> for the geometry and <see cref="Element.Anchor"/> for
+/// why the difference is kept rather than converted away.</summary>
+public enum FieldAnchor
+{
+    /// <summary>`^FO`: the top-left corner of the drawn field.</summary>
+    TopLeft,
+
+    /// <summary>`^FT`: the field's bottom-left, which for text is the baseline rather
+    /// than the bottom of the line.</summary>
+    Baseline,
+}
+
 /// <summary>
 /// Base type for everything placed on a label. Geometry is stored in printer dots
 /// with a top-left origin, matching ZPL's ^FO field origin, so what you place is what
@@ -27,11 +41,27 @@ public abstract class Element
     /// <summary>Human-facing name shown in the layers/objects panel.</summary>
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>X of the field origin in dots (top-left).</summary>
+    /// <summary>X of the field origin in dots. Which corner of the drawn field that
+    /// origin names is <see cref="Anchor"/>'s business.</summary>
     public int X { get; set; }
 
-    /// <summary>Y of the field origin in dots (top-left).</summary>
+    /// <summary>Y of the field origin in dots; see <see cref="X"/>.</summary>
     public int Y { get; set; }
+
+    /// <summary>
+    /// Which point of the field <see cref="X"/> and <see cref="Y"/> name, which is also
+    /// which ZPL command places it: `^FO` for the top-left corner, `^FT` for the
+    /// bottom-left (the baseline, for text).
+    ///
+    /// It matters because the two anchors behave differently when the content changes
+    /// size. A `^FO` field grows right and down from a fixed corner; a `^FT` field at 180
+    /// or 270 degrees grows away from a fixed corner in the other direction, so where it
+    /// prints depends on how wide its own content turns out to be. That is exactly what
+    /// real labels rely on, and it is why the anchor is modelled instead of being
+    /// converted away: a template field carries a marker at design time and a value of
+    /// some other length at print time, and only the printer knows the second one.
+    /// </summary>
+    public FieldAnchor Anchor { get; set; } = FieldAnchor.TopLeft;
 
     public Orientation Orientation { get; set; } = Orientation.Normal;
 

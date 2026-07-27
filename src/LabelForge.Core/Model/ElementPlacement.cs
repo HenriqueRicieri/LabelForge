@@ -34,10 +34,15 @@ public static class ElementPlacement
     public const double PasteboardMarginMm = 20;
 
     /// <summary>
-    /// True when the element is meant to print and its origin can be emitted as a ^FO
-    /// that lands on the label. ZPL has no negative origins, and an origin past the edge
+    /// True when the element is meant to print and its origin lands on the label. ZPL has
+    /// no negative origins under either placing command, and an origin past the edge
     /// prints nothing. A "do not print" element fails here too, so the generator needs no
     /// second rule and cannot disagree with the canvas about which is which.
+    ///
+    /// It is the origin that is tested, not the drawn box. Those are the same corner for
+    /// a `^FO` field and are not for a `^FT` one, whose box can extend up and left of the
+    /// origin it is placed by; that is a legal label and the printer draws what fits, so
+    /// it is <see cref="Classify"/>'s clipping that has something to say about it.
     ///
     /// Continuous stock has no bottom edge to fall off: the roll simply gets longer, so
     /// only the left, top and right bounds apply. That is also what keeps the rule
@@ -69,8 +74,11 @@ public static class ElementPlacement
         }
 
         // On continuous stock the bottom cannot clip, because the label was measured to
-        // reach the last element in the first place.
-        return bounds.X + bounds.Width > document.WidthDots ||
+        // reach the last element in the first place. The near edges can only be crossed
+        // by a field placed from an anchor other than its top-left corner, since a
+        // printable origin is already on the label.
+        return bounds.X < 0 || bounds.Y < 0 ||
+               bounds.X + bounds.Width > document.WidthDots ||
                bounds.Y + bounds.Height > document.HeightDots
             ? PlacementStatus.Clipped
             : PlacementStatus.Inside;

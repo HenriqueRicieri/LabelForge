@@ -36,6 +36,23 @@ public sealed class ElementBoundsCalculator : IElementVisitor
     /// which reasons about the element's intrinsic width (e.g. barcode modules).</summary>
     public DotRect GetUnrotatedBounds(Element element)
     {
+        DotRect local = GetLocalBounds(element);
+        (int x, int y) = FieldTypeset.DrawnTopLeft(element, local);
+        return local with { X = local.X + x, Y = local.Y + y };
+    }
+
+    /// <summary>
+    /// The footprint measured from the field's own origin rather than from the label's,
+    /// so it is the element's size and nothing about where it sits.
+    ///
+    /// Separate from <see cref="GetUnrotatedBounds"/> because placing a field can need
+    /// its size first: a `^FT` origin is the field's bottom-left, so working out which
+    /// dot its top-left lands on means knowing how tall and wide it is.
+    /// <see cref="FieldTypeset"/> asks for this one, and asking for the placed bounds
+    /// there would be circular.
+    /// </summary>
+    public DotRect GetLocalBounds(Element element)
+    {
         ArgumentNullException.ThrowIfNull(element);
         element.Accept(this);
         return _result;
@@ -56,7 +73,7 @@ public sealed class ElementBoundsCalculator : IElementVisitor
 
         if (!element.IsBlock)
         {
-            _result = new DotRect(element.X, element.Y, naturalWidth, element.FontHeightDots);
+            _result = new DotRect(0, 0, naturalWidth, element.FontHeightDots);
             return;
         }
 
@@ -71,7 +88,7 @@ public sealed class ElementBoundsCalculator : IElementVisitor
                      + Math.Max(lines - 1, 0) * element.BlockLineSpacingDots;
 
         _result = new DotRect(
-            element.X, element.Y, element.BlockWidthDots, Math.Max(height, element.FontHeightDots));
+            0, 0, element.BlockWidthDots, Math.Max(height, element.FontHeightDots));
     }
 
     public void Visit(BarcodeElement element)
@@ -99,7 +116,7 @@ public sealed class ElementBoundsCalculator : IElementVisitor
         };
 
         int height = element.HeightDots + (element.PrintInterpretationLine ? 30 : 0);
-        _result = new DotRect(element.X, element.Y, modules * element.ModuleWidthDots, height);
+        _result = new DotRect(0, 0, modules * element.ModuleWidthDots, height);
     }
 
     public void Visit(QrCodeElement element)
@@ -122,7 +139,7 @@ public sealed class ElementBoundsCalculator : IElementVisitor
         // BinaryKits' QR drawer paints 10 dots below the field origin. A fixed number of
         // dots rather than a number of modules: measured across magnifications 2, 4 and 8
         // and across symbol versions it never moved, so it is scaled by nothing.
-        _result = new DotRect(element.X, element.Y + 10, side, side);
+        _result = new DotRect(0, 10, side, side);
     }
 
     public void Visit(DataMatrixElement element)
@@ -163,7 +180,7 @@ public sealed class ElementBoundsCalculator : IElementVisitor
         }
 
         int side = modules * Math.Max(element.ModuleSizeDots, 1);
-        _result = new DotRect(element.X, element.Y, side, side);
+        _result = new DotRect(0, 0, side, side);
     }
 
     public void Visit(Pdf417Element element)
@@ -171,20 +188,20 @@ public sealed class ElementBoundsCalculator : IElementVisitor
         // The one place the symbol's shape is worked out; see Pdf417Metrics for how
         // exact each half of it is.
         Pdf417Shape shape = Pdf417Metrics.Measure(element);
-        _result = new DotRect(element.X, element.Y, shape.WidthDots, shape.HeightDots);
+        _result = new DotRect(0, 0, shape.WidthDots, shape.HeightDots);
     }
 
     public void Visit(ImageElement element) =>
-        _result = new DotRect(element.X, element.Y, element.WidthDots, element.HeightDots);
+        _result = new DotRect(0, 0, element.WidthDots, element.HeightDots);
 
     public void Visit(LineElement element)
     {
         (int w, int h) = element.IsVertical
             ? (element.ThicknessDots, element.LengthDots)
             : (element.LengthDots, element.ThicknessDots);
-        _result = new DotRect(element.X, element.Y, w, h);
+        _result = new DotRect(0, 0, w, h);
     }
 
     public void Visit(BoxElement element) =>
-        _result = new DotRect(element.X, element.Y, element.WidthDots, element.HeightDots);
+        _result = new DotRect(0, 0, element.WidthDots, element.HeightDots);
 }

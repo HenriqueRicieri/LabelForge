@@ -11,9 +11,14 @@ namespace LabelForge.Tests;
 /// outnumbers `^FO` by 1304 to 477 and appears in 28 of the 30 files.
 ///
 /// The test that carries this is not an assertion about coordinates, it is the picture.
-/// Render the original, import it, regenerate as `^FO`, render that, and the ink has to
-/// land in the same place. That fails the moment the conversion is wrong for any field
-/// type or any orientation, including combinations nobody thought to write down.
+/// Render the original, import it, regenerate, render that, and the ink has to land in
+/// the same place. That fails the moment the geometry is wrong for any field type or any
+/// orientation, including combinations nobody thought to write down.
+///
+/// A `^FT` field keeps its anchor rather than being converted to a `^FO`, so the ink test
+/// now also holds the stronger property that the command comes back out as it went in.
+/// What the conversion is still needed for is the canvas: the drawn top-left of a field
+/// typeset by its baseline has to be worked out from its own size.
 /// </summary>
 public sealed class FieldTypesetTests
 {
@@ -61,21 +66,20 @@ public sealed class FieldTypesetTests
         Assert.InRange(after.Y, before.Y - 2, before.Y + 2);
     }
 
-    /// <summary>Reading `^FT` as `^FO` is what this replaces, and the gap it left was not
-    /// subtle: a field landed low by its own height.</summary>
+    /// <summary>The gap between the two commands is not subtle: at the same coordinates a
+    /// typeset field draws higher by its own ascent, which is what reading one as the
+    /// other used to lose.</summary>
     [Fact]
-    public void ReadingItAsAPlainOrigin_WouldHaveBeenWrongByTheFieldsHeight()
+    public void ATypesetField_DrawsHigherThanAPlainOneAtTheSameCoordinates()
     {
-        LabelDocument typeset =
-            ZplDocumentImport.FromZpl("^XA^PW800^LL600^FT100,300^A0N,40^FDWXYZ^FS^XZ", 8).Document;
-        LabelDocument plain =
-            ZplDocumentImport.FromZpl("^XA^PW800^LL600^FO100,300^A0N,40^FDWXYZ^FS^XZ", 8).Document;
+        var bounds = new ElementBoundsCalculator();
 
-        int typesetY = Assert.Single(typeset.Elements).Y;
-        int plainY = Assert.Single(plain.Elements).Y;
+        DotRect typeset = bounds.GetBounds(Imported("^FT100,300^A0N,40^FDWXYZ^FS"));
+        DotRect plain = bounds.GetBounds(Imported("^FO100,300^A0N,40^FDWXYZ^FS"));
 
         // The ascent of a 40 dot font, which is what the two commands differ by.
-        Assert.Equal(29, plainY - typesetY);
+        Assert.Equal(29, plain.Y - typeset.Y);
+        Assert.Equal(plain.X, typeset.X);
     }
 
     /// <summary>A plain `^FO` field is untouched, so nothing that was already read
@@ -83,10 +87,22 @@ public sealed class FieldTypesetTests
     [Fact]
     public void APlainOrigin_IsLeftAlone()
     {
-        LabelDocument document =
-            ZplDocumentImport.FromZpl("^XA^PW800^LL600^FO100,300^A0N,40^FDWXYZ^FS^XZ", 8).Document;
+        Element element = Imported("^FO100,300^A0N,40^FDWXYZ^FS");
 
-        Element element = Assert.Single(document.Elements);
+        Assert.Equal(FieldAnchor.TopLeft, element.Anchor);
+        Assert.Equal(100, element.X);
+        Assert.Equal(300, element.Y);
+    }
+
+    /// <summary>The origin is kept as the file wrote it, which is what lets a template
+    /// field print where it printed: a `^FT` position depends on the width of whatever
+    /// the marker is replaced with, and only the printer knows that.</summary>
+    [Fact]
+    public void ATypesetOrigin_IsKeptAsOne()
+    {
+        Element element = Imported("^FT100,300^A0N,40^FDWXYZ^FS");
+
+        Assert.Equal(FieldAnchor.Baseline, element.Anchor);
         Assert.Equal(100, element.X);
         Assert.Equal(300, element.Y);
     }
@@ -105,10 +121,90 @@ public sealed class FieldTypesetTests
             8).Document;
 
         Assert.Equal(3, document.Elements.Count);
-        Assert.Equal(271, document.Elements[0].Y);
-        Assert.Equal(300, document.Elements[1].Y);
-        Assert.Equal(271, document.Elements[2].Y);
+        Assert.Equal(
+            [FieldAnchor.Baseline, FieldAnchor.TopLeft, FieldAnchor.Baseline],
+            document.Elements.Select(e => e.Anchor));
+
+        // Same coordinates, and the middle one still draws lower than its neighbours.
+        var bounds = new ElementBoundsCalculator();
+        Assert.All(document.Elements, e => Assert.Equal(300, e.Y));
+        Assert.Equal(271, bounds.GetBounds(document.Elements[0]).Y);
+        Assert.Equal(300, bounds.GetBounds(document.Elements[1]).Y);
+        Assert.Equal(271, bounds.GetBounds(document.Elements[2]).Y);
     }
+
+    /// <summary>
+    /// What E1g cost before the anchor was modelled. A `^FT` field at 180 degrees is
+    /// placed from its own right edge, so the printed position depends on how wide the
+    /// content turns out to be. The label carries a marker; the system that prints it
+    /// substitutes a value of some other length. Keeping the anchor means the printer
+    /// decides, which is what the source label did.
+    /// </summary>
+    [Fact]
+    public void ARotatedTypesetField_KeepsItsAnchorWhateverTheContentsWidth()
+    {
+        const string head = "^XA^PW800^LL600";
+        const string tail = "^A0I,43,43^FD";
+
+        string marker = new ZplGenerator().Generate(
+            ZplDocumentImport.FromZpl($"{head}^FT340,73{tail}##PESO_LIQUIDO@0,000##^FS^XZ", 8).Document);
+        string value = new ZplGenerator().Generate(
+            ZplDocumentImport.FromZpl($"{head}^FT340,73{tail}12,345^FS^XZ", 8).Document);
+
+        // The same anchor either way: the field's own width never enters into it.
+        Assert.Contains("^FT340,73", marker, StringComparison.Ordinal);
+        Assert.Contains("^FT340,73", value, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The coordinates a real file was written with come back out unchanged, which is
+    /// what a round trip through this app has to mean for the ordinary case: `^FT` is
+    /// 73 per cent of the corpus's field origins.
+    /// </summary>
+    [Theory]
+    [InlineData("^FT120,240^A0N,40^FDWXYZ^FS")]
+    [InlineData("^FT120,240^A0I,43,43^FD##PESO_LIQUIDO@0,000##^FS")]
+    [InlineData("^BY2^FT120,240^BCB,80,Y,N,N^FD12345678^FS")]
+    [InlineData("^FT120,240^BQN,2,4^FDMA,HELLO^FS")]
+    [InlineData("^FT120,240^GB160,90,4,B^FS")]
+    public void ATypesetField_RegeneratesTheCommandItCameFrom(string field)
+    {
+        string original = $"^XA^PW1200^LL900{field}^XZ";
+
+        string generated = new ZplGenerator().Generate(
+            ZplDocumentImport.FromZpl(original, dpmm: 8).Document);
+
+        Assert.Contains("^FT120,240", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("^FO", generated, StringComparison.Ordinal);
+
+        // And it is stable, which is the property that fails first if the anchor and the
+        // geometry ever disagree.
+        Assert.Equal(
+            generated,
+            new ZplGenerator().Generate(ZplDocumentImport.FromZpl(generated, dpmm: 8).Document));
+    }
+
+    /// <summary>A field placed by its baseline can legitimately draw above and left of
+    /// its own origin, which no `^FO` can express and which the old conversion clamped to
+    /// the label edge. The origin stays where the file put it; the canvas reports the
+    /// overhang as clipping, which is what a printer does with it.</summary>
+    [Fact]
+    public void ATypesetFieldCanDrawOutsideItsOwnOrigin()
+    {
+        Element element = Imported("^FT40,30^A0I,40^FDWXYZ^FS");
+        var document = new LabelDocument { WidthMm = 100, HeightMm = 75, Dpmm = 8 };
+        DotRect bounds = new ElementBoundsCalculator().GetBounds(element);
+
+        Assert.Equal(40, element.X);
+        Assert.True(bounds.X < 0, $"a 180 degree field draws left of its anchor ({bounds.X})");
+
+        // The origin is on the label, so it prints; the part that hangs off is clipping.
+        Assert.True(ElementPlacement.IsPrintable(element, document));
+        Assert.Equal(PlacementStatus.Clipped, ElementPlacement.Classify(element, bounds, document));
+    }
+
+    private static Element Imported(string field) =>
+        Assert.Single(ZplDocumentImport.FromZpl($"^XA^PW800^LL600{field}^XZ", 8).Document.Elements);
 
     private static DotRect Ink(string zpl)
     {

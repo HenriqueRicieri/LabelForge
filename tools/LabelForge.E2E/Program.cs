@@ -591,6 +591,30 @@ if (mode == "designer")
     Pump(400);
     Capture("designer-erase-and-escape.png");
 
+    // ^FT is how real labels place a field, and it stays a ^FT: where one prints depends
+    // on the width of whatever fills its marker, so freezing it into a ^FO would pin it
+    // to the marker's own width.
+    d.ImportZplDocument(
+        "^XA\n^FT340,73^A0I,43,43^FD##PESO_LIQUIDO@0,000##^FS\n"
+        + "^FT60,300^A0N,40^FDBaseline^FS\n^FO60,360^A0N,40^FDTop left^FS\n^XZ",
+        "typeset.zpl");
+    Pump(900);
+    Console.WriteLine(
+        "anchors read per field: "
+        + $"{string.Join(", ", d.Document.Elements.Select(e => e.Anchor))} "
+        + "(expected Baseline, Baseline, TopLeft)");
+    Console.WriteLine(
+        $"and written back as they came: ^FT count={Count(d.GeneratedZpl, "^FT")}, "
+        + $"^FO count={Count(d.GeneratedZpl, "^FO")}, keeps ^FT340,73="
+        + $"{d.GeneratedZpl.Contains("^FT340,73")} (expected 2/1/True)");
+
+    d.Selection.Set(d.Document.Elements[1]);
+    Pump(300);
+    Console.WriteLine(
+        $"panel names the anchor: '{d.SelectionProperties?.SelectedAnchor}' "
+        + "(expected the baseline option)");
+    Capture("designer-anchors.png");
+
     // Element flags: a locked element resists canvas gestures, a "do not print" one stays
     // on the canvas with its own outline and leaves the exported ZPL.
     d.NewDocumentCommand.Execute(null);

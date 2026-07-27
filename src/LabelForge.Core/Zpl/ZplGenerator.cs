@@ -192,9 +192,17 @@ public sealed class ZplGenerator : IElementVisitor
 
     /// <summary>The field origin, plus the reverse marker when the field asks for it.
     /// ^FR goes here rather than next to the data because that is the one position that
-    /// works for every field type, graphic commands included.</summary>
+    /// works for every field type, graphic commands included.
+    ///
+    /// Which command places the field is the element's own answer: ^FT names its
+    /// bottom-left and ^FO its top-left, and an element that came in as one is written
+    /// back as the same one. That is not only round-trip tidiness. A ^FT field's printed
+    /// position depends on how wide its content turns out to be, so converting it to a
+    /// fixed ^FO would freeze it at the width of whatever text the label carries at
+    /// design time, which for a template field is a marker rather than the value.</summary>
     private string Fo(Element element) =>
-        $"^FO{element.X + _offset},{element.Y + _offset}"
+        $"{(element.Anchor == FieldAnchor.Baseline ? "^FT" : "^FO")}"
+        + $"{element.X + _offset},{element.Y + _offset}"
         + (element.IsReversed ? "^FR" : string.Empty);
 
     /// <summary>Emits a field's data, resolving the document's counters and clocks. The

@@ -586,6 +586,13 @@
                         <ComboBox ItemsSource="{Binding SelectionProperties.Orientations, FallbackValue={x:Null}}"
                                   SelectedItem="{Binding SelectionProperties.SelectedOrientation, FallbackValue={x:Null}}"
                                   HorizontalAlignment="Stretch" />
+                        <TextBlock Classes="propLabel" Text="Position names" />
+                        <ComboBox ItemsSource="{Binding SelectionProperties.Anchors, FallbackValue={x:Null}}"
+                                  SelectedItem="{Binding SelectionProperties.SelectedAnchor, FallbackValue={x:Null}}"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="^FO places a field by its top-left corner, ^FT by its bottom-left. A baseline-placed field moves when its content changes width, which is how real labels keep a filled-in value anchored." />
+                        <TextBlock Text="{Binding SelectionProperties.AnchorHint, FallbackValue=''}"
+                                   FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
                         <CheckBox Content="Reverse (knock out of the ink below)" FontSize="12" Margin="0,4,0,0"
                                   IsChecked="{Binding SelectionProperties.IsReversed, FallbackValue=false}"
                                   ToolTip.Tip="^FR: prints white where this field crosses black. Over blank stock it prints nothing." />

@@ -21,6 +21,12 @@ public sealed record OrientationOption(string Label, Orientation Value)
     public override string ToString() => Label;
 }
 
+/// <summary>A friendly label for which point of a field its origin names.</summary>
+public sealed record AnchorOption(FieldAnchor Value, string Label)
+{
+    public override string ToString() => Label;
+}
+
 /// <summary>
 /// Base of the per-type property editors shown in the designer's panel. Each editor
 /// wraps the selected element directly (getters read the model, setters write it) and
@@ -116,6 +122,31 @@ public abstract class ElementPropertiesViewModel : ObservableObject
         get => Orientations.First(o => o.Value == Element.Orientation);
         set => Edit(Element.Orientation, value?.Value ?? Orientation.Normal, v => Element.Orientation = v);
     }
+
+    public IReadOnlyList<AnchorOption> Anchors { get; } =
+    [
+        new(FieldAnchor.TopLeft, "Top-left corner (^FO)"),
+        new(FieldAnchor.Baseline, "Baseline / bottom-left (^FT)"),
+    ];
+
+    /// <summary>Which point of the field X and Y name, and so which command places it.
+    /// Worth having on the panel rather than only on import, because the two behave
+    /// differently once the content changes width: a baseline-placed field at 180 or 270
+    /// degrees grows away from its anchor, which is how a label keeps a value's right
+    /// edge fixed when the value itself is filled in elsewhere.</summary>
+    public AnchorOption SelectedAnchor
+    {
+        get => Anchors.First(a => a.Value == Element.Anchor);
+        set => Edit(Element.Anchor, value?.Value ?? FieldAnchor.TopLeft, v =>
+        {
+            Element.Anchor = v;
+            OnPropertyChanged(nameof(AnchorHint));
+        });
+    }
+
+    public string AnchorHint => Element.Anchor == FieldAnchor.Baseline
+        ? "X and Y are the field's bottom-left; text sits on that line."
+        : "X and Y are the top-left corner of the field.";
 
     /// <summary>Knocks this field out of whatever ink is under it (^FR) instead of
     /// adding to it. Applies to any element, which is why it lives on the base editor;

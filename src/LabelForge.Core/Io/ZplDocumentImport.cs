@@ -703,22 +703,18 @@ public static class ZplDocumentImport
             element.Orientation = _orientation;
             element.IsReversed = _reversed;
 
-            int x = (_originX ?? 0) + _homeX;
-            int y = (_originY ?? 0) + _homeY;
-
-            // A ^FT origin is the field's bottom left, so it becomes a top left once the
-            // field is known. Reading it as ^FO puts everything low by its own height,
-            // which on real files is almost everything: ^FT outnumbers ^FO in the corpus
-            // by nearly three to one.
-            if (_typeset)
-            {
-                (x, y) = FieldTypeset.ToFieldOrigin(element, x, y);
-            }
+            // A ^FT origin is the field's bottom left, and it is kept as one rather than
+            // converted to a top-left ^FO. Which matters twice over: where a ^FT field
+            // prints depends on how wide its content turns out to be, so a fixed ^FO
+            // would freeze it at the width of the marker the label carries at design
+            // time; and a field typeset by its baseline can legitimately extend up and
+            // left of its own origin, which no ^FO can express.
+            element.Anchor = _typeset ? FieldAnchor.Baseline : FieldAnchor.TopLeft;
 
             // ZPL has no negative origins, so a label home that pushes a field off the
             // top-left is clamped rather than producing a coordinate we cannot re-emit.
-            element.X = Math.Max(x, 0);
-            element.Y = Math.Max(y, 0);
+            element.X = Math.Max((_originX ?? 0) + _homeX, 0);
+            element.Y = Math.Max((_originY ?? 0) + _homeY, 0);
             _current?.Elements.Add(element);
         }
 

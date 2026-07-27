@@ -52,6 +52,13 @@ public sealed class ZplDocumentImportTests
             X = 300, Y = 200, WidthDots = 120, HeightDots = 60, ThicknessDots = 60,
             IsWhite = true,
         });
+        document.Elements.Add(new TextElement
+        {
+            // Placed by its baseline, which is how nearly every real label is written
+            // and which has to come back out as the same command.
+            X = 560, Y = 260, Text = "Typeset", FontHeightDots = 34,
+            Anchor = FieldAnchor.Baseline,
+        });
         document.Elements.Add(new BarcodeElement
         {
             X = 20, Y = 200, Symbology = BarcodeSymbology.Code128, Data = "ABC-123",

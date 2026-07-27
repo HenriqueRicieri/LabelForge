@@ -46,23 +46,52 @@ public static class FieldTypeset
     /// </summary>
     private const int QrDrawOffsetDots = 10;
 
-    /// <summary>The origin to store for a field the file placed with `^FT`.</summary>
+    /// <summary>The `^FO` origin that draws the same thing as a `^FT` at
+    /// <paramref name="x"/>, <paramref name="y"/>.</summary>
     public static (int X, int Y) ToFieldOrigin(Element element, int x, int y)
     {
         ArgumentNullException.ThrowIfNull(element);
+        (int shiftX, int shiftY) = Shift(element, Extent(element));
+        return (x - shiftX, y - shiftY);
+    }
 
-        (int width, int height, int anchorAboveBottom) = Extent(element);
+    /// <summary>
+    /// Where a field's drawn top-left lands, given the origin it stores and what that
+    /// origin names. A `^FO` element is already there and answers zero; a `^FT` element
+    /// answers the offset to its own top-left corner, which can be negative, because a
+    /// field typeset by its baseline legitimately extends up and to the left of it.
+    /// </summary>
+    /// <param name="localBounds">The element's footprint measured from its own origin,
+    /// passed in rather than measured here so the bounds calculator can call this without
+    /// asking itself for the answer it is computing.</param>
+    public static (int X, int Y) DrawnTopLeft(Element element, DotRect localBounds)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        if (element.Anchor != FieldAnchor.Baseline)
+        {
+            return (element.X, element.Y);
+        }
+
+        (int shiftX, int shiftY) = Shift(element, Extent(element, localBounds));
+        return (element.X - shiftX, element.Y - shiftY);
+    }
+
+    /// <summary>How far the drawn box's top-left sits from the `^FT` anchor. The anchor
+    /// is the field's own bottom-left corner, so rotating the field moves that corner to
+    /// a different corner of the box actually drawn.</summary>
+    private static (int X, int Y) Shift(
+        Element element, (int Width, int Height, int AnchorAboveBottom) extent)
+    {
+        (int width, int height, int anchorAboveBottom) = extent;
         int aboveAnchor = height - anchorAboveBottom;
 
-        (int shiftX, int shiftY) = element.Orientation switch
+        return element.Orientation switch
         {
             Orientation.Rotated90 => (anchorAboveBottom, 0),
             Orientation.Rotated180 => (width, anchorAboveBottom),
             Orientation.Rotated270 => (aboveAnchor, width),
             _ => (0, aboveAnchor),
         };
-
-        return (x - shiftX, y - shiftY);
     }
 
     /// <summary>
@@ -74,11 +103,13 @@ public static class FieldTypeset
     /// the baseline, which is the descender depth above the bottom; and a QR carries the
     /// renderer's ten-dot offset at both ends.
     /// </summary>
-    private static (int Width, int Height, int AnchorAboveBottom) Extent(Element element)
-    {
-        var bounds = new ElementBoundsCalculator();
-        DotRect box = bounds.GetUnrotatedBounds(element);
+    private static (int Width, int Height, int AnchorAboveBottom) Extent(Element element) =>
+        Extent(element, new ElementBoundsCalculator().GetLocalBounds(element));
 
+    /// <inheritdoc cref="Extent(Element)"/>
+    private static (int Width, int Height, int AnchorAboveBottom) Extent(
+        Element element, DotRect box)
+    {
         return element switch
         {
             TextElement text => (
