@@ -5,11 +5,20 @@
 # not. So the only way to see its output is to print through it into a file.
 #
 # Prerequisite, and it is not scriptable: the ZDesigner driver has to be installed
-# first. It is not in Windows' driver store and it is not obtainable from Windows
-# Update, so it comes off Zebra's (or Seagull's) download portal behind a registration
-# form and a EULA, and staging a new driver package needs administrator rights. Adding
-# a QUEUE for a driver that is already installed does not, which is why the rest of
-# this runs unelevated.
+# first. It is not in Windows' driver store and Add-PrinterDriver cannot fetch it, and
+# staging a new driver package needs administrator rights. Adding a QUEUE for a driver
+# that is already installed does not, which is why the rest of this runs unelevated.
+#
+# Usually there is nothing to download. Zebra Setup Utilities bundles this driver, and
+# any model-specific queue ("ZDesigner ZT230-200dpi ZPL" and the like) is the same
+# package with a model INF entry, so a machine that already prints to a Zebra already
+# has it. Seagull Scientific builds it for Zebra under contract, which is why their
+# download and Zebra's are the same driver rather than two choices.
+#
+# NONE OF THIS IS A RUNTIME DEPENDENCY. LabelForge generates its own ZPL and prints raw
+# bytes, over TCP 9100 or through the spooler's RAW datatype, which passes the driver
+# by. The driver is a development tool for producing comparison fixtures, used by
+# whoever makes them and by nobody who installs the app.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File scripts\zdesigner-capture.ps1 -Setup
@@ -103,10 +112,19 @@ if ($drivers.Count -eq 0) {
     Fail @"
 No Zebra printer driver is installed, so there is nothing to capture through.
 
-Install the ZDesigner Windows driver first. It needs administrator rights and it is not
-available from Windows Update: Add-PrinterDriver reports "the specified driver does not
-exist in the driver repository" for every ZDesigner name. Once it is installed, run this
-again - adding a queue for a driver that is already present needs no elevation.
+There is probably nothing to download. Zebra Setup Utilities bundles this driver, and any
+model-specific queue ("ZDesigner ZT230-200dpi ZPL" and the like) is the same package with a
+model INF entry, so any machine that already prints to a Zebra already has it. Running this
+on that machine is the shortest route. Otherwise install Zebra Setup Utilities, or the
+driver from Zebra's own download page for the printer model in question.
+
+Installing it needs administrator rights, and Windows cannot fetch it: Add-PrinterDriver
+answers "the specified driver does not exist in the driver repository" for every ZDesigner
+name. Once it is installed, run this again - adding a queue for a driver already present
+needs no elevation.
+
+This is a development tool for producing comparison fixtures. LabelForge itself needs no
+driver: it generates its own ZPL and prints raw bytes.
 "@
 }
 
