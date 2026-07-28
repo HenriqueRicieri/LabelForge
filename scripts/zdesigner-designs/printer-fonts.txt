@@ -1,0 +1,25 @@
+# Reference design for tests/LabelForge.Tests/Fixtures/zdesigner-printer-fonts.zpl.
+#
+# One line per field: x,y,height,face,text - all in printer dots, at the driver's own
+# density. The face names are the driver's DEVICE fonts; run -ListFonts to see what a
+# given driver offers. Reproduce the fixture with:
+#
+#   zdesigner-capture.ps1 -Setup
+#   zdesigner-capture.ps1 -Print scripts\zdesigner-designs\printer-fonts.txt
+#   zdesigner-capture.ps1 -Capture printer-fonts
+#
+# Every resident font the ZT230 driver offers, so the ^A cells it asks for can be
+# checked against the ones the manual publishes and ZplFont holds. Heights are each
+# font's own cell, except font A, which is asked for at three times its cell to show
+# that a bitmapped font is magnified in whole steps rather than sized freely.
+40,40,40,Zebra Triumvirate,SCALABLE 0
+40,110,27,Zebra Courier,FONT A x3
+40,160,11,Zebra Font B,FONT B
+40,190,28,Zebra OCR-B,FONT E OCRB
+40,240,26,Zebra Font F,FONT F
+40,290,60,Zebra Font G,FONT G
+40,370,21,Zebra OCR-A,FONT H OCRA
+
+# The barcode font, which is how the driver is asked for a real ^B command with its
+# own ^BY module width and ratio rather than a picture of a barcode.
+40,420,60,Zebra-Sample Bar Code Font,12345678

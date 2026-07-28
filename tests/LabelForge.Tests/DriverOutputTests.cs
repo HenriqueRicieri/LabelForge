@@ -1,5 +1,6 @@
 using LabelForge.Core.Io;
 using LabelForge.Core.Model;
+using LabelForge.Core.Zpl;
 
 namespace LabelForge.Tests;
 
@@ -22,6 +23,12 @@ public sealed class DriverOutputTests
     private static string DriverZpl() =>
         ZplTextFile.ReadFile(
             Path.Combine(TestCorpus.FixturesDirectory(), "zdesigner-driver-output.zpl")).Text;
+
+    /// <summary>The other capture: the same driver asked for the printer's own resident
+    /// fonts instead, which is what makes it emit ^A commands rather than a bitmap.</summary>
+    private static string PrinterFontZpl() =>
+        ZplTextFile.ReadFile(
+            Path.Combine(TestCorpus.FixturesDirectory(), "zdesigner-printer-fonts.zpl")).Text;
 
     /// <summary>
     /// The size comes from the setup block, not from measuring the content.
@@ -105,5 +112,84 @@ public sealed class DriverOutputTests
             "^XA^FO10,10^A0N,30^FDno size anywhere^FS^XZ", dpmm: 8);
 
         Assert.NotNull(result.MeasuredSize);
+    }
+
+    /// <summary>
+    /// The bitmapped font cells, confirmed by a third source.
+    ///
+    /// B14 took these from the ZPL manual and checked them against Labelary, deliberately
+    /// against the offline renderer, which draws five of the eight at the wrong width. The
+    /// driver is an independent third opinion, and it is the one that matters commercially:
+    /// it is what a Windows application actually sends when someone picks a printer font.
+    /// Asked for each resident font, it emits exactly the cell `ZplFont` holds.
+    ///
+    /// Font A arrives at three times its cell rather than at it, which is the other half of
+    /// B14 confirmed: a bitmapped font prints whole multiples of its cell, so the driver
+    /// picked a multiple rather than the nearest number of dots.
+    /// </summary>
+    [Theory]
+    [InlineData('A', 27, 15, 3)]
+    [InlineData('B', 11, 7, 1)]
+    [InlineData('E', 28, 15, 1)]
+    [InlineData('F', 26, 13, 1)]
+    [InlineData('G', 60, 40, 1)]
+    [InlineData('H', 21, 13, 1)]
+    public void TheDriverAsksForTheCellsTheManualPublishes(
+        char font, int heightDots, int widthDots, int magnification)
+    {
+        string zpl = PrinterFontZpl();
+        Assert.Contains(
+            $"^A{font}N,{heightDots},{widthDots}", zpl, StringComparison.Ordinal);
+
+        FontCell cell = Assert.NotNull(ZplFont.Cell(font, dpmm: 8));
+        Assert.Equal(cell.HeightDots * magnification, heightDots);
+        Assert.Equal(cell.WidthDots * magnification, widthDots);
+    }
+
+    /// <summary>
+    /// Every field the driver placed comes back, in the command it was written with.
+    ///
+    /// The driver writes text with `^FT` and the barcode with `^FO`, in one file, which is
+    /// the mix B5 exists to model. An importer that converted either way would regenerate a
+    /// different label; this holds that it does not.
+    /// </summary>
+    [Fact]
+    public void PrinterFontOutputRoundTrips()
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(PrinterFontZpl(), dpmm: 8);
+
+        Assert.Equal(8, result.Document.Elements.Count);
+        Assert.Equal(7, result.Document.Elements.OfType<TextElement>().Count());
+
+        var barcode = Assert.Single(result.Document.Elements.OfType<BarcodeElement>());
+        Assert.Equal(BarcodeSymbology.Code39, barcode.Symbology);
+        Assert.Equal("12345678", barcode.Data);
+        Assert.Equal(4, barcode.ModuleWidthDots);
+        Assert.Equal(2.5, barcode.WideBarRatio);
+        Assert.Equal(FieldAnchor.TopLeft, barcode.Anchor);
+
+        // Text is typeset by its baseline, which is how the driver writes it and how every
+        // real label does.
+        Assert.All(
+            result.Document.Elements.OfType<TextElement>(),
+            t => Assert.Equal(FieldAnchor.Baseline, t.Anchor));
+
+        // The fonts survive as the designators they arrived as, rather than falling back.
+        Assert.Equal(
+            ['0', 'A', 'B', 'E', 'F', 'G', 'H'],
+            result.Document.Elements.OfType<TextElement>().Select(t => t.Font));
+    }
+
+    /// <summary>The driver states its own code page, and it is one we model. Worth pinning
+    /// because `^CI` decides what a `^FH` escape decodes to, and E1e settled that against
+    /// the renderer rather than against a real producer of ZPL.</summary>
+    [Fact]
+    public void TheDriverStatesACodePageWeModel()
+    {
+        foreach (int set in new[] { 0, 27 })
+        {
+            Assert.Contains($"^CI{set}", PrinterFontZpl(), StringComparison.Ordinal);
+            Assert.True(ZplCodePage.IsModelled(set));
+        }
     }
 }
