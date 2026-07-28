@@ -55,7 +55,7 @@ public static class ZplDocumentImport
     /// are structural, or the generator re-emits them from the document.</summary>
     private static readonly HashSet<string> Handled = new(StringComparer.Ordinal)
     {
-        "XA", "XZ", "CI", "FS", "FH", "LH", "PW", "LL", "BY", "PQ", "MD", "PR",
+        "XA", "XZ", "CI", "FS", "FH", "LH", "PW", "LL", "BY", "PQ", "MD", "PR", "MM", "LT",
         "DG", "FO", "FT", "FD", "FB", "FR", "SN", "GB", "GE", "GC", "GD", "GF", "XG",
         "BC", "B3", "BE", "BU", "BX", "BQ", "B7",
     };
@@ -80,15 +80,20 @@ public static class ZplDocumentImport
     /// Kept deliberately narrow. Commands that change what the label looks like or where
     /// it prints stay off this list even when they look like setup, because losing one of
     /// those is a real loss the user has to hear about: ^LR and ^PM invert or mirror the
-    /// whole label, ^LS and ^LT shift every field, ^DF stores the format on the printer,
+    /// whole label, ^LS shifts every field, ^DF stores the format on the printer,
     /// and ^CC and ^CT redefine the characters this parser reads.
     /// ^MN is the one that moved off this list conditionally rather than wholesale.
     /// Gap and mark sensing stay printer setup, because several modes are valid and the
     /// operator's matches what is loaded; continuous is different, because a roll with
     /// no gaps is a fact about the label's own stock and about how long it prints.
+    /// ^MM and ^LT came off it outright, and belong with ^PQ, ^MD and ^PR rather than
+    /// here: whether a run is torn, peeled or cut is what this label is for, not how
+    /// somebody's printer happens to be set, and the generator emits both, which makes
+    /// reading them the difference between a round trip and a label that quietly stops
+    /// cutting.
     private static readonly HashSet<string> PrinterConfiguration = new(StringComparer.Ordinal)
     {
-        "MM", "MT", "MP", "MU", "MF", "MC", "MW", "CO",
+        "MT", "MP", "MU", "MF", "MC", "MW", "CO",
         "IS", "ID", "JU", "JA", "SS", "SZ", "SC", "ST", "XS", "SX",
         "NI", "NC", "NR", "NS", "WD", "KL", "KN", "KP", "HS", "HH", "HW", "HM",
     };
@@ -178,6 +183,12 @@ public static class ZplDocumentImport
         private int? _widthDots;
         private int? _heightDots;
 
+        /// <summary>Print mode and label-top offset in force, persistent across blocks
+        /// for the reason the size is: real files state them once in a setup block.</summary>
+        private MediaHandling _mediaHandling = MediaHandling.PrinterDefault;
+        private bool _prepeel;
+        private int _labelTop;
+
         private int _homeX;
         private int _homeY;
         private int? _originX;
@@ -232,6 +243,9 @@ public static class ZplDocumentImport
                 // The size in force carries into the new block: a block that states its own
                 // overwrites it below, one that does not inherits what the file last said.
                 _current = new BlockDraft { WidthDots = _widthDots, HeightDots = _heightDots };
+                _current.Print.MediaHandling = _mediaHandling;
+                _current.Print.Prepeel = _prepeel;
+                _current.Print.LabelTopDots = _labelTop;
                 _blocks.Add(_current);
                 ResetField();
                 _homeX = 0;
@@ -263,6 +277,47 @@ public static class ZplDocumentImport
                     if (_current is { } heightBlock)
                     {
                         heightBlock.HeightDots = _heightDots;
+                    }
+
+                    return;
+
+                case "MM":
+                    // Persistent for the same reason ^PW and ^LL are, and the corpus is
+                    // what settles it rather than the manual's "the current value remains
+                    // unchanged": 440.zpl and 208v1.ZPL both state ^MMT in a bare setup
+                    // block of their own and never mention it again, so a per-block
+                    // reading would drop the mode from the only block that draws anything.
+                    if (PrintSettings.FromLetter(command.Arg(0)) is { } mode)
+                    {
+                        _mediaHandling = mode;
+
+                        // The prepeel flag only reaches a peeler, so it is remembered only
+                        // where it can mean something.
+                        _prepeel = mode == MediaHandling.PeelOff
+                            && command.Arg(1).Equals("Y", StringComparison.OrdinalIgnoreCase);
+                    }
+                    else
+                    {
+                        // RFID, kiosk and the two reserved letters. Not modes an ordinary
+                        // label chooses, and guessing one of them wrong would change what
+                        // the printer does with the media.
+                        Warn($"{command.Prefix}{command.Code}{command.Arg(0)} is a print mode "
+                            + "this designer does not model and was dropped.");
+                    }
+
+                    if (_current is { } modeBlock)
+                    {
+                        modeBlock.Print.MediaHandling = _mediaHandling;
+                        modeBlock.Print.Prepeel = _prepeel;
+                    }
+
+                    return;
+
+                case "LT":
+                    _labelTop = command.Int(0);
+                    if (_current is { } topBlock)
+                    {
+                        topBlock.Print.LabelTopDots = _labelTop;
                     }
 
                     return;
@@ -428,6 +483,7 @@ public static class ZplDocumentImport
 
                 case "PQ":
                     block.Print.Copies = Math.Max(command.Int(0, 1), 1);
+                    ReadPrintQuantity(block, command);
                     return;
 
                 case "MD":
@@ -503,6 +559,10 @@ public static class ZplDocumentImport
             document.Print.Copies = block.Print.Copies;
             document.Print.DarknessDelta = block.Print.DarknessDelta;
             document.Print.SpeedIps = block.Print.SpeedIps;
+            document.Print.MediaHandling = block.Print.MediaHandling;
+            document.Print.Prepeel = block.Print.Prepeel;
+            document.Print.CutAfterLabels = block.Print.CutAfterLabels;
+            document.Print.LabelTopDots = block.Print.LabelTopDots;
 
             for (int i = 0; i < block.Elements.Count; i++)
             {
@@ -1122,6 +1182,48 @@ public static class ZplDocumentImport
             _blockSpacing = 0;
             _blockIndent = 0;
             _justification = TextJustification.Left;
+        }
+
+        /// <summary>
+        /// ^PQ's three parameters after the quantity: the group count, the replicates of
+        /// each serial number, and whether reaching a group cuts or pauses.
+        ///
+        /// Real files write all four, so reading only the first was leaving three on the
+        /// floor: the corpus writes `^PQ1,0,0,Y` and the ZDesigner driver `^PQ1,0,1,Y`.
+        /// Both of those say "no group, cut rather than pause", which is exactly nothing,
+        /// and that is why nothing was ever noticed. A file that does state a group is
+        /// saying something about the run, and it has to survive or be named.
+        /// </summary>
+        private void ReadPrintQuantity(BlockDraft block, ZplCommand command)
+        {
+            int group = command.Int(1);
+            bool cuts = command.Arg(3).Equals("Y", StringComparison.OrdinalIgnoreCase);
+            if (group > 0)
+            {
+                if (cuts)
+                {
+                    block.Print.CutAfterLabels = group;
+                }
+                else
+                {
+                    // The other half of the parameter is an operator workflow rather than
+                    // a property of the label: the printer stops and waits for someone.
+                    // Nothing here can carry that, so it is named rather than silently
+                    // turned into a cut, which is a different machine doing a different
+                    // thing to the media.
+                    Warn($"{command.Prefix}{command.Code} pauses after every {group} labels, "
+                        + "which is not modelled and was dropped.");
+                }
+            }
+
+            // Replicates only mean anything beside a ^SN, and 0 and 1 are written
+            // interchangeably for "one of each" by the files that state them at all, so
+            // only a real multiplier is worth a line.
+            if (command.Int(2) > 1)
+            {
+                Warn($"{command.Prefix}{command.Code} asks for {command.Int(2)} replicates of "
+                    + "each serial number, which is not modelled and was dropped.");
+            }
         }
 
         private void Warn(string message)

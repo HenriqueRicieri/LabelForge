@@ -394,13 +394,16 @@ public sealed class ZplDocumentImportTests
     [Fact]
     public void PrinterSetup_IsReportedAsDeliberateRatherThanAsALoss()
     {
+        // ^MT is the media type (thermal transfer or direct), which is a fact about what
+        // is loaded rather than about this label. It stands in for the setup case that
+        // ^MM used to, now that the print mode is a job setting the generator emits.
         ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
-            "^XA\n^MMT\n^MNY\n^IS R:X.GRF,Y\n^FO0,0^A0N,30^FDkeep^FS\n^XZ");
+            "^XA\n^MTT\n^MNY\n^IS R:X.GRF,Y\n^FO0,0^A0N,30^FDkeep^FS\n^XZ");
 
         Assert.Single(result.Document.Elements);
         string note = Assert.Single(result.Warnings);
         Assert.Contains("deliberate", note, StringComparison.Ordinal);
-        Assert.Contains("^MM", note, StringComparison.Ordinal);
+        Assert.Contains("^MT", note, StringComparison.Ordinal);
         Assert.Contains("^MN", note, StringComparison.Ordinal);
         Assert.Contains("^IS", note, StringComparison.Ordinal);
         Assert.DoesNotContain("not modelled", note, StringComparison.Ordinal);
@@ -412,13 +415,19 @@ public sealed class ZplDocumentImportTests
     /// mirror the whole label, shift every field, store the format on the printer, or
     /// redefine the characters this parser reads.
     ///
-    /// ^SN used to be here and is now read: see <see cref="SerialNumberImportTests"/>.
+    /// ^SN used to be here and is now read: see <see cref="SerialNumberImportTests"/>, and
+    /// ^LT likewise, see <see cref="MediaHandlingTests"/>. Both left this list the same
+    /// way, by being modelled rather than by being reclassified: the test above them is
+    /// that the generator writes them back.
+    ///
+    /// ^LS stays. It shifts every field left for compatibility with Z-130 formats, which
+    /// is the same axis ^FO already states, so modelling it would give the document two
+    /// ways to say where a field is.
     /// </summary>
     [Theory]
     [InlineData("^LRY")]
     [InlineData("^PMY")]
     [InlineData("^LS40")]
-    [InlineData("^LT20")]
     [InlineData("^DFR:FMT.ZPL")]
     [InlineData("^CC~")]
     public void CommandsThatChangeTheLabel_AreNeverTreatedAsPrinterSetup(string command)

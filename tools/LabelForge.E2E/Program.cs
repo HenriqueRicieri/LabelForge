@@ -141,10 +141,15 @@ else
 
     // Media catalog: applying a stock sets both dimensions as ONE undo step, and a
     // manual size edit clears the picked media so the field never lies.
+    //
+    // This stock is continuous, so since A3 its height is MEASURED from the content
+    // rather than being the catalog's 101.6: a roll has no die cut to match. The width
+    // is the one the catalog states, and the flag coming across is the other half of
+    // what applying a continuous media has to do.
     var media = LabelForge.Core.Media.StockCatalog.Search("3007301-T")[0];
     d.SelectedMedia = media;
     Console.WriteLine(FormattableString.Invariant(
-        $"media apply: {d.WidthMm}x{d.HeightMm} mm (expected 75.4x101.6)"));
+        $"media apply: {d.WidthMm} mm wide, continuous={d.IsContinuous}, length measured at {d.HeightMm} mm (expected 75.4, True, measured)"));
     d.UndoCommand.Execute(null);
     Console.WriteLine(FormattableString.Invariant(
         $"media undo: {d.WidthMm}x{d.HeightMm} mm (expected 100x60, one step)"));
@@ -1419,6 +1424,63 @@ if (mode == "designer")
     Console.WriteLine(
         $"printhead sees the web: {d.PrinterWarning.Contains("Web width", StringComparison.Ordinal)} "
         + "(expected True)");
+
+    // What happens to the media after a label prints. The unit tests cover the bytes; what
+    // they cannot reach is the panel, where the point is that choosing a mode is an ordinary
+    // undoable edit and that the cut hint answers for the mode beside it rather than for the
+    // number alone.
+    d.NewDocumentCommand.Execute(null);
+    d.WidthMm = 50m;
+    d.HeightMm = 30m;
+    d.AddTextCommand.Execute(null);
+    d.PlaceAt(10, 10);
+    d.PrintCopies = 20;
+    d.PrintCutAfter = 5;
+    Pump(300);
+    Console.WriteLine(
+        $"a cut group with no cutter: hint mentions the cutter="
+        + $"{d.CutHint.Contains("cutter", StringComparison.Ordinal)} (expected True)");
+
+    d.SelectedMediaHandling = d.MediaHandlingOptions.First(
+        o => o.Value == LabelForge.Core.Model.MediaHandling.Cutter);
+    Pump(300);
+    var cutJob = d.BuildPrintJob();
+    Console.WriteLine(
+        $"cutter picked: ^MMC={cutJob.Zpl.Contains("^MMC", StringComparison.Ordinal)} "
+        + $"^PQ20,5,0,Y={cutJob.Zpl.Contains("^PQ20,5,0,Y", StringComparison.Ordinal)} "
+        + $"hint says it cuts={d.CutHint.Contains("cuts after each group", StringComparison.Ordinal)} "
+        + "(expected True True True)");
+
+    // Peel-off is the only mode with anything to pre-peel, so the checkbox appears with it
+    // and with nothing else.
+    d.SelectedMediaHandling = d.MediaHandlingOptions.First(
+        o => o.Value == LabelForge.Core.Model.MediaHandling.PeelOff);
+    Pump(200);
+    bool peelShows = d.IsPeelOff;
+    d.PrintPrepeel = true;
+    d.SelectedMediaHandling = d.MediaHandlingOptions.First(
+        o => o.Value == LabelForge.Core.Model.MediaHandling.TearOff);
+    Pump(200);
+    Console.WriteLine(
+        $"prepeel is offered for the peeler only: {peelShows} then {d.IsPeelOff} "
+        + "(expected True then False)");
+
+    // And the mode is an undo step of its own, like every other document edit.
+    d.UndoCommand.Execute(null);
+    Pump(200);
+    Console.WriteLine(
+        $"mode undone on its own: {d.SelectedMediaHandling.Value} (expected PeelOff)");
+
+    // ^LT rides everything that reaches a printer, which is the pane's exported label and
+    // the print job alike. What it must stay out of is the canvas underlay, and that is
+    // GeneratePreview rather than anything reachable from here, so a unit test pins it.
+    d.PrintLabelTop = 15;
+    Pump(500);
+    Console.WriteLine(
+        $"label top rides what prints: "
+        + $"job={d.BuildPrintJob().Zpl.Contains("^LT15", StringComparison.Ordinal)} "
+        + $"pane={d.GeneratedZpl.Contains("^LT15", StringComparison.Ordinal)} "
+        + "(expected True True)");
 
     // Crash recovery: the snapshot follows the edits, a real save clears it because the
     // work is safe elsewhere, and a snapshot left by a dead session is offered on start.

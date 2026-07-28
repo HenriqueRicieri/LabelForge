@@ -607,6 +607,104 @@ public partial class DesignerViewModel : ViewModelBase
             v => Document.Print.SpeedIps = v, "print-speed");
     }
 
+    /// <summary>The ^MM modes, named the way somebody choosing one would recognise them
+    /// rather than by ZPL's letter.</summary>
+    public IReadOnlyList<MediaHandlingOption> MediaHandlingOptions { get; } =
+        MediaHandlingOption.All;
+
+    /// <summary>What the printer does with each label (^MM). The default states nothing,
+    /// leaving whatever mode the printer is set up for.</summary>
+    public MediaHandlingOption SelectedMediaHandling
+    {
+        get => MediaHandlingOption.For(Document.Print.MediaHandling);
+        set
+        {
+            MediaHandling next = value?.Value ?? MediaHandling.PrinterDefault;
+            if (next == Document.Print.MediaHandling)
+            {
+                return;
+            }
+
+            Document.Print.MediaHandling = next;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsPeelOff));
+            OnPropertyChanged(nameof(CutHint));
+            if (!_restoring)
+            {
+                RecordUndo("print-media-handling");
+                ScheduleRender();
+            }
+        }
+    }
+
+    /// <summary>^MM's second parameter, and the only mode with anything to pre-peel.</summary>
+    public bool PrintPrepeel
+    {
+        get => Document.Print.Prepeel;
+        set
+        {
+            if (value == Document.Print.Prepeel)
+            {
+                return;
+            }
+
+            Document.Print.Prepeel = value;
+            OnPropertyChanged();
+            if (!_restoring)
+            {
+                RecordUndo("print-prepeel");
+                ScheduleRender();
+            }
+        }
+    }
+
+    /// <summary>Cut after every this many labels (^PQ's group); 0 is off.</summary>
+    public decimal PrintCutAfter
+    {
+        get => Document.Print.CutAfterLabels;
+        set
+        {
+            EditPrintSetting((int)value, 0, 9999, Document.Print.CutAfterLabels,
+                v => Document.Print.CutAfterLabels = v, "print-cut-after");
+            OnPropertyChanged(nameof(CutHint));
+        }
+    }
+
+    /// <summary>^LT, the registration nudge: moves the printed format up or down relative
+    /// to the media's top edge, which the label's own coordinates cannot express.</summary>
+    public decimal PrintLabelTop
+    {
+        get => Document.Print.LabelTopDots;
+        set => EditPrintSetting((int)value, -120, 120, Document.Print.LabelTopDots,
+            v => Document.Print.LabelTopDots = v, "print-label-top");
+    }
+
+    /// <summary>Whether the prepeel control has anything to act on.</summary>
+    public bool IsPeelOff => Document.Print.MediaHandling == MediaHandling.PeelOff;
+
+    /// <summary>
+    /// What a cut group will actually do, which depends on the mode beside it.
+    ///
+    /// The group is generated either way, because ^PQ and ^MM are separate commands and a
+    /// file may state one without the other. So the panel is where it gets said that a
+    /// group with no cutter chosen is an instruction nothing will carry out, rather than
+    /// the generator quietly declining to write it.
+    /// </summary>
+    public string CutHint
+    {
+        get
+        {
+            if (Document.Print.CutAfterLabels <= 0)
+            {
+                return string.Empty;
+            }
+
+            return PrintSettings.Cuts(Document.Print.MediaHandling)
+                ? "The printer cuts after each group and carries on without pausing."
+                : "Nothing will cut this: pick the cutter or delayed cutter mode above.";
+        }
+    }
+
     private void EditPrintSetting(int value, int min, int max, int current, Action<int> apply,
         string undoKey, [System.Runtime.CompilerServices.CallerMemberName] string? property = null)
     {
@@ -917,6 +1015,12 @@ public partial class DesignerViewModel : ViewModelBase
         OnPropertyChanged(nameof(PrintCopies));
         OnPropertyChanged(nameof(PrintDarkness));
         OnPropertyChanged(nameof(PrintSpeed));
+        OnPropertyChanged(nameof(SelectedMediaHandling));
+        OnPropertyChanged(nameof(PrintPrepeel));
+        OnPropertyChanged(nameof(PrintCutAfter));
+        OnPropertyChanged(nameof(PrintLabelTop));
+        OnPropertyChanged(nameof(IsPeelOff));
+        OnPropertyChanged(nameof(CutHint));
         OnPropertyChanged(nameof(CornerRadiusMm));
         OnPropertyChanged(nameof(IsContinuous));
         OnPropertyChanged(nameof(HasFixedLength));

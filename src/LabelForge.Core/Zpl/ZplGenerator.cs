@@ -103,6 +103,27 @@ public sealed class ZplGenerator : IElementVisitor
         // just flag them as unknown commands.
         if (!includeOffLabel)
         {
+            // ^LT is a registration nudge, so it is stated before any field and only
+            // when it was asked for: a label that emitted ^LT0 would be overwriting a
+            // setting the operator made on the front panel.
+            if (document.Print.LabelTopDots != 0)
+            {
+                Line($"^LT{Math.Clamp(document.Print.LabelTopDots, -120, 120)}");
+            }
+
+            // What the printer does with the label once it is printed. Nothing is
+            // emitted for the printer's own default, so a label that says nothing about
+            // it leaves the mode its operator set.
+            if (PrintSettings.Letter(document.Print.MediaHandling) is { } mode)
+            {
+                // ^MM's prepeel parameter presents the next label early, which only
+                // means something to a peeler. Stating it in any other mode would be
+                // carrying a setting into a machine that has nothing to peel.
+                Line(document.Print.MediaHandling == MediaHandling.PeelOff && document.Print.Prepeel
+                    ? $"^MM{mode},Y"
+                    : $"^MM{mode}");
+            }
+
             // Media tracking is emitted for continuous stock and for nothing else.
             // A roll with no gaps has to be declared, because a printer left sensing
             // gaps will feed forward hunting for one that is not there. Gap and mark
@@ -161,9 +182,27 @@ public sealed class ZplGenerator : IElementVisitor
         // ^PQ counts pulls of the media, and a pull is the whole web. Stating the label
         // count on 3-across stock would print three times the run.
         int rows = AcrossLayout.Rows(document.Print.Copies, _columns);
-        if (!includeOffLabel && context.EmitCopies && rows > 1)
+
+        // The group a cut falls after is counted in pulls for the same reason the
+        // quantity is, so it goes through the same conversion rather than a second one.
+        //
+        // Not gated on the mode being a cutter, deliberately. ^PQ's group and ^MM are
+        // separate commands in ZPL and a file may state either without the other, so
+        // gating here would mean reading a group and then declining to write it back.
+        // Whether the machine has a cutter to obey it is the operator's question; the
+        // panel is where it gets asked.
+        // Rows floors at one, so "no group" has to be asked before converting rather than
+        // read out of the answer.
+        int cutAfter = Math.Max(document.Print.CutAfterLabels, 0);
+        int cutRows = cutAfter > 0 ? AcrossLayout.Rows(cutAfter, _columns) : 0;
+        if (!includeOffLabel && context.EmitCopies && (rows > 1 || cutRows > 0))
         {
-            Line($"^PQ{rows}");
+            // The bare form stays exactly what it was, so every label written before the
+            // cutter existed generates the bytes it always did. Reaching ^PQ's override
+            // flag means stating the two parameters in between: the replicate count is
+            // ZPL's own default, and Y is what makes the printer cut without also
+            // pausing to wait for someone to press a button.
+            Line(cutRows > 0 ? $"^PQ{rows},{cutRows},0,Y" : $"^PQ{rows}");
         }
 
         _sb.Append("^XZ");

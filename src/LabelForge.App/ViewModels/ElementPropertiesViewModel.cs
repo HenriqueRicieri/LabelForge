@@ -27,6 +27,34 @@ public sealed record AnchorOption(FieldAnchor Value, string Label)
     public override string ToString() => Label;
 }
 
+/// <summary>
+/// A friendly label for what the printer does with a label once it has printed it (^MM).
+///
+/// The first entry is the absence of a mode rather than a mode, and it is named that way
+/// on purpose: picking it emits no ^MM at all, so the printer keeps whatever its operator
+/// set. Which of the rest a given machine can do is a hardware question ZPL answers by
+/// ignoring an ^MM it cannot honour, so the list is the manual's and the choice is the
+/// person's.
+/// </summary>
+public sealed record MediaHandlingOption(MediaHandling Value, string Label)
+{
+    public static IReadOnlyList<MediaHandlingOption> All { get; } =
+    [
+        new(MediaHandling.PrinterDefault, "Whatever the printer is set to"),
+        new(MediaHandling.TearOff, "Tear-off"),
+        new(MediaHandling.PeelOff, "Peel-off"),
+        new(MediaHandling.Rewind, "Rewind"),
+        new(MediaHandling.Applicator, "Applicator"),
+        new(MediaHandling.Cutter, "Cutter (cuts every label)"),
+        new(MediaHandling.DelayedCutter, "Delayed cutter (cuts on ~JK)"),
+    ];
+
+    public static MediaHandlingOption For(MediaHandling value) =>
+        All.First(o => o.Value == value);
+
+    public override string ToString() => Label;
+}
+
 /// <summary>One of the printer's built-in fonts, named the way someone picking one would
 /// recognise it rather than by its ZPL letter alone.</summary>
 public sealed record FontOption(char Value, string Label)

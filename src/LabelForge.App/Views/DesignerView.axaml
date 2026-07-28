@@ -381,6 +381,25 @@
                                 <TextBlock Text="Speed, inches per second (0 = printer default)" FontSize="12" Opacity="0.8" />
                                 <NumericUpDown Value="{Binding PrintSpeed}" Minimum="0" Maximum="14"
                                                Increment="1" FormatString="0" />
+                                <TextBlock Text="After printing" FontSize="12" Opacity="0.8" />
+                                <ComboBox ItemsSource="{Binding MediaHandlingOptions}"
+                                          SelectedItem="{Binding SelectedMediaHandling}"
+                                          HorizontalAlignment="Stretch"
+                                          ToolTip.Tip="^MM: what the printer does with the label once it has printed. Leaving it at the printer's own setting states nothing, so the mode its operator chose stands." />
+                                <CheckBox Content="Pre-peel the next label" FontSize="12"
+                                          IsChecked="{Binding PrintPrepeel}"
+                                          IsVisible="{Binding IsPeelOff}"
+                                          ToolTip.Tip="^MM's second parameter: presents the next label before it is asked for. Only a peeler has anything to pre-peel." />
+                                <TextBlock Text="Cut after every N labels (0 = off)" FontSize="12" Opacity="0.8" />
+                                <NumericUpDown Value="{Binding PrintCutAfter}" Minimum="0" Maximum="9999"
+                                               Increment="1" FormatString="0"
+                                               ToolTip.Tip="^PQ's group value. The printer cuts at the end of each group and carries straight on rather than pausing for someone." />
+                                <TextBlock Text="{Binding CutHint}" FontSize="11" Opacity="0.7"
+                                           TextWrapping="Wrap" IsVisible="{Binding CutHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                <TextBlock Text="Label top offset, dot rows (0 = printer default)" FontSize="12" Opacity="0.8" />
+                                <NumericUpDown Value="{Binding PrintLabelTop}" Minimum="-120" Maximum="120"
+                                               Increment="1" FormatString="0"
+                                               ToolTip.Tip="^LT: moves the whole printed format up or down relative to the top edge of the media, to line the print up with the die cut. It stays set on the printer until another label changes it." />
                                 <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="0,6" />
                                 <TextBlock Text="Network printer (TCP 9100)" FontWeight="SemiBold" FontSize="12" />
                                 <TextBox Text="{Binding PrinterHost}" PlaceholderText="192.168.0.50" />
