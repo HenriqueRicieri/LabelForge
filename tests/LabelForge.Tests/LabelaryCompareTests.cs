@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using LabelForge.Core.Model;
 using LabelForge.Core.Rendering;
 using SkiaSharp;
 
@@ -241,7 +242,92 @@ public sealed class LabelaryCompareTests
         Assert.False(difference.Comparable);
         Assert.Equal(100, difference.LeftInk);
         Assert.Equal(100, difference.RightInk);
-        Assert.Contains("Sizes differ", difference.Summary, StringComparison.Ordinal);
+        Assert.Contains("Canvas sizes differ", difference.Summary, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The two questions a comparison has to keep apart: where the ink is, and how much of
+    /// it there is. Same box, different weight is what the live service actually produces
+    /// for text - the preview draws the same letters in the same place with lighter strokes,
+    /// because it substitutes a typeface for a font that lives in the printer - and calling
+    /// that "60 per cent apart" and stopping would say the label is wrong when it is right.
+    /// </summary>
+    [Fact]
+    public void GeometryAndWeightAreReportedSeparately()
+    {
+        // Same 20-pixel-wide band of ink in both, but one fills it twice as densely.
+        byte[] light = Striped(20, 10, rows: 4, everyOther: true);
+        byte[] heavy = Striped(20, 10, rows: 4, everyOther: false);
+
+        RenderDifference difference = RenderComparison.Compare(light, heavy);
+
+        Assert.Equal(0, difference.EdgeDifferenceDots);
+        Assert.Equal(new DotRect(0, 0, 20, 4), difference.LeftBounds);
+        Assert.Equal(difference.LeftBounds, difference.RightBounds);
+        Assert.True(difference.InkDifference > 0.4);
+        Assert.StartsWith("Same size and position.", difference.Summary, StringComparison.Ordinal);
+    }
+
+    /// <summary>Ink shifted bodily is the case that must NOT read as "same size and
+    /// position", since a field in the wrong place is the failure that matters.</summary>
+    [Fact]
+    public void InkInADifferentPlaceIsReportedAsSuch()
+    {
+        RenderDifference difference = RenderComparison.Compare(
+            Block(30, 20, x: 2, y: 2, w: 10, h: 5),
+            Block(30, 20, x: 9, y: 2, w: 10, h: 5));
+
+        Assert.Equal(7, difference.EdgeDifferenceDots);
+        Assert.Equal(difference.LeftInk, difference.RightInk);
+        Assert.Contains("Ink box differs by 7 dot(s)", difference.Summary, StringComparison.Ordinal);
+    }
+
+    private static byte[] Striped(int width, int height, int rows, bool everyOther)
+    {
+        var bitmap = new SKBitmap(width, height);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.White);
+        }
+
+        for (int y = 0; y < rows; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                // The sparse one still reaches every edge, so the two occupy the same box
+                // and differ only in how much of it they fill. That is the whole point:
+                // it is the shape the live service produces for text.
+                if (!everyOther || x % 2 == 0 || x == width - 1)
+                {
+                    bitmap.SetPixel(x, y, SKColors.Black);
+                }
+            }
+        }
+
+        using SKData data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
+        bitmap.Dispose();
+        return data.ToArray();
+    }
+
+    private static byte[] Block(int width, int height, int x, int y, int w, int h)
+    {
+        var bitmap = new SKBitmap(width, height);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.White);
+        }
+
+        for (int j = y; j < y + h; j++)
+        {
+            for (int i = x; i < x + w; i++)
+            {
+                bitmap.SetPixel(i, j, SKColors.Black);
+            }
+        }
+
+        using SKData data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
+        bitmap.Dispose();
+        return data.ToArray();
     }
 
     /// <summary>A missing image says which side is missing. "Nothing to compare" without
