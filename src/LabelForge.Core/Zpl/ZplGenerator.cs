@@ -28,6 +28,12 @@ public sealed class ZplGenerator : IElementVisitor
     /// stamp placed twice is converted once and recognized as the same graphic.</summary>
     private readonly Dictionary<string, SharedGraphic> _graphics = new(StringComparer.Ordinal);
     private int _offset;
+
+    /// <summary>Extra X applied to every origin while a column other than the first is
+    /// being emitted, and the copy index that column's counters read.</summary>
+    private int _columnX;
+    private int _columnCopyIndex;
+    private int _columns = 1;
     private LabelDocument? _document;
     private GenerationContext _context = new();
     private bool _preview;
@@ -80,9 +86,16 @@ public sealed class ZplGenerator : IElementVisitor
         _printerCounter = false;
         _printerClock = false;
         _softwareCounter = false;
+        _columnX = 0;
+        _columnCopyIndex = context.CopyIndex;
+
+        // A preview is one label on the canvas whatever the stock carries: the designer
+        // draws the label being designed, not the web it will be cut from.
+        _columns = includeOffLabel ? 1 : Math.Clamp(context.Columns, 1, AcrossLayout.MaxAcross);
+        int printWidth = AcrossLayout.WebWidthDots(document, _columns);
         Line("^XA");
         Line("^CI28");
-        Line($"^PW{document.WidthDots + 2 * offsetDots}");
+        Line($"^PW{printWidth + 2 * offsetDots}");
         Line($"^LL{document.HeightDots + 2 * offsetDots}");
         Line("^LH0,0");
 
@@ -121,16 +134,36 @@ public sealed class ZplGenerator : IElementVisitor
             .Where(e => e.X + offsetDots >= 0 && e.Y + offsetDots >= 0)
             .ToArray();
 
-        PlanSharedGraphics(emitted);
+        PlanSharedGraphics(emitted, _columns);
 
-        foreach (Element element in emitted)
+        // One column is the ordinary case and runs the loop once, so an ordinary label's
+        // bytes are exactly what they were before the web existed.
+        //
+        // The columns are emitted as repeated fields at baked X offsets rather than as a
+        // ^LH shift per column, and the manual is what decided that: ^LH "must come
+        // before the first ^FS to be compatible with existing printers", and the setting
+        // "is retained until you turn off the printer or send a new ^LH". So a per-column
+        // ^LH is both out of position and would leave the next job's home moved.
+        int pitch = _columns > 1 ? AcrossLayout.PitchDots(document) : 0;
+        for (int column = 0; column < _columns; column++)
         {
-            element.Accept(this);
+            _columnX = column * pitch;
+            _columnCopyIndex = context.CopyIndex + column;
+            foreach (Element element in emitted)
+            {
+                element.Accept(this);
+            }
         }
 
-        if (!includeOffLabel && context.EmitCopies && document.Print.Copies > 1)
+        _columnX = 0;
+        _columnCopyIndex = context.CopyIndex;
+
+        // ^PQ counts pulls of the media, and a pull is the whole web. Stating the label
+        // count on 3-across stock would print three times the run.
+        int rows = AcrossLayout.Rows(document.Print.Copies, _columns);
+        if (!includeOffLabel && context.EmitCopies && rows > 1)
         {
-            Line($"^PQ{document.Print.Copies}");
+            Line($"^PQ{rows}");
         }
 
         _sb.Append("^XZ");
@@ -147,7 +180,10 @@ public sealed class ZplGenerator : IElementVisitor
     /// same bits placed again become a single ~DG download recalled by ^XG, which is
     /// what a repeated stamp costs on a real label: the payload once instead of N times.
     /// </summary>
-    private void PlanSharedGraphics(IReadOnlyList<Element> elements)
+    /// <param name="columns">How many times the whole element list is emitted. A stamp
+    /// placed once on 3-across stock is still three placements on the web, so the download
+    /// pays for itself there exactly as a repeated placement does.</param>
+    private void PlanSharedGraphics(IReadOnlyList<Element> elements, int columns)
     {
         var order = new List<string>();
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -164,7 +200,7 @@ public sealed class ZplGenerator : IElementVisitor
                 order.Add(key);
             }
 
-            counts[key] = seen + 1;
+            counts[key] = seen + Math.Max(columns, 1);
         }
 
         // Named in first-use order so the same document always generates the same ZPL.
@@ -202,7 +238,7 @@ public sealed class ZplGenerator : IElementVisitor
     /// design time, which for a template field is a marker rather than the value.</summary>
     private string Fo(Element element) =>
         $"{(element.Anchor == FieldAnchor.Baseline ? "^FT" : "^FO")}"
-        + $"{element.X + _offset},{element.Y + _offset}"
+        + $"{element.X + _offset + _columnX},{element.Y + _offset}"
         + (element.IsReversed ? "^FR" : string.Empty);
 
     /// <summary>Emits a field's data, resolving the document's counters and clocks. The
@@ -214,8 +250,11 @@ public sealed class ZplGenerator : IElementVisitor
             return ZplEncoding.FieldData(text, _document?.Markers);
         }
 
+        // The column's own copy index, and the stride the printer advances by: on a web
+        // laid out three across, one pull prints three labels, so a ^SN field steps three
+        // at a time and each column starts one further along.
         FieldEncoding encoding = DynamicField.Encode(
-            text, _document, _context.CopyIndex, _context.Now);
+            text, _document, _columnCopyIndex, _context.Now, _columns);
         _printerCounter |= encoding.UsesPrinterCounter;
         _printerClock |= encoding.UsesPrinterClock;
         _softwareCounter |= encoding.UsesSoftwareCounter;

@@ -44,8 +44,12 @@ public static class DynamicField
 
     private static readonly IReadOnlyList<string> NoWarnings = [];
 
+    /// <param name="counterStride">How many labels one printed row produces, which is how
+    /// far a printer-side counter advances per pull. 1 on ordinary stock; on a web laid
+    /// out several across it is the column count, because every column of a row is a
+    /// separate label and they have to number consecutively rather than in lockstep.</param>
     public static FieldEncoding Encode(
-        string text, LabelDocument document, int copyIndex, DateTime now)
+        string text, LabelDocument document, int copyIndex, DateTime now, int counterStride = 1)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(document);
@@ -62,7 +66,7 @@ public static class DynamicField
         List<TemplateSegment> segments = TemplateScanner.Scan(text, document.Markers).ToList();
         var warnings = new List<string>();
 
-        if (TrySerialize(segments, document, copyIndex, warnings, out string serialized))
+        if (TrySerialize(segments, document, copyIndex, counterStride, warnings, out string serialized))
         {
             return new FieldEncoding(serialized, true, false, false, warnings);
         }
@@ -80,6 +84,7 @@ public static class DynamicField
         List<TemplateSegment> segments,
         LabelDocument document,
         int copyIndex,
+        int counterStride,
         List<string> warnings,
         out string zpl)
     {
@@ -135,7 +140,13 @@ public static class DynamicField
         // Padding is what the leading-zeros flag preserves; without it the number is
         // free to grow a digit and ^SN should not pad it.
         string leadingZeros = definition.CounterPadding > 0 ? "Y" : "N";
-        zpl = $"^SN{value},{definition.CounterStep.ToString(CultureInfo.InvariantCulture)},{leadingZeros}^FS";
+
+        // The manual allows "100 to 150 fields in a given format" to serialize, each
+        // indexing on its own, and each advances once per label the printer produces. On
+        // a web laid out N across, one production is N labels, so a column starts one
+        // step further along (its copy index already says so) and steps N at a time.
+        long step = definition.CounterStep * Math.Max(counterStride, 1);
+        zpl = $"^SN{value},{step.ToString(CultureInfo.InvariantCulture)},{leadingZeros}^FS";
         return true;
     }
 

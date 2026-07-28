@@ -3,7 +3,8 @@
 Reads the media stock database installed with ZebraDesigner 3
 (C:/ProgramData/Zebra Technologies/ZebraDesigner 3/Stock.db, a plain SQLite file)
 and exports the factual media specifications: part number, material line, die-cut
-dimensions, and corner radius. These are physical product specifications that Zebra
+dimensions, corner radius, and how many labels sit across the web. These are physical
+product specifications that Zebra
 also publishes in its public media catalogs; no proprietary code or artwork is copied.
 
 The generated JSON is committed, so this script is only needed to refresh the catalog
@@ -39,13 +40,18 @@ def dims_to_mm(dims_text):
 
 def export(db_path):
     cur = sqlite3.connect(db_path).cursor()
+    # WebX is how many labels sit side by side across the web and GapX the liner between
+    # them, so the pitch is LabelSizeX + GapX. Checked against PaperSizeX: for 02T40303000
+    # (2 across) 2 x 40000 + 2000 + 2 x 2000 of edge margin is exactly the 86000 stated.
+    # WebY is 1 for every row in the database, so multi-down never comes up.
     cur.execute(
-        """SELECT StockNumber, StockType, StockName, LabelSizeX, LabelSizeY, RadiusX
+        """SELECT StockNumber, StockType, StockName, LabelSizeX, LabelSizeY, RadiusX,
+                  WebX, GapX
            FROM Stock WHERE StockNumber IS NOT NULL AND LabelSizeX > 0"""
     )
 
     entries = {}
-    for pn, material, name, width_um, height_um, radius_um in cur.fetchall():
+    for pn, material, name, width_um, height_um, radius_um, across, gap_um in cur.fetchall():
         width_mm = round(width_um / 1000.0, 3)
         height_mm = round(height_um / 1000.0, 3)
         key = (pn.upper(), width_um, height_um)
@@ -73,6 +79,9 @@ def export(db_path):
             entry["radiusMm"] = round(radius_um / 1000.0, 3)
         if continuous:
             entry["continuous"] = True
+        if across and across > 1:
+            entry["across"] = across
+            entry["gapMm"] = round((gap_um or 0) / 1000.0, 3)
         entries[key] = entry
 
     ordered = sorted(entries.values(), key=lambda e: e["partNumber"])

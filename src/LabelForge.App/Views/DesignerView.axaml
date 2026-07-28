@@ -362,6 +362,9 @@
                                 <TextBlock Text="Copies" FontSize="12" Opacity="0.8" />
                                 <NumericUpDown Value="{Binding PrintCopies}" Minimum="1" Maximum="9999"
                                                Increment="1" FormatString="0" />
+                                <TextBlock Text="{Binding AcrossHint}" FontSize="11" Opacity="0.7"
+                                           TextWrapping="Wrap" IsVisible="{Binding IsMultiAcross}"
+                                           ToolTip.Tip="A row is one pull of the media and cannot be part printed, so a quantity that does not divide evenly prints a few extra." />
                                 <TextBlock Text="Darkness adjust (0 = printer default)" FontSize="12" Opacity="0.8" />
                                 <NumericUpDown Value="{Binding PrintDarkness}" Minimum="-30" Maximum="30"
                                                Increment="1" FormatString="0" />
@@ -449,6 +452,17 @@
                 <NumericUpDown Value="{Binding CornerRadiusMm}" Minimum="0" Maximum="50"
                                Increment="0.5" FormatString="0.##" Width="105"
                                IsVisible="{Binding HasFixedLength}" />
+                <TextBlock Text="Across" VerticalAlignment="Center"
+                           ToolTip.Tip="How many of this label sit side by side on the web. The design stays one label; a print repeats it across the roll." />
+                <NumericUpDown Value="{Binding LabelsAcross}" Minimum="1" Maximum="20"
+                               Increment="1" FormatString="0" Width="95"
+                               ToolTip.Tip="{Binding AcrossHint}" />
+                <TextBlock Text="Web gap (mm)" VerticalAlignment="Center"
+                           IsVisible="{Binding IsMultiAcross}"
+                           ToolTip.Tip="Liner between one column and the next. With the label width it makes the pitch each column is offset by." />
+                <NumericUpDown Value="{Binding AcrossGapMm}" Minimum="0" Maximum="50"
+                               Increment="0.5" FormatString="0.##" Width="105"
+                               IsVisible="{Binding IsMultiAcross}" />
                 <CheckBox Content="Quiet zones" IsChecked="{Binding CheckQuietZones}"
                           VerticalAlignment="Center"
                           ToolTip.Tip="Warn when something crowds the blank margin a barcode needs to scan. A design aid only: it never changes the generated ZPL." />

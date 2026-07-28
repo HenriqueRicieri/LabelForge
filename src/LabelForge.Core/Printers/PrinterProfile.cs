@@ -30,9 +30,16 @@ public sealed record PrinterProfile(string Id, string ModelName, int Dpi, int Dp
             warnings.Add($"Label density ({document.Dpmm} dpmm) differs from the printer ({Dpmm} dpmm)");
         }
 
-        if (document.WidthMm > MaxPrintWidthMm)
+        // The web is what has to fit under the head, and on multi-across stock that is
+        // wider than the label: three 40 mm labels are 120 mm of print on a 104 mm head,
+        // and each one of them looks perfectly printable on its own.
+        double webMm = document.WebWidthMm;
+        if (webMm > MaxPrintWidthMm)
         {
-            warnings.Add($"Label width {document.WidthMm:0.#} mm exceeds the print head ({MaxPrintWidthMm:0.#} mm)");
+            int columns = AcrossLayout.Columns(document);
+            warnings.Add(columns > 1
+                ? $"Web width {webMm:0.#} mm ({columns} across) exceeds the print head ({MaxPrintWidthMm:0.#} mm)"
+                : $"Label width {webMm:0.#} mm exceeds the print head ({MaxPrintWidthMm:0.#} mm)");
         }
 
         return warnings;

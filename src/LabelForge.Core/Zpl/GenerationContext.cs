@@ -12,8 +12,21 @@ namespace LabelForge.Core.Zpl;
 /// </summary>
 public sealed record GenerationContext
 {
-    /// <summary>Zero-based position in the run; drives counter values.</summary>
+    /// <summary>Zero-based position in the run of this block's FIRST label; drives counter
+    /// values. A block laid out several columns wide holds that many consecutive labels,
+    /// so column n carries copy index CopyIndex + n.</summary>
     public int CopyIndex { get; init; }
+
+    /// <summary>
+    /// How many columns of the design this block carries across the web. One is an
+    /// ordinary label and emits exactly the bytes it always did.
+    ///
+    /// It is the run's decision rather than the document's, which is the whole reason it
+    /// lives here: <see cref="ZplGenerator.Generate(LabelDocument)"/> is the single label
+    /// the ZPL pane shows and the file export writes, and it has to keep parsing back into
+    /// the document it came from. Only <see cref="PrintJob"/> asks for the web.
+    /// </summary>
+    public int Columns { get; init; } = 1;
 
     /// <summary>The moment clock variables are formatted against. Captured once per run
     /// so every label in a job carries the same timestamp.</summary>

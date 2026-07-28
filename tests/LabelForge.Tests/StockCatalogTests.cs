@@ -25,6 +25,32 @@ public sealed class StockCatalogTests
         // the canvas draws.
         Assert.Equal(719, StockCatalog.All.Count(m => m.RadiusMm > 0));
         Assert.Equal(57, StockCatalog.All.Count(m => m.Continuous));
+
+        // Multi-across stock, which decides how a run is laid out on the web. Rare enough
+        // (39 of 797) that losing the column entirely would leave every other test green.
+        Assert.Equal(39, StockCatalog.All.Count(m => m.Across > 1));
+    }
+
+    /// <summary>A column count and a gap only mean anything together: the pitch is the
+    /// label plus the gap, so an export that kept one and dropped the other would lay the
+    /// columns on top of each other. Every multi-across entry in the database states both,
+    /// and none of them is continuous, which is why the two features never interact.</summary>
+    [Fact]
+    public void All_MultiAcrossEntriesCarryTheirPitch()
+    {
+        Assert.All(StockCatalog.All.Where(m => m.Across > 1), media =>
+        {
+            Assert.InRange(media.Across, 2, 8);
+            Assert.InRange(media.GapMm, 0.5, 10);
+            Assert.False(media.Continuous);
+        });
+
+        // The other 758 say nothing about a web, which is what "one across" means.
+        Assert.All(StockCatalog.All.Where(m => m.Across <= 1), media =>
+        {
+            Assert.Equal(1, media.Across);
+            Assert.Equal(0, media.GapMm);
+        });
     }
 
     /// <summary>Every entry has the two fields a picker cannot work without. An export

@@ -64,6 +64,22 @@ public sealed class LabelDocument
     public int Dpmm { get; set; } = 8;
 
     /// <summary>
+    /// How many of this label sit side by side across the web; 1 is an ordinary roll.
+    ///
+    /// This describes the stock, not the design. The label is still one label: it is
+    /// drawn once, edited once and measured once, and a single label's ZPL is unchanged
+    /// by it. What it changes is the run, which repeats the design across the web so one
+    /// pull of the media produces this many labels. <see cref="AcrossLayout"/> holds the
+    /// arithmetic and <see cref="Zpl.PrintJob"/> is what applies it.
+    /// </summary>
+    public int LabelsAcross { get; set; } = 1;
+
+    /// <summary>Blank liner between one column and the next, in millimeters. Zero is a
+    /// butt-cut web, which is real stock; the Zebra catalog's multi-across media all leave
+    /// 2 or 3.18 mm.</summary>
+    public double AcrossGapMm { get; set; }
+
+    /// <summary>
     /// Die-cut corner radius in millimeters; 0 is a square-cornered label. Set from the
     /// media catalog or a saved preset, and editable by hand.
     ///
@@ -147,4 +163,10 @@ public sealed class LabelDocument
 
     [JsonIgnore]
     public int CornerRadiusDots => Units.MmToDots(EffectiveCornerRadiusMm, Dpmm);
+
+    /// <summary>The printed width of one pull of the media: every column and the gaps
+    /// between them. Equal to <see cref="WidthMm"/> on ordinary stock, which is why it is
+    /// what the printhead check measures against rather than the label's own width.</summary>
+    [JsonIgnore]
+    public double WebWidthMm => AcrossLayout.WebWidthMm(this);
 }

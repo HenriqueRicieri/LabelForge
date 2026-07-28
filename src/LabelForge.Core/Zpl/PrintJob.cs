@@ -4,8 +4,9 @@ using LabelForge.Core.Model;
 namespace LabelForge.Core.Zpl;
 
 /// <summary>The bytes a print run sends, and what they will produce.</summary>
-/// <param name="Zpl">The complete job: one label block, or one per copy.</param>
-/// <param name="Labels">How many labels the printer will produce.</param>
+/// <param name="Zpl">The complete job: one label block, or one per row of the web.</param>
+/// <param name="Labels">How many labels the printer will produce, which on multi-across
+/// stock can be more than the copies asked for: a row cannot be part printed.</param>
 /// <param name="CountedByPrinter">True when the printer serializes the run itself (^SN).</param>
 /// <param name="Warnings">Reasons a printer-side feature was not used, plus any cap
 /// applied to the run. Empty on an ordinary job.</param>
@@ -23,6 +24,11 @@ public sealed record PrintJobResult(
 /// because the number is baked into the field data, so the run becomes one ^XA block
 /// per copy. That difference is why ^SN is preferred and why a fallback is worth
 /// telling the user about rather than silently sending ten thousand blocks.
+///
+/// It is also where multi-across stock is applied. The design is one label and the ZPL
+/// pane shows one label; how many of it sit side by side on the web is a fact about the
+/// run, so the layout happens here and <see cref="ZplGenerator.Generate(LabelDocument)"/>
+/// keeps producing the single label that parses back into the document it came from.
 /// </summary>
 public static class PrintJob
 {
@@ -35,44 +41,60 @@ public static class PrintJob
         ArgumentNullException.ThrowIfNull(document);
 
         var generator = new ZplGenerator();
-        var context = new GenerationContext { Now = now };
+        int columns = AcrossLayout.Columns(document);
+        var context = new GenerationContext { Now = now, Columns = columns };
         string single = generator.Generate(document, context);
         GenerationInfo info = generator.LastRun;
         int copies = Math.Max(1, document.Print.Copies);
-
-        // Every label identical, or the printer doing the counting: one block, ^PQ and
-        // ^SN carry the run.
-        if (!info.UsesSoftwareCounter || copies == 1)
-        {
-            return new PrintJobResult(single, copies, info.UsesPrinterCounter, info.Warnings);
-        }
+        int rows = AcrossLayout.Rows(copies, columns);
 
         var warnings = new List<string>(info.Warnings);
-        int labels = Math.Min(copies, MaxSoftwareCopies);
-        if (labels < copies)
+
+        // A row is one pull of the media and cannot be part printed, so asking for 10 on
+        // 3-across stock produces 12. Better said than discovered on the roll.
+        int produced = AcrossLayout.LabelsInRows(rows, columns);
+        if (produced > copies)
         {
             warnings.Add(
-                $"Built the first {labels} of {copies} labels: a run numbered by the PC is capped at {MaxSoftwareCopies}.");
+                $"{columns} across: {copies} copies takes {rows} rows and prints {produced} labels.");
         }
 
-        // One block per copy, each a specific label, so ^PQ must not repeat them.
+        // Every label identical, or the printer doing the counting: one block, ^PQ and
+        // ^SN carry the run. The block already holds every column.
+        if (!info.UsesSoftwareCounter || (copies == 1 && columns == 1))
+        {
+            return new PrintJobResult(single, produced, info.UsesPrinterCounter, warnings);
+        }
+
+        int builtRows = Math.Min(rows, MaxSoftwareCopies);
+        if (builtRows < rows)
+        {
+            warnings.Add(
+                $"Built the first {AcrossLayout.LabelsInRows(builtRows, columns)} of {produced} labels: a run numbered by the PC is capped at {MaxSoftwareCopies} blocks.");
+        }
+
+        // One block per row, each a specific set of labels, so ^PQ must not repeat them.
         // A graphic shared across placements is downloaded by the first block only: the
         // whole run is one stream to one printer, and a ~DG stays in memory for the rest
         // of it, so repeating a logo per copy would be paying for it thousands of times.
-        var sb = new StringBuilder(single.Length * labels);
-        for (int copy = 0; copy < labels; copy++)
+        var sb = new StringBuilder(single.Length * builtRows);
+        for (int row = 0; row < builtRows; row++)
         {
             sb.Append(generator.Generate(
                 document,
                 context with
                 {
-                    CopyIndex = copy,
+                    CopyIndex = row * columns,
                     EmitCopies = false,
-                    IncludeGraphicDownloads = copy == 0,
+                    IncludeGraphicDownloads = row == 0,
                 }));
             sb.Append('\n');
         }
 
-        return new PrintJobResult(sb.ToString(), labels, CountedByPrinter: false, warnings);
+        return new PrintJobResult(
+            sb.ToString(),
+            AcrossLayout.LabelsInRows(builtRows, columns),
+            CountedByPrinter: false,
+            warnings);
     }
 }

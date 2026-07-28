@@ -1315,6 +1315,64 @@ if (mode == "designer")
         + $"pad={serial?.CounterPadding} printer={serial?.UsePrinterCounter} "
         + "(expected 1 element, SERIAL 41 4 True)");
 
+    // Multi-across stock. The design stays one label and the canvas keeps drawing one, so
+    // the checks that matter are on the run: the columns, the web width, and the fact that
+    // a quantity which does not divide by the column count prints a few extra.
+    d.NewDocumentCommand.Execute(null);
+    d.WidthMm = 25m;
+    d.HeightMm = 20m;
+    d.AddBoxCommand.Execute(null);
+    d.PlaceAt(10, 10);
+    d.LabelsAcross = 3m;
+    d.AcrossGapMm = 3m;
+    d.PrintCopies = 10;
+    d.NotifyDocumentEdited();
+    Pump(900);
+    var web = d.BuildPrintJob();
+    Console.WriteLine(
+        $"across: {d.AcrossHint}"
+        + $" | web {d.Document.WebWidthMm:0.#} mm (expected 81)");
+    Console.WriteLine(
+        $"across run: {Count(web.Zpl, "^GB")} columns (expected 3), "
+        + $"^PW648={web.Zpl.Contains("^PW648")} ^PQ4={web.Zpl.Contains("^PQ4")} "
+        + $"labels={web.Labels} (expected True True 12)");
+    Console.WriteLine(
+        $"across warns about the overshoot: "
+        + $"{web.Warnings.Any(w => w.Contains("prints 12 labels", StringComparison.Ordinal))} (expected True)");
+
+    // The pane still shows the single label, which is what keeps the round trip true.
+    Console.WriteLine(
+        $"pane stays one label: {Count(d.GeneratedZpl, "^GB") == 1} (expected True), "
+        + $"^PW200={d.GeneratedZpl.Contains("^PW200")} (expected True)");
+
+    // Each is its own undo step, like every other document edit: the gap comes off
+    // without taking the columns with it.
+    d.UndoCommand.Execute(null);
+    d.UndoCommand.Execute(null);
+    Console.WriteLine(
+        $"gap undone on its own: {d.LabelsAcross} across, gap {d.AcrossGapMm} (expected 3 0)");
+    d.UndoCommand.Execute(null);
+    Console.WriteLine($"across undone: {d.LabelsAcross} across (expected 1)");
+
+    // A 4-across stock from the catalog brings its own web with it, which is the mistake
+    // this exists to prevent: designing on stock whose other three columns print blank.
+    var acrossMedia = LabelForge.Core.Media.StockCatalog.All.First(m => m.Across == 4);
+    d.SelectedMedia = acrossMedia;
+    Pump(300);
+    string acrossGap = FormattableString.Invariant($"{d.AcrossGapMm:0.##}");
+    Console.WriteLine(
+        $"media {acrossMedia.PartNumber}: {d.LabelsAcross} across, gap {acrossGap} mm, "
+        + $"multi={d.IsMultiAcross} (expected 4 3.18 True)");
+
+    // And the printhead check measures the web, not the label: each column fits on its own.
+    d.SelectedPrinter = d.Printers.First(p => p.Id == "zd421-203");
+    d.WidthMm = 40m;
+    d.LabelsAcross = 3m;
+    Pump(300);
+    Console.WriteLine(
+        $"printhead sees the web: {d.PrinterWarning.Contains("Web width", StringComparison.Ordinal)} "
+        + "(expected True)");
+
     // Crash recovery: the snapshot follows the edits, a real save clears it because the
     // work is safe elsewhere, and a snapshot left by a dead session is offered on start.
     d.NewDocumentCommand.Execute(null);

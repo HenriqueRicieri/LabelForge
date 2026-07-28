@@ -151,9 +151,18 @@ public partial class DesignerViewModel : ViewModelBase
     public partial bool NewMediaContinuous { get; set; }
 
     /// <summary>The size saving would record right now, shown so it is confirmed before
-    /// it is stored rather than after.</summary>
-    public string NewMediaSizeText => Core.Media.StockMedia.FormatSize(
-        (double)WidthMm, (double)HeightMm, NewMediaContinuous);
+    /// it is stored rather than after. The web is named too, because it is taken from the
+    /// label rather than typed here and would otherwise be recorded unseen.</summary>
+    public string NewMediaSizeText
+    {
+        get
+        {
+            string size = Core.Media.StockMedia.FormatSize(
+                (double)WidthMm, (double)HeightMm, NewMediaContinuous);
+            int columns = Core.Model.AcrossLayout.Columns(Document);
+            return columns > 1 ? $"{size}, {columns} across" : size;
+        }
+    }
 
     /// <summary>
     /// Every element on the label, front to back, so one can be found by reading rather
@@ -464,6 +473,92 @@ public partial class DesignerViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// How many of this label sit side by side across the web.
+    ///
+    /// It changes the run, not the design: the canvas keeps showing one label, because one
+    /// label is what is being drawn. What it changes is what a print produces, which is why
+    /// the readout beside it talks about the job.
+    /// </summary>
+    public decimal LabelsAcross
+    {
+        get => Document.LabelsAcross;
+        set
+        {
+            int next = Math.Clamp((int)value, 1, Core.Model.AcrossLayout.MaxAcross);
+            if (Document.LabelsAcross == next)
+            {
+                return;
+            }
+
+            Document.LabelsAcross = next;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsMultiAcross));
+            OnPropertyChanged(nameof(AcrossHint));
+            OnPropertyChanged(nameof(NewMediaSizeText));
+            UpdatePrinterWarning();
+            if (!_restoring)
+            {
+                // Hand-editing the stock means the picked media no longer describes it,
+                // exactly as editing the size or the roll kind does.
+                SelectedMedia = null;
+                RecordUndo("doc-across");
+                Notify(AcrossHint);
+            }
+        }
+    }
+
+    /// <summary>Liner between one column and the next; with the width it makes the pitch.
+    /// Only shown once there is more than one column for it to sit between.</summary>
+    public decimal AcrossGapMm
+    {
+        get => (decimal)Document.AcrossGapMm;
+        set
+        {
+            double next = Math.Clamp((double)value, 0, 50);
+            if (Math.Abs(next - Document.AcrossGapMm) < 0.0001)
+            {
+                return;
+            }
+
+            Document.AcrossGapMm = next;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(AcrossHint));
+            UpdatePrinterWarning();
+            if (!_restoring)
+            {
+                SelectedMedia = null;
+                RecordUndo("doc-across-gap");
+                Notify(AcrossHint);
+            }
+        }
+    }
+
+    public bool IsMultiAcross => Core.Model.AcrossLayout.Columns(Document) > 1;
+
+    /// <summary>What the web costs and produces, in the units the operator thinks in. The
+    /// row count is the part nobody can work out at a glance and the part that decides
+    /// whether a quantity comes out even.</summary>
+    public string AcrossHint
+    {
+        get
+        {
+            int columns = Core.Model.AcrossLayout.Columns(Document);
+            if (columns <= 1)
+            {
+                return "One label across the web";
+            }
+
+            int rows = Core.Model.AcrossLayout.Rows(Document.Print.Copies, columns);
+            int labels = Core.Model.AcrossLayout.LabelsInRows(rows, columns);
+            string web = FormattableString.Invariant($"{Document.WebWidthMm:0.#}");
+            string copies = Document.Print.Copies == 1 ? "1 copy" : $"{Document.Print.Copies} copies";
+            string pulls = rows == 1 ? "1 row" : $"{rows} rows";
+            return $"{columns} across: {web} mm of web, "
+                + $"{copies} prints {labels} labels in {pulls}";
+        }
+    }
+
     /// <summary>Die-cut corner radius in mm. Describes the physical stock: it shapes the
     /// canvas and the PDF, never the ZPL.</summary>
     public decimal CornerRadiusMm
@@ -523,6 +618,10 @@ public partial class DesignerViewModel : ViewModelBase
 
         apply(next);
         OnPropertyChanged(property);
+
+        // The copy count is half of what the across readout says, so it has to be re-read
+        // when either half moves.
+        OnPropertyChanged(nameof(AcrossHint));
         if (!_restoring)
         {
             RecordUndo(undoKey);
@@ -823,6 +922,10 @@ public partial class DesignerViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasFixedLength));
         OnPropertyChanged(nameof(LengthHint));
         OnPropertyChanged(nameof(ContinuousMarginMm));
+        OnPropertyChanged(nameof(LabelsAcross));
+        OnPropertyChanged(nameof(AcrossGapMm));
+        OnPropertyChanged(nameof(IsMultiAcross));
+        OnPropertyChanged(nameof(AcrossHint));
         OnPropertyChanged(nameof(CheckQuietZones));
         OnPropertyChanged(nameof(GridPitchMm));
         OnPropertyChanged(nameof(SelectedFieldCatalog));
@@ -963,7 +1066,14 @@ public partial class DesignerViewModel : ViewModelBase
             ? $", capped from {Document.Print.Copies}"
             : string.Empty;
         string numbering = job.CountedByPrinter ? ", serialized by the printer" : string.Empty;
-        return $" ({job.Labels} labels{numbering}{capped})";
+
+        // A run that produced more than was asked for is not a bug and not a cap; it is
+        // the web, and saying so is the difference between a surprise and a fact.
+        int columns = Core.Model.AcrossLayout.Columns(Document);
+        string across = columns > 1
+            ? $", {columns} across in {Core.Model.AcrossLayout.Rows(Document.Print.Copies, columns)} rows"
+            : string.Empty;
+        return $" ({job.Labels} labels{across}{numbering}{capped})";
     }
 
     /// <summary>Guarded so the platform-specific spooler call has a Windows-only context;
@@ -1674,6 +1784,11 @@ public partial class DesignerViewModel : ViewModelBase
         // The roll's own kind comes with it, so a continuous stock stops pretending to
         // have a die-cut height the moment it is picked.
         IsContinuous = value.Continuous;
+
+        // So does how many of it are on the web. Picking a 4-across stock and printing one
+        // label across it is the mistake this exists to prevent.
+        LabelsAcross = value.Across;
+        AcrossGapMm = (decimal)value.GapMm;
         _restoring = false;
 
         Document.WidthMm = value.WidthMm;
@@ -1682,13 +1797,17 @@ public partial class DesignerViewModel : ViewModelBase
         // The stock's own die-cut shape comes with it, so the canvas shows the label
         // that will actually come off the roll.
         Document.CornerRadiusMm = value.RadiusMm;
+        Document.LabelsAcross = Math.Max(value.Across, 1);
+        Document.AcrossGapMm = value.GapMm;
         UpdatePrinterWarning();
         RecordUndo();
         ScheduleRender();
         string kind = value.IsUserDefined ? "my media" : "media";
         StatusText = value.Continuous
             ? $"Applied {kind} {value.PartNumber}: continuous {value.WidthMm:0.#} mm roll, the length now follows the content"
-            : $"Applied {kind} {value.PartNumber} ({value.SizeText})";
+            : value.Across > 1
+                ? $"Applied {kind} {value.PartNumber} ({value.SizeText}), {value.Across} across the web"
+                : $"Applied {kind} {value.PartNumber} ({value.SizeText})";
     }
 
     /// <summary>Saves the label's current size as one of the user's own media. Presets
@@ -1703,13 +1822,18 @@ public partial class DesignerViewModel : ViewModelBase
             return;
         }
 
+        // The web comes from the label rather than from a control of its own: it is
+        // already set up in the setup bar, and a preset that forgot it would put a
+        // 4-across stock back as a single label the next time it was picked.
         var media = Core.Media.StockMedia.UserDefined(
             name,
             (double)WidthMm,
             (double)HeightMm,
             NewMediaMaterial,
             (double)NewMediaRadiusMm,
-            NewMediaContinuous);
+            NewMediaContinuous,
+            Core.Model.AcrossLayout.Columns(Document),
+            Document.AcrossGapMm);
 
         Core.Media.UserMediaResult result = _userMediaStore.Add(media);
         ApplyUserMedia(result.Entries);

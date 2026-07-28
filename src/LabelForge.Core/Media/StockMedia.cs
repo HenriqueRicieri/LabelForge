@@ -10,6 +10,10 @@ namespace LabelForge.Core.Media;
 /// run. <see cref="IsUserDefined"/> is the only difference, and it exists so the picker
 /// can label them honestly and so only the user's own can be deleted.
 /// </summary>
+/// <param name="Across">Labels side by side across the web; 1 is an ordinary roll. 39 of
+/// the catalog's entries carry more, up to 8.</param>
+/// <param name="GapMm">Liner between one column and the next, which with the width gives
+/// the pitch. Meaningless below 2 across.</param>
 public sealed record StockMedia(
     string PartNumber,
     string Material,
@@ -18,7 +22,9 @@ public sealed record StockMedia(
     string SizeText,
     double RadiusMm = 0,
     bool Continuous = false,
-    bool IsUserDefined = false)
+    bool IsUserDefined = false,
+    int Across = 1,
+    double GapMm = 0)
 {
     /// <summary>Builds one of the user's own media definitions, formatting the size
     /// text the way the catalog does so both kinds read alike in the picker.</summary>
@@ -28,7 +34,9 @@ public sealed record StockMedia(
         double heightMm,
         string material = "",
         double radiusMm = 0,
-        bool continuous = false) =>
+        bool continuous = false,
+        int across = 1,
+        double gapMm = 0) =>
         new(
             (name ?? string.Empty).Trim(),
             (material ?? string.Empty).Trim(),
@@ -37,7 +45,9 @@ public sealed record StockMedia(
             FormatSize(widthMm, heightMm, continuous),
             radiusMm,
             continuous,
-            IsUserDefined: true);
+            IsUserDefined: true,
+            Math.Max(across, 1),
+            gapMm);
 
     /// <summary>Size text in the catalog's own shape ("102mm x 152mm"). A continuous
     /// roll states only its width, because its length is whatever the content needs.</summary>
@@ -46,12 +56,15 @@ public sealed record StockMedia(
             ? FormattableString.Invariant($"{widthMm:0.##}mm continuous")
             : FormattableString.Invariant($"{widthMm:0.##}mm x {heightMm:0.##}mm");
 
-    /// <summary>Display form used by pickers and search results.</summary>
+    /// <summary>Display form used by pickers and search results. The column count is named
+    /// because it is not in the size text and it changes what a run produces: two entries
+    /// with the same die cut print very differently at 4 across.</summary>
     public override string ToString()
     {
+        string size = Across > 1 ? $"{SizeText}, {Across} across" : SizeText;
         string text = Material.Length > 0
-            ? $"{PartNumber} - {Material} ({SizeText})"
-            : $"{PartNumber} ({SizeText})";
+            ? $"{PartNumber} - {Material} ({size})"
+            : $"{PartNumber} ({size})";
         return IsUserDefined ? $"{text} - my media" : text;
     }
 }
