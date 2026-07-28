@@ -73,6 +73,9 @@ public enum BarcodeSymbology
     Code39,
     Ean13,
     UpcA,
+
+    /// <summary>^B2. ITF-14, the carton barcode, is this symbology at 14 digits.</summary>
+    Interleaved2of5,
 }
 
 /// <summary>A linear barcode. Width is derived by the symbology from the data and the
@@ -89,11 +92,23 @@ public sealed class BarcodeElement : Element
     /// <summary>Narrow-bar (module) width in dots, 1-10 (^BY).</summary>
     public int ModuleWidthDots { get; set; } = 2;
 
-    /// <summary>Wide-to-narrow bar ratio for symbologies that use it (e.g. Code 39).</summary>
+    /// <summary>Wide-to-narrow bar ratio for symbologies that use it (Code 39 and
+    /// Interleaved 2 of 5).</summary>
     public double WideBarRatio { get; set; } = 3.0;
 
     /// <summary>Whether to print the human-readable interpretation line.</summary>
     public bool PrintInterpretationLine { get; set; } = true;
+
+    /// <summary>
+    /// ^B2's check-digit parameter: the printer works out a Mod 10 check digit and adds
+    /// it to what it encodes. Interleaved 2 of 5 is the only symbology here that has the
+    /// choice, and ZPL's default is off.
+    ///
+    /// The UPC/EAN family is not the same case and has no flag: those always carry a
+    /// check digit, and the printer always computes it. ^BU's own `e` parameter decides
+    /// whether the interpretation line shows the digit, not whether the symbol has one.
+    /// </summary>
+    public bool AddCheckDigit { get; set; }
 
     public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
 }

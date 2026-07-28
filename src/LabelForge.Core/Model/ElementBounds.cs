@@ -104,6 +104,20 @@ public sealed class ElementBoundsCalculator : IElementVisitor
         // zone is deliberately not in here: it is blank stock rather than symbol, it
         // belongs on both sides rather than only after the last bar, and QuietZone is
         // where it lives now.
+        // Interleaved 2 of 5 is the odd one out and has to be worked out in dots rather
+        // than in modules, because its wide bar is floor(ratio * module) dots and so is
+        // not a whole number of them. Interleaved2of5 also knows the digits the printer
+        // encodes, which are not always the digits typed.
+        if (element.Symbology == BarcodeSymbology.Interleaved2of5)
+        {
+            _result = new DotRect(
+                0,
+                0,
+                Interleaved2of5.WidthDots(element),
+                element.HeightDots + (element.PrintInterpretationLine ? 30 : 0));
+            return;
+        }
+
         int modules = element.Symbology switch
         {
             // EAN-13 and UPC-A are fixed-width: 95 modules whatever the data.

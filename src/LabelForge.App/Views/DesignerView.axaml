@@ -103,6 +103,13 @@
                            ToolTip.Tip="The application identifiers this payload carries" />
                 <TextBlock Text="{Binding Gs1Warning}" IsVisible="{Binding HasGs1Warning}"
                            Foreground="#D97706" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />
+                <TextBlock Text="{Binding CheckDigitInfo}" IsVisible="{Binding HasCheckDigitInfo}"
+                           Opacity="0.6" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0"
+                           ToolTip.Tip="A check digit is invisible in the ZPL: the printer works it out from the data." />
+                <Button Content="Add check digit" Command="{Binding AppendCheckDigitCommand}"
+                        IsVisible="{Binding CanAddCheckDigit}" HorizontalAlignment="Left"
+                        Margin="0,2,0,0" FontSize="12"
+                        ToolTip.Tip="Writes the Mod 10 check digit into the data, so the box shows the number that scans." />
                 <TextBlock Classes="propLabel" Text="Symbology" />
                 <ComboBox ItemsSource="{Binding Symbologies}"
                           SelectedItem="{Binding Symbology}"
@@ -113,11 +120,14 @@
                 <TextBlock Classes="propLabel" Text="Module width (dots, 1-10)" />
                 <NumericUpDown Value="{Binding ModuleWidth}" Minimum="1" Maximum="10"
                                Increment="1" FormatString="0" />
-                <StackPanel IsVisible="{Binding IsCode39}" Spacing="4">
-                    <TextBlock Classes="propLabel" Text="Wide bar ratio (Code 39)" />
+                <StackPanel IsVisible="{Binding UsesRatio}" Spacing="4">
+                    <TextBlock Classes="propLabel" Text="Wide bar ratio" />
                     <NumericUpDown Value="{Binding Ratio}" Minimum="2" Maximum="3"
                                    Increment="0.1" FormatString="0.0" />
                 </StackPanel>
+                <CheckBox Content="Printer adds a check digit" IsVisible="{Binding IsInterleaved}"
+                          IsChecked="{Binding AddCheckDigit}" Margin="0,4,0,0"
+                          ToolTip.Tip="^B2's check-digit parameter. The preview cannot draw it, so the symbol prints wider than it looks." />
                 <CheckBox Content="Print interpretation line"
                           IsChecked="{Binding Interpretation}" Margin="0,4,0,0" />
             </StackPanel>

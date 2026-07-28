@@ -948,6 +948,53 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(200);
 
+    // Check digits, through the panel rather than through the math, because the panel is
+    // where the offer has to appear and disappear as the data is typed. An EAN-13 carries
+    // twelve digits of a thirteen-digit number, so the number that scans is one nobody can
+    // read off the screen unless it is worked out and stated.
+    d.NewDocumentCommand.Execute(null);
+    Pump(200);
+    var ean = new LabelForge.Core.Model.BarcodeElement
+    {
+        X = 40, Y = 60, Symbology = LabelForge.Core.Model.BarcodeSymbology.Ean13,
+        Data = "590123412345", HeightDots = 80, ModuleWidthDots = 2,
+    };
+    d.Document.Elements.Add(ean);
+    d.Selection.Set(ean);
+    d.NotifyDocumentEdited();
+    Pump(900);
+    var checkPanel = (BarcodePropertiesViewModel)d.SelectionProperties!;
+    Console.WriteLine(
+        $"ean check digit: '{checkPanel.CheckDigitInfo}' (expect it scans as 5901234123457), "
+        + $"offered={checkPanel.CanAddCheckDigit} (expected True)");
+
+    checkPanel.AppendCheckDigitCommand.Execute(null);
+    Pump(900);
+    Console.WriteLine(
+        $"appended: data={checkPanel.Data} (expected 5901234123457), "
+        + $"reaches the ZPL={d.GeneratedZpl.Contains("^FD5901234123457", StringComparison.Ordinal)} (expected True), "
+        + $"offered again={checkPanel.CanAddCheckDigit} (expected False)");
+
+    // ^B2 is the one symbology whose check digit is a choice, and the count has to be even
+    // or the printer silently pads it. The offline renderer refuses instead, so the
+    // preview goes blank and the warning is the only thing that explains why.
+    checkPanel.Symbology = LabelForge.Core.Model.BarcodeSymbology.Interleaved2of5;
+    checkPanel.Data = "1234567890123";
+    Pump(900);
+    Console.WriteLine(
+        $"itf odd count: '{checkPanel.Warning}' (expect a leading zero and a blank preview), "
+        + $"ratio shown={checkPanel.UsesRatio} (expected True)");
+
+    checkPanel.AppendCheckDigitCommand.Execute(null);
+    Pump(900);
+    Console.WriteLine(
+        $"itf-14: data={checkPanel.Data} (expected 12345678901231), "
+        + $"warning='{checkPanel.Warning}' (expect empty), "
+        + $"^B2 emitted={d.GeneratedZpl.Contains("^B2", StringComparison.Ordinal)} (expected True)");
+    Capture("designer-checkdigit.png");
+    d.Selection.Clear();
+    Pump(200);
+
     // A file with several labels stays reachable after the import. Real ones routinely
     // hold more than one: this corpus file holds four, and one of them holds twenty-seven.
     d.NewDocumentCommand.Execute(null);

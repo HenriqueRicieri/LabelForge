@@ -342,7 +342,11 @@ public sealed class ZplGenerator : IElementVisitor
     {
         string o = element.Orientation.Letter();
         string print = element.PrintInterpretationLine ? "Y" : "N";
-        string by = element.Symbology == BarcodeSymbology.Code39
+        // The ratio rides on ^BY, so it has to be stated by every symbology that reads
+        // one or the printer falls back to its default of 3.0 and draws a wider symbol
+        // than the model measured. Only the two that use it state it, which is what keeps
+        // every label written before Interleaved 2 of 5 existed byte-identical.
+        string by = element.Symbology is BarcodeSymbology.Code39 or BarcodeSymbology.Interleaved2of5
             ? $"^BY{element.ModuleWidthDots},{element.WideBarRatio.ToString("0.0", CultureInfo.InvariantCulture)}"
             : $"^BY{element.ModuleWidthDots}";
 
@@ -352,6 +356,8 @@ public sealed class ZplGenerator : IElementVisitor
             BarcodeSymbology.Code39 => $"^B3{o},N,{element.HeightDots},{print},N",
             BarcodeSymbology.Ean13 => $"^BE{o},{element.HeightDots},{print},N",
             BarcodeSymbology.UpcA => $"^BU{o},{element.HeightDots},{print},N,Y",
+            BarcodeSymbology.Interleaved2of5 =>
+                $"^B2{o},{element.HeightDots},{print},N,{(element.AddCheckDigit ? "Y" : "N")}",
             _ => throw new NotSupportedException($"Unsupported symbology: {element.Symbology}"),
         };
 

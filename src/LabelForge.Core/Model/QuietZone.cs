@@ -48,7 +48,8 @@ public static class QuietZone
                     // 9 modules either side.
                     BarcodeSymbology.UpcA => (9, 9),
 
-                    // ISO/IEC 15417 and 16388 both ask for 10 modules either side.
+                    // ISO/IEC 15417 (Code 128), 16388 (Code 39) and 16390 (Interleaved
+                    // 2 of 5) all ask for 10 modules either side.
                     _ => (10, 10),
                 }),
 

@@ -15,8 +15,17 @@ public static class BarcodeValidator
     // Code 39 encodes uppercase A-Z, digits, and a small set of symbols.
     private const string Code39Charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%";
 
+    /// <summary>Validates a field, reading the settings that change what can be encoded
+    /// off the element itself.</summary>
+    public static string? Validate(BarcodeElement element, MarkerSyntax? markers = null)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return Validate(element.Symbology, element.Data, markers, element.AddCheckDigit);
+    }
+
     public static string? Validate(
-        BarcodeSymbology symbology, string? data, MarkerSyntax? markers = null)
+        BarcodeSymbology symbology, string? data, MarkerSyntax? markers = null,
+        bool addCheckDigit = false)
     {
         data ??= string.Empty;
         MarkerSyntax syntax = markers ?? MarkerSyntax.Default;
@@ -80,6 +89,27 @@ public static class BarcodeValidator
                 if (data.Any(c => c > 127))
                 {
                     return "Code 128 encodes ASCII characters only.";
+                }
+
+                break;
+
+            case BarcodeSymbology.Interleaved2of5:
+                if (!data.All(char.IsAsciiDigit))
+                {
+                    return "Interleaved 2 of 5 encodes digits only.";
+                }
+
+                // An odd count is not an error to a printer: the manual says it "adds a
+                // leading 0 (zero)", so the label prints and scans as a longer number
+                // than the one that was typed. It is an error to the offline renderer,
+                // which refuses the field and returns no image at all, so a single odd
+                // field blanks the whole preview. Both are worth one sentence, because
+                // the first is silent and the second looks like the app being broken.
+                if (data.Length % 2 == 1)
+                {
+                    return "Interleaved 2 of 5 encodes digits in pairs, so the printer adds "
+                           + $"a leading zero and this scans as {Interleaved2of5.Encoded(data, addCheckDigit)}. "
+                           + "The preview stays blank until the count is even.";
                 }
 
                 break;

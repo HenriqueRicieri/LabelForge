@@ -2123,8 +2123,7 @@ public partial class DesignerViewModel : ViewModelBase
         var problems = new List<string>();
         foreach (BarcodeElement barcode in Document.Elements.OfType<BarcodeElement>().Where(b => b.IsVisible))
         {
-            if (Core.Zpl.BarcodeValidator.Validate(
-                    barcode.Symbology, barcode.Data, Document.Markers) is { } warning)
+            if (Core.Zpl.BarcodeValidator.Validate(barcode, Document.Markers) is { } warning)
             {
                 string name = string.IsNullOrEmpty(barcode.Name) ? barcode.Symbology.ToString() : barcode.Name;
                 problems.Add($"Barcode '{name}': {warning}");

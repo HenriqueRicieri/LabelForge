@@ -113,6 +113,14 @@ public sealed class ZplDocumentImportTests
             X = 500, Y = 320, Symbology = BarcodeSymbology.UpcA, Data = "036000291452",
             HeightDots = 80, ModuleWidthDots = 2,
         });
+        document.Elements.Add(new BarcodeElement
+        {
+            // Both of ^B2's own arguments: the wide-bar ratio it reads off ^BY, and the
+            // check digit it is the only symbology here to have a choice about.
+            X = 700, Y = 430, Symbology = BarcodeSymbology.Interleaved2of5,
+            Data = "1234567890123", HeightDots = 60, ModuleWidthDots = 2,
+            WideBarRatio = 2.5, AddCheckDigit = true, PrintInterpretationLine = false,
+        });
         document.Elements.Add(new QrCodeElement
         {
             X = 620, Y = 30, Data = "https://example.com/label", Magnification = 6,

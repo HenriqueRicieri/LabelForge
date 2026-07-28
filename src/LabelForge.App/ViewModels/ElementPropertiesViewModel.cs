@@ -365,7 +365,7 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
     }
 }
 
-public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel
+public sealed partial class BarcodePropertiesViewModel : ElementPropertiesViewModel
 {
     private readonly BarcodeElement _barcode;
 
@@ -382,14 +382,18 @@ public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel
         set
         {
             Edit(_barcode.Symbology, value, v => _barcode.Symbology = v);
-            OnPropertyChanged(nameof(IsCode39));
-            OnPropertyChanged(nameof(Warning));
-            OnPropertyChanged(nameof(HasWarning));
-            NotifyGs1Changed();
+            OnPropertyChanged(nameof(UsesRatio));
+            OnPropertyChanged(nameof(IsInterleaved));
+            NotifyDataChanged();
         }
     }
 
-    public bool IsCode39 => _barcode.Symbology == BarcodeSymbology.Code39;
+    public bool IsInterleaved => _barcode.Symbology == BarcodeSymbology.Interleaved2of5;
+
+    /// <summary>The two symbologies whose bars come in two widths, so ^BY's ratio means
+    /// something to them.</summary>
+    public bool UsesRatio =>
+        _barcode.Symbology is BarcodeSymbology.Code39 or BarcodeSymbology.Interleaved2of5;
 
     public string Data
     {
@@ -397,17 +401,63 @@ public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel
         set
         {
             Edit(_barcode.Data, value ?? string.Empty, v => _barcode.Data = v);
-            OnPropertyChanged(nameof(Warning));
-            OnPropertyChanged(nameof(HasWarning));
-            NotifyGs1Changed();
+            NotifyDataChanged();
         }
     }
 
     /// <summary>A design-time message when the data cannot be encoded, else empty.</summary>
-    public string Warning => Core.Zpl.BarcodeValidator.Validate(
-        _barcode.Symbology, _barcode.Data, Document.Markers) ?? string.Empty;
+    public string Warning =>
+        Core.Zpl.BarcodeValidator.Validate(_barcode, Document.Markers) ?? string.Empty;
 
     public bool HasWarning => Warning.Length > 0;
+
+    /// <summary>
+    /// ^B2's check-digit parameter. Only Interleaved 2 of 5 has the choice, which is why
+    /// the row is hidden for everything else rather than shown and ignored.
+    /// </summary>
+    public bool AddCheckDigit
+    {
+        get => _barcode.AddCheckDigit;
+        set
+        {
+            Edit(_barcode.AddCheckDigit, value, v => _barcode.AddCheckDigit = v);
+            NotifyDataChanged();
+        }
+    }
+
+    /// <summary>
+    /// What the label will scan as and where its check digit comes from. Not a warning:
+    /// a printer-side check digit is normal and correct, it is just invisible, and the
+    /// number a person checks against a purchase order is never the string in the data
+    /// box for EAN-13 or UPC-A.
+    /// </summary>
+    public string CheckDigitInfo => Core.Zpl.BarcodeCheckDigit.Describe(_barcode);
+
+    public bool HasCheckDigitInfo => CheckDigitInfo.Length > 0;
+
+    /// <summary>True when the check digit can be written into the data, which is the one
+    /// place the designer, the preview and a scanner all agree about it.</summary>
+    public bool CanAddCheckDigit => Core.Zpl.BarcodeCheckDigit.Complete(_barcode) is not null;
+
+    [RelayCommand]
+    private void AppendCheckDigit()
+    {
+        if (Core.Zpl.BarcodeCheckDigit.Complete(_barcode) is { } completed)
+        {
+            Data = completed;
+            OnPropertyChanged(nameof(Data));
+        }
+    }
+
+    private void NotifyDataChanged()
+    {
+        OnPropertyChanged(nameof(Warning));
+        OnPropertyChanged(nameof(HasWarning));
+        OnPropertyChanged(nameof(CheckDigitInfo));
+        OnPropertyChanged(nameof(HasCheckDigitInfo));
+        OnPropertyChanged(nameof(CanAddCheckDigit));
+        NotifyGs1Changed();
+    }
 
     public decimal Height
     {
@@ -421,7 +471,7 @@ public sealed class BarcodePropertiesViewModel : ElementPropertiesViewModel
         set => Edit(_barcode.ModuleWidthDots, Math.Clamp((int)value, 1, 10), v => _barcode.ModuleWidthDots = v);
     }
 
-    /// <summary>Wide-to-narrow ratio; only Code 39 uses it.</summary>
+    /// <summary>Wide-to-narrow ratio, used by Code 39 and Interleaved 2 of 5.</summary>
     public decimal Ratio
     {
         get => (decimal)_barcode.WideBarRatio;

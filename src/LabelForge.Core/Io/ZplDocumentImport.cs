@@ -201,6 +201,7 @@ public static class ZplDocumentImport
         private BarcodeSymbology? _symbology;
         private int _barcodeHeight;
         private bool _interpretation = true;
+        private bool _addCheckDigit;
 
         private int? _dataMatrixModule;
         private int? _qrMagnification;
@@ -350,6 +351,16 @@ public static class ZplDocumentImport
 
                 case "BU":
                     StartBarcode(BarcodeSymbology.UpcA, command, heightIndex: 1, printIndex: 2);
+                    return;
+
+                case "B2":
+                    // ^B2's fifth argument asks the printer to work out a Mod 10 check
+                    // digit. It falls back to ZPL's own default rather than to this
+                    // model's, which is the call ^B7 already makes: an imported label has
+                    // to keep printing what it printed.
+                    StartBarcode(
+                        BarcodeSymbology.Interleaved2of5, command,
+                        heightIndex: 1, printIndex: 2, checkDigitIndex: 4);
                     return;
 
                 case "BX":
@@ -609,12 +620,15 @@ public static class ZplDocumentImport
         }
 
         private void StartBarcode(
-            BarcodeSymbology symbology, ZplCommand command, int heightIndex, int printIndex)
+            BarcodeSymbology symbology, ZplCommand command, int heightIndex, int printIndex,
+            int checkDigitIndex = -1)
         {
             _symbology = symbology;
             _orientation = ToOrientation(command.Arg(0));
             _barcodeHeight = command.Int(heightIndex, 100);
             _interpretation = !string.Equals(command.Arg(printIndex), "N", StringComparison.OrdinalIgnoreCase);
+            _addCheckDigit = checkDigitIndex >= 0 &&
+                             string.Equals(command.Arg(checkDigitIndex), "Y", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -661,6 +675,7 @@ public static class ZplDocumentImport
                     ModuleWidthDots = _moduleWidth,
                     WideBarRatio = _wideRatio,
                     PrintInterpretationLine = _interpretation,
+                    AddCheckDigit = _addCheckDigit,
                 });
                 return;
             }
@@ -1095,6 +1110,7 @@ public static class ZplDocumentImport
             _fontHeight = 0;
             _fontWidth = 0;
             _symbology = null;
+            _addCheckDigit = false;
             _dataMatrixModule = null;
             _qrMagnification = null;
             _pdf417 = null;
