@@ -166,6 +166,18 @@ public static class ZplDocumentImport
         private readonly List<BlockDraft> _blocks = [];
         private BlockDraft? _current;
 
+        /// <summary>
+        /// The label size in force, which outlives the block that set it.
+        ///
+        /// `^LL` is "retained until you turn off the printer or send a new ^LL", and `^PW`
+        /// defaults to "the last permanently saved value": both are printer settings rather
+        /// than properties of one `^XA` block. A driver states them once in a setup block at
+        /// the top of the file and never again, so scoping them to their own block leaves
+        /// every real label after it with no stated size at all.
+        /// </summary>
+        private int? _widthDots;
+        private int? _heightDots;
+
         private int _homeX;
         private int _homeY;
         private int? _originX;
@@ -216,7 +228,9 @@ public static class ZplDocumentImport
         {
             if (command.Code == "XA")
             {
-                _current = new BlockDraft();
+                // The size in force carries into the new block: a block that states its own
+                // overwrites it below, one that does not inherits what the file last said.
+                _current = new BlockDraft { WidthDots = _widthDots, HeightDots = _heightDots };
                 _blocks.Add(_current);
                 ResetField();
                 _homeX = 0;
@@ -224,13 +238,33 @@ public static class ZplDocumentImport
                 return;
             }
 
-            // Read before the preamble guard below, because ^CI is a printer mode rather
-            // than part of a label: it can be set outside any ^XA block and it stays set
-            // across the ones that follow.
-            if (command.Code == "CI")
+            // Read before the preamble guard below, because these are printer modes rather
+            // than parts of a label: they can be set outside any ^XA block and they stay set
+            // across the ones that follow. ^PW and ^LL are here for the reason the manual
+            // gives and a driver relies on, stated on the fields they set.
+            switch (command.Code)
             {
-                _internationalSet = command.Int(0);
-                return;
+                case "CI":
+                    _internationalSet = command.Int(0);
+                    return;
+
+                case "PW":
+                    _widthDots = command.Int(0);
+                    if (_current is { } widthBlock)
+                    {
+                        widthBlock.WidthDots = _widthDots;
+                    }
+
+                    return;
+
+                case "LL":
+                    _heightDots = command.Int(0);
+                    if (_current is { } heightBlock)
+                    {
+                        heightBlock.HeightDots = _heightDots;
+                    }
+
+                    return;
             }
 
             // Anything before the first ^XA is preamble: printer configuration, and the
@@ -245,14 +279,6 @@ public static class ZplDocumentImport
                 case "LH":
                     _homeX = command.Int(0);
                     _homeY = command.Int(1);
-                    return;
-
-                case "PW":
-                    block.WidthDots = command.Int(0);
-                    return;
-
-                case "LL":
-                    block.HeightDots = command.Int(0);
                     return;
 
                 case "FO":
