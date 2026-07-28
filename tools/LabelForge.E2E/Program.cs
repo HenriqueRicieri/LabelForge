@@ -32,10 +32,16 @@ if (Directory.Exists(recoveryDir))
     Directory.Delete(recoveryDir, recursive: true);
 }
 
+// The viewer's compare mode measures against Labelary, which means sending the label
+// over the internet. A harness run must not: the same rule as the scratch store paths
+// above, and a harder one, because the recipient is a third party rather than a file.
+// The offline engine stands in for it, so what is exercised is the comparison rather
+// than the service.
 var vm = new MainViewModel(
     new LabelForge.Core.Media.UserMediaStore(presetsPath),
     new LabelForge.Core.Fields.FieldCatalogStore(catalogsPath),
-    new LabelForge.Core.Io.RecoveryStore(recoveryDir, "e2e"));
+    new LabelForge.Core.Io.RecoveryStore(recoveryDir, "e2e"),
+    () => new LabelForge.Core.Rendering.BinaryKitsRenderer());
 var window = new MainWindow { DataContext = vm };
 window.Show();
 
@@ -1390,6 +1396,34 @@ if (mode == "designer")
     Console.WriteLine(
         $"startup .png: tab={tabs.SelectedIndex} said={d.StatusText.Contains(".png")} "
         + "(expected 0 True)");
+
+    // Labelary compare mode, against the offline engine standing in for the service, so
+    // the harness never sends a label anywhere. Comparing a renderer with itself is the
+    // one case whose answer is known in advance, which makes it a real check: anything
+    // but "identical" means the comparison is measuring something other than the ink.
+    tabs.SelectedIndex = 1;
+    Pump(700);
+    var v = vm.Viewer;
+    Console.WriteLine(
+        $"before comparing: HasComparison={v.HasComparison} (expected False), "
+        + $"warns about sending={v.OutboundDescription.Contains("over the internet")} (expected True)");
+
+    v.CompareCommand.Execute(null);
+    Pump(2500);
+    Console.WriteLine(
+        $"compare: HasComparison={v.HasComparison} (expected True), image={v.ComparisonImage != null} "
+        + $"(expected True), busy={v.IsComparing} (expected False)");
+    Console.WriteLine($"  summary: {v.ComparisonSummary}");
+    Console.WriteLine(
+        $"  same renderer twice is identical: {v.ComparisonSummary.StartsWith("Identical")} (expected True)");
+
+    v.ClearComparisonCommand.Execute(null);
+    Pump(300);
+    Console.WriteLine(
+        $"close compare: HasComparison={v.HasComparison} (expected False), "
+        + $"image={v.ComparisonImage != null} (expected False)");
+    tabs.SelectedIndex = 0;
+    Pump(300);
 
     // The .lfl shell association. Pointed at a scratch classes root for the same reason
     // the media, catalog and recovery stores are pointed at scratch files: this is

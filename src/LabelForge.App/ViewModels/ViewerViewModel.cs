@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LabelForge.Core.Io;
 using LabelForge.Core.Printing;
 using LabelForge.Core.Rendering;
 using LabelForge.Core.Templating;
@@ -110,11 +111,19 @@ public partial class ViewerViewModel : ViewModelBase
         }
     }
 
-    public ViewerViewModel()
+    /// <param name="comparisonRenderer">Makes the renderer the compare mode measures
+    /// against. Injectable for the same reason the media, catalog and recovery stores are,
+    /// and more urgently: the default one sends the label to a third party over the
+    /// internet, so a harness run must be able to answer itself instead. Null uses
+    /// Labelary, which is the only thing a real user ever wants.</param>
+    public ViewerViewModel(Func<IZplRenderer>? comparisonRenderer = null)
     {
+        _comparisonRenderer = comparisonRenderer ?? (() => new LabelaryRenderer());
         SelectedDensity = Densities[0];
         ScheduleRender();
     }
+
+    private readonly Func<IZplRenderer> _comparisonRenderer;
 
     /// <summary>Replaces the editor contents (used when opening a file).</summary>
     /// <param name="encodingNote">Shown in the diagnostics strip when the file's
@@ -313,6 +322,114 @@ public partial class ViewerViewModel : ViewModelBase
         }
 
         _suppressLabelRender = false;
+    }
+
+    // -- Labelary compare mode (backlog E2) --
+
+    /// <summary>Labelary's rendering of the same ZPL, or null when none has been asked
+    /// for. Never fetched on its own: only <see cref="CompareCommand"/> puts one here.</summary>
+    [ObservableProperty]
+    public partial Bitmap? ComparisonImage { get; set; }
+
+    [ObservableProperty]
+    public partial string ComparisonSummary { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool HasComparison { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsComparing { get; set; }
+
+    /// <summary>Exactly what would leave the machine, in the units someone can judge.
+    /// Shown next to the button rather than in a help page, because the moment of
+    /// deciding is the only moment it is any use.</summary>
+    public string OutboundDescription =>
+        $"This sends the {ZplTextFile.ToBytes(ZplText ?? string.Empty).Length:N0} bytes in the "
+        + "editor to labelary.com over the internet, and renders them there. Do not send a "
+        + "label whose contents are confidential.";
+
+    /// <summary>
+    /// Renders the same ZPL at Labelary and reports how the two differ.
+    ///
+    /// A command rather than a mode, and that is the safety design rather than a UI
+    /// preference. Every press is one send the user asked for, with
+    /// <see cref="OutboundDescription"/> in front of them as they ask; a live "compare"
+    /// toggle would put the label on the wire on every keystroke, and a customer's label
+    /// would be at a third party before anyone thought about it.
+    /// </summary>
+    [RelayCommand]
+    private async Task CompareAsync()
+    {
+        if (IsComparing)
+        {
+            return;
+        }
+
+        IsComparing = true;
+        try
+        {
+            string zpl = _substitutor.Substitute(ZplText ?? string.Empty);
+            double widthMm = (double)WidthMm;
+            double heightMm = (double)HeightMm;
+            int dpmm = SelectedDensity?.Dpmm ?? 8;
+            int labelIndex = SelectedLabelIndex;
+
+            // Both sides rendered from the same string in the same pass. Reusing whatever
+            // the preview happens to be showing would compare two different labels
+            // whenever a keystroke landed between them.
+            (RenderResult ours, RenderResult theirs) = await Task.Run(() =>
+            {
+                IZplRenderer online = _comparisonRenderer();
+                try
+                {
+                    return (
+                        _renderer.Render(zpl, widthMm, heightMm, dpmm, labelIndex),
+                        online.Render(zpl, widthMm, heightMm, dpmm, labelIndex));
+                }
+                finally
+                {
+                    (online as IDisposable)?.Dispose();
+                }
+            });
+
+            Bitmap? previous = ComparisonImage;
+            ComparisonImage = null;
+            previous?.Dispose();
+
+            if (theirs.Errors.Count > 0)
+            {
+                ComparisonSummary = string.Join(" ", theirs.Errors);
+                HasComparison = true;
+                return;
+            }
+
+            using (var stream = new MemoryStream(theirs.Png))
+            {
+                ComparisonImage = new Bitmap(stream);
+            }
+
+            ComparisonSummary = RenderComparison.Compare(ours.Png, theirs.Png).Summary;
+            HasComparison = true;
+        }
+        catch (Exception ex)
+        {
+            ComparisonSummary = $"The comparison could not be made: {ex.Message}";
+            HasComparison = true;
+        }
+        finally
+        {
+            IsComparing = false;
+        }
+    }
+
+    [RelayCommand]
+    private void ClearComparison()
+    {
+        Bitmap? previous = ComparisonImage;
+        ComparisonImage = null;
+        previous?.Dispose();
+        ComparisonSummary = string.Empty;
+        HasComparison = false;
     }
 
     private const string SampleZpl =

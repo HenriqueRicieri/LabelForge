@@ -1,3 +1,4 @@
+using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LabelForge.Core.Io;
 
@@ -14,22 +15,27 @@ public partial class MainViewModel : ViewModelBase
     /// <param name="userMediaStore">Where the user's own media presets live.</param>
     /// <param name="fieldCatalogStore">Where the imported field catalogs live.</param>
     /// <param name="recoveryStore">Where crash snapshots live.</param>
+    /// <param name="comparisonRenderer">What the viewer's compare mode measures against.</param>
     /// <remarks>
-    /// All three are per-machine state and all three are injectable for the same reason:
-    /// a harness run must not write to what the person using the app has saved. Leaving
-    /// one of them out is not a smaller shortcut, it is the same mistake in one place.
+    /// All four are injectable for one reason: a harness run must not touch what belongs to
+    /// the person using the app. Three of them are per-machine files it would otherwise
+    /// overwrite; the fourth would otherwise send their label to a third party over the
+    /// internet. Leaving one out is not a smaller shortcut, it is the same mistake in one
+    /// place, which F2 already learned the hard way with the field catalog.
     /// </remarks>
     public MainViewModel(
         LabelForge.Core.Media.UserMediaStore? userMediaStore = null,
         LabelForge.Core.Fields.FieldCatalogStore? fieldCatalogStore = null,
-        LabelForge.Core.Io.RecoveryStore? recoveryStore = null)
+        LabelForge.Core.Io.RecoveryStore? recoveryStore = null,
+        Func<LabelForge.Core.Rendering.IZplRenderer>? comparisonRenderer = null)
     {
         Designer = new DesignerViewModel(userMediaStore, fieldCatalogStore, recoveryStore);
+        Viewer = new ViewerViewModel(comparisonRenderer);
     }
 
     public DesignerViewModel Designer { get; }
 
-    public ViewerViewModel Viewer { get; } = new();
+    public ViewerViewModel Viewer { get; }
 
     /// <summary>Which tab is showing. A property rather than a view concern because
     /// opening a file decides where it belongs, and only the shell knows both halves.</summary>
