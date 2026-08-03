@@ -46,4 +46,42 @@ public static class BarcodeInterpretation
     /// <summary>What the line takes at a given narrow-bar width.</summary>
     public static int HeightDots(int moduleWidthDots) =>
         (CellHeightDots * Math.Max(moduleWidthDots, 1)) + GapDots;
+
+    /// <summary>
+    /// Font A's advance, width plus its intercharacter gap, which is the cell one digit
+    /// gets. The manual publishes 5 by 9 and B14 measured the advance at 6 against both
+    /// Labelary and the ZDesigner driver.
+    /// </summary>
+    private const int AdvanceDots = 6;
+
+    /// <summary>
+    /// How far the interpretation line reaches to the LEFT of the first bar.
+    ///
+    /// EAN-13 and UPC-A print their leading digit outside the guard bars, which is what
+    /// the symbologies themselves specify and what both engines draw: measured at 7, 13,
+    /// 18, 24, 30, 36, 42 and 48 dots for modules 1 to 8, one font A cell magnified by the
+    /// module. Every other symbology here keeps its whole line under the bars.
+    /// </summary>
+    public static int LeadingDigitDots(BarcodeElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return element.PrintInterpretationLine
+            && element.Symbology is BarcodeSymbology.Ean13 or BarcodeSymbology.UpcA
+            ? (AdvanceDots * Math.Max(element.ModuleWidthDots, 1)) + 1
+            : 0;
+    }
+
+    /// <summary>
+    /// The same, to the RIGHT of the last bar, which only UPC-A has: it prints the check
+    /// digit outside the trailing guard as well as the number system digit outside the
+    /// leading one. Measured a dot wider than the leading side at 6, 13, 19, 26, 32, 37
+    /// and 44 dots for modules 1 to 7.
+    /// </summary>
+    public static int TrailingDigitDots(BarcodeElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return element.PrintInterpretationLine && element.Symbology == BarcodeSymbology.UpcA
+            ? (AdvanceDots * Math.Max(element.ModuleWidthDots, 1)) + 2
+            : 0;
+    }
 }

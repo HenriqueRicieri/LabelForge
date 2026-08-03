@@ -189,27 +189,96 @@ public sealed class BarcodeInterpretationTests
     }
 
     /// <summary>
-    /// A known limit, measured and pinned rather than left to be rediscovered: EAN-13 and
-    /// UPC-A print a digit outside their own guard bars - the leading digit at the left for
-    /// both, the check digit at the right for UPC-A - and the footprint is the symbol, so
-    /// that digit falls outside it. It costs nothing today because it lands inside the quiet
-    /// zone B3 already draws and checks (11 modules leading for EAN-13 against the 6 the
-    /// digit needs), but the box is narrower than the ink there, which is the direction that
-    /// matters. Filed as B4a.
+    /// EAN-13 and UPC-A print a digit outside their own guard bars - the leading digit to
+    /// the left for both, the check digit to the right for UPC-A - so the box has to start
+    /// left of the field's own origin, which no other element here does at a top-left
+    /// anchor. Measured at one font A cell per module either side.
     /// </summary>
     [Theory]
     [InlineData(BarcodeSymbology.Ean13, "123456789012")]
     [InlineData(BarcodeSymbology.UpcA, "12345678901")]
-    public void TheLeadingDigitFallsOutsideTheFootprint(BarcodeSymbology symbology, string data)
+    public void TheDigitsOutsideTheGuardBars_AreInTheFootprint(
+        BarcodeSymbology symbology, string data)
     {
-        const int module = 2;
-        BarcodeElement element = Barcode(symbology, data, module, line: true);
+        for (int module = 1; module <= 8; module++)
+        {
+            BarcodeElement element = Barcode(symbology, data, module, line: true);
+            DotRect bounds = new ElementBoundsCalculator().GetBounds(element);
+            InkBounds ink = InkBox(element);
 
-        DotRect bounds = new ElementBoundsCalculator().GetBounds(element);
-        InkBounds ink = InkBox(element);
+            Assert.True(bounds.X < element.X, $"module {module}: the box starts at the origin");
+            Assert.True(
+                bounds.X <= ink.Left,
+                $"module {module}: box starts at {bounds.X}, ink at {ink.Left}");
+            Assert.True(
+                bounds.X + bounds.Width - 1 >= ink.Right,
+                $"module {module}: box ends at {bounds.X + bounds.Width - 1}, ink at {ink.Right}");
+            Assert.InRange(ink.Left - bounds.X, 0, 3);
+        }
+    }
 
-        Assert.True(ink.Left < bounds.X, $"ink starts at {ink.Left}, box at {bounds.X}");
-        Assert.InRange(bounds.X - ink.Left, 1, QuietZone.For(element).Left);
+    /// <summary>
+    /// The bug the digits found, and it was not theirs: what a barcode draws outside its
+    /// bars turns with the field, and the width/height swap kept it where an upright one
+    /// puts it. So a rotated barcode's box claimed 21 dots on the side opposite the ink and
+    /// missed the side the ink was on - at 90 degrees the interpretation line is to the LEFT
+    /// of the bars, at 180 it is ABOVE them, measured on every symbology rather than only on
+    /// the two with digits outside their guards.
+    /// </summary>
+    [Theory]
+    [InlineData(BarcodeSymbology.Code128, "12345678")]
+    [InlineData(BarcodeSymbology.Code39, "ABC123")]
+    [InlineData(BarcodeSymbology.Ean13, "123456789012")]
+    [InlineData(BarcodeSymbology.UpcA, "12345678901")]
+    [InlineData(BarcodeSymbology.Interleaved2of5, "123456")]
+    public void TheFootprintFollowsTheLineRoundTheRotations(
+        BarcodeSymbology symbology, string data)
+    {
+        foreach (Orientation orientation in Enum.GetValues<Orientation>())
+        {
+            BarcodeElement element = Barcode(symbology, data, 2, line: true);
+            element.Orientation = orientation;
+
+            DotRect box = new ElementBoundsCalculator().GetBounds(element);
+            InkBounds ink = InkBox(element);
+
+            Assert.True(box.X <= ink.Left, $"{orientation}: box {box.X}, ink {ink.Left}");
+            Assert.True(box.Y <= ink.Top, $"{orientation}: box {box.Y}, ink {ink.Top}");
+            Assert.True(
+                box.X + box.Width - 1 >= ink.Right,
+                $"{orientation}: box ends {box.X + box.Width - 1}, ink {ink.Right}");
+            Assert.True(
+                box.Y + box.Height - 1 >= ink.Bottom,
+                $"{orientation}: box ends {box.Y + box.Height - 1}, ink {ink.Bottom}");
+
+            // And it hugs it: covering the ink is easy to do by being enormous.
+            Assert.InRange(ink.Left - box.X, 0, 3);
+            Assert.InRange(ink.Top - box.Y, 0, 3);
+            Assert.InRange(box.X + box.Width - 1 - ink.Right, 0, 3);
+            Assert.InRange(box.Y + box.Height - 1 - ink.Bottom, 0, 3);
+        }
+    }
+
+    /// <summary>A barcode with no line has nothing outside its bars, so its box is what it
+    /// always was in every orientation. That is what keeps this a fix to the appendages
+    /// rather than a new rotation model for everything.</summary>
+    [Theory]
+    [InlineData(Orientation.Normal)]
+    [InlineData(Orientation.Rotated90)]
+    [InlineData(Orientation.Rotated180)]
+    [InlineData(Orientation.Rotated270)]
+    public void WithNoLine_TheBoxIsTheSymbolWhicheverWayItTurns(Orientation orientation)
+    {
+        BarcodeElement element = Barcode(BarcodeSymbology.Code128, "12345678", 2, line: false);
+        element.Orientation = orientation;
+
+        DotRect box = new ElementBoundsCalculator().GetBounds(element);
+        bool turned = orientation is Orientation.Rotated90 or Orientation.Rotated270;
+
+        Assert.Equal(element.X, box.X);
+        Assert.Equal(element.Y, box.Y);
+        Assert.Equal(turned ? 100 : 246, box.Width);
+        Assert.Equal(turned ? 246 : 100, box.Height);
     }
 
     private readonly record struct InkBounds(int Left, int Right, int Top, int Bottom);

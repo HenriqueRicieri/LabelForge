@@ -23,21 +23,84 @@ public sealed class ElementBoundsCalculator : IElementVisitor
 
     public DotRect GetBounds(Element element)
     {
-        DotRect bounds = GetUnrotatedBounds(element);
+        ArgumentNullException.ThrowIfNull(element);
 
-        // ZPL rotates fields around the origin; approximating the rotated footprint
-        // as a width/height swap at the same origin is close enough for selection.
-        //
-        // Only for the fields it rotates, though. The graphic primitives take no
-        // orientation argument at all, so swapping their sides described a shape the ink
-        // never took: a 200 by 100 box set to 90 degrees drew 200 by 100 and measured
-        // 100 by 200, which is a selection outline, a snap target and a measured label
-        // length all wrong at once. See FieldRotation.
-        return FieldRotation.Applies(element) &&
-               element.Orientation is Orientation.Rotated90 or Orientation.Rotated270
-            ? bounds with { Width = bounds.Height, Height = bounds.Width }
-            : bounds;
+        DotRect local = GetLocalBounds(element);
+        (int x, int y) = FieldTypeset.DrawnTopLeft(element, local);
+
+        // A barcode is the one element that draws outside the box its origin names, and
+        // what it draws there turns with the field. Everything else keeps the swap below,
+        // whose whole footprint starts at the origin either way.
+        DotRect drawn = element is BarcodeElement barcode
+            ? Turn(WithSideDigits(barcode, local), local with { Height = barcode.HeightDots },
+                barcode.Orientation)
+            : Swap(element, local);
+
+        return drawn with { X = drawn.X + x, Y = drawn.Y + y };
     }
+
+    /// <summary>
+    /// The barcode's drawn box: the symbol, the interpretation line already under it, and
+    /// the digit EAN-13 and UPC-A print outside their guard bars.
+    ///
+    /// Kept out of the local bounds deliberately. That box is what the resizer counts
+    /// modules in and what a `^FT` anchor is measured from, and neither of those is about a
+    /// digit printed outside the symbol: including it would have a resize gesture reading
+    /// 108 modules where an EAN-13 has 95.
+    /// </summary>
+    private static DotRect WithSideDigits(BarcodeElement element, DotRect local)
+    {
+        int leading = BarcodeInterpretation.LeadingDigitDots(element);
+        int trailing = BarcodeInterpretation.TrailingDigitDots(element);
+        return local with
+        {
+            X = local.X - leading,
+            Width = local.Width + leading + trailing,
+        };
+    }
+
+    /// <summary>
+    /// Turns a field's drawn box about the box its origin names, which the printer keeps
+    /// pinned at the origin in every orientation (measured: a barcode's bars start on the
+    /// field origin and grow right and down at 0, 90, 180 and 270 alike).
+    ///
+    /// So anything drawn outside that box travels: measured, a barcode's interpretation
+    /// line sits below the bars at 0 degrees, to their LEFT at 90, ABOVE them at 180 and to
+    /// their right at 270. The width/height swap this replaces kept every appendage where
+    /// an upright field puts it, so a rotated barcode's box claimed 21 dots on the side
+    /// opposite the ink and missed the side the ink was on.
+    /// </summary>
+    private static DotRect Turn(DotRect drawn, DotRect anchor, Orientation orientation) =>
+        orientation switch
+        {
+            Orientation.Rotated90 => new DotRect(
+                anchor.Height - (drawn.Y + drawn.Height), drawn.X, drawn.Height, drawn.Width),
+            Orientation.Rotated180 => new DotRect(
+                anchor.Width - (drawn.X + drawn.Width),
+                anchor.Height - (drawn.Y + drawn.Height),
+                drawn.Width,
+                drawn.Height),
+            Orientation.Rotated270 => new DotRect(
+                drawn.Y, anchor.Width - (drawn.X + drawn.Width), drawn.Height, drawn.Width),
+            _ => drawn,
+        };
+
+    /// <summary>
+    /// ZPL rotates fields around the origin; approximating the rotated footprint as a
+    /// width/height swap at the same origin is close enough for selection, and exact for
+    /// every element whose whole footprint starts there.
+    ///
+    /// Only for the fields it rotates, though. The graphic primitives take no orientation
+    /// argument at all, so swapping their sides described a shape the ink never took: a 200
+    /// by 100 box set to 90 degrees drew 200 by 100 and measured 100 by 200, which is a
+    /// selection outline, a snap target and a measured label length all wrong at once.
+    /// See FieldRotation.
+    /// </summary>
+    private static DotRect Swap(Element element, DotRect local) =>
+        FieldRotation.Applies(element) &&
+        element.Orientation is Orientation.Rotated90 or Orientation.Rotated270
+            ? local with { Width = local.Height, Height = local.Width }
+            : local;
 
     /// <summary>The footprint before orientation is applied. Used by resize logic,
     /// which reasons about the element's intrinsic width (e.g. barcode modules).</summary>
