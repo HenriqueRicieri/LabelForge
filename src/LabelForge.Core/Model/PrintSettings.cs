@@ -72,6 +72,38 @@ public sealed class PrintSettings
     public int CutAfterLabels { get; set; }
 
     /// <summary>
+    /// ^PM: prints the whole printable area flipped left to right. False emits nothing.
+    ///
+    /// Modelled for the reason <see cref="LabelTopDots"/> is and <c>^LH</c> is not: the
+    /// label's own coordinate space cannot express it. Nothing that can be done to the
+    /// elements mirrors text, so mirroring is a fact about the print rather than a second
+    /// way to say where a field sits.
+    ///
+    /// The canvas cannot show it, measured: a printer mirrors (Labelary flips the ink
+    /// about the print width) and the offline engine ignores ^PM entirely. The properties
+    /// panel says so rather than the canvas pretending, which is the call ^FB's line cap
+    /// and a white ^GE already made. It is also the mode's own logic: mirroring is for
+    /// stock read through its face, so the unmirrored canvas IS the side somebody reads.
+    /// </summary>
+    public bool Mirror { get; set; }
+
+    /// <summary>
+    /// ^LR: reverses every field on the label, which is how white-on-black stock and
+    /// pre-printed backgrounds are printed. False emits nothing.
+    ///
+    /// "Identical to placing an ^FR command in all current and subsequent fields", so it
+    /// is <see cref="Element.IsReversed"/> for the whole label rather than a different
+    /// effect. The two do not cancel: a reversed field under a reversed label is reversed
+    /// once, measured on both engines, which is what lets an imported label carry the
+    /// flag at both levels without changing what prints.
+    ///
+    /// Unlike darkness, speed and the media modes beside it, this one rides the preview
+    /// too. Those are instructions to a machine and the canvas has nothing to say about
+    /// them; this is ink, and the offline engine honours it exactly as it honours ^FR.
+    /// </summary>
+    public bool ReverseAll { get; set; }
+
+    /// <summary>
     /// ^LT: moves the whole printed format up or down relative to the top edge of the
     /// media, -120 to 120 dot rows. Zero emits nothing.
     ///

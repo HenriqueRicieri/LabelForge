@@ -400,6 +400,14 @@
                                 <NumericUpDown Value="{Binding PrintLabelTop}" Minimum="-120" Maximum="120"
                                                Increment="1" FormatString="0"
                                                ToolTip.Tip="^LT: moves the whole printed format up or down relative to the top edge of the media, to line the print up with the die cut. It stays set on the printer until another label changes it." />
+                                <CheckBox Content="Reverse every field" FontSize="12"
+                                          IsChecked="{Binding PrintReverseAll}"
+                                          ToolTip.Tip="^LR: prints every field the other way round, for white on black stock and pre-printed backgrounds. The same as marking each field reversed, and the canvas shows it." />
+                                <CheckBox Content="Mirror the print" FontSize="12"
+                                          IsChecked="{Binding PrintMirror}"
+                                          ToolTip.Tip="^PM: the printer flips the whole printable area left to right, for stock that is read through its face." />
+                                <TextBlock Text="{Binding MirrorHint}" FontSize="11" Opacity="0.7"
+                                           TextWrapping="Wrap" IsVisible="{Binding MirrorHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                 <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="0,6" />
                                 <TextBlock Text="Network printer (TCP 9100)" FontWeight="SemiBold" FontSize="12" />
                                 <TextBox Text="{Binding PrinterHost}" PlaceholderText="192.168.0.50" />

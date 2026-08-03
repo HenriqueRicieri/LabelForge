@@ -411,22 +411,25 @@ public sealed class ZplDocumentImportTests
 
     /// <summary>
     /// The commands that look like setup but change the label are deliberately not on
-    /// that list, because losing one silently would change what prints: these invert or
-    /// mirror the whole label, shift every field, store the format on the printer, or
-    /// redefine the characters this parser reads.
+    /// that list, because losing one silently would change what prints: these shift every
+    /// field, store the format on the printer, or redefine the characters this parser
+    /// reads.
     ///
-    /// ^SN used to be here and is now read: see <see cref="SerialNumberImportTests"/>, and
-    /// ^LT likewise, see <see cref="MediaHandlingTests"/>. Both left this list the same
-    /// way, by being modelled rather than by being reclassified: the test above them is
-    /// that the generator writes them back.
+    /// ^SN used to be here and is now read: see <see cref="SerialNumberImportTests"/>, ^LT
+    /// likewise, see <see cref="MediaHandlingTests"/>, and ^LR and ^PM likewise, see
+    /// <see cref="MirrorAndReverseTests"/>. All left this list the same way, by being
+    /// modelled rather than by being reclassified: the test above them is that the
+    /// generator writes them back.
     ///
     /// ^LS stays. It shifts every field left for compatibility with Z-130 formats, which
     /// is the same axis ^FO already states, so modelling it would give the document two
-    /// ways to say where a field is.
+    /// ways to say where a field is. ^PO stays for the same reason and is worth naming,
+    /// since it looks like ^PM's twin: inverting the format 180 degrees is a label whose
+    /// elements are each turned and placed that way, which the document can already say,
+    /// where no arrangement of elements mirrors text.
     /// </summary>
     [Theory]
-    [InlineData("^LRY")]
-    [InlineData("^PMY")]
+    [InlineData("^POI")]
     [InlineData("^LS40")]
     [InlineData("^DFR:FMT.ZPL")]
     [InlineData("^CC~")]

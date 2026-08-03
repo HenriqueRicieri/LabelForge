@@ -56,6 +56,7 @@ public static class ZplDocumentImport
     private static readonly HashSet<string> Handled = new(StringComparer.Ordinal)
     {
         "XA", "XZ", "CI", "FS", "FH", "LH", "PW", "LL", "BY", "PQ", "MD", "PR", "MM", "LT",
+        "PM", "LR",
         "DG", "FO", "FT", "FD", "FB", "FR", "SN", "GB", "GE", "GC", "GD", "GF", "XG",
         "BC", "B3", "BE", "BU", "BX", "BQ", "B7",
     };
@@ -79,9 +80,10 @@ public static class ZplDocumentImport
     /// </summary>
     /// Kept deliberately narrow. Commands that change what the label looks like or where
     /// it prints stay off this list even when they look like setup, because losing one of
-    /// those is a real loss the user has to hear about: ^LR and ^PM invert or mirror the
-    /// whole label, ^LS shifts every field, ^DF stores the format on the printer,
-    /// and ^CC and ^CT redefine the characters this parser reads.
+    /// those is a real loss the user has to hear about: ^LS shifts every field, ^DF stores
+    /// the format on the printer, and ^CC and ^CT redefine the characters this parser reads.
+    /// ^LR and ^PM used to be named here as examples and are now modelled, which is how a
+    /// command leaves this list: by being written back, not by being reclassified.
     /// ^MN is the one that moved off this list conditionally rather than wholesale.
     /// Gap and mark sensing stay printer setup, because several modes are valid and the
     /// operator's matches what is loaded; continuous is different, because a roll with
@@ -166,6 +168,19 @@ public static class ZplDocumentImport
             public bool IsContinuous { get; set; }
 
             public PrintSettings Print { get; } = new();
+
+            /// <summary>Whether each element carried an ^FR of its own, kept beside the
+            /// elements rather than on them so a label-wide ^LR can be lifted back out
+            /// again without taking a field's own reverse with it.</summary>
+            public List<bool> OwnReverse { get; } = [];
+
+            /// <summary>Whether ^LR was in force when this block's first field was added.
+            /// A block drawn entirely under it is one that can carry the flag.</summary>
+            public bool ReverseFromFirstField { get; set; }
+
+            /// <summary>Whether ^LR changed while the block was drawing, which is the one
+            /// shape a single document-wide flag cannot express.</summary>
+            public bool ReverseMixed { get; set; }
         }
 
         private readonly List<BlockDraft> _blocks = [];
@@ -188,6 +203,12 @@ public static class ZplDocumentImport
         private MediaHandling _mediaHandling = MediaHandling.PrinterDefault;
         private bool _prepeel;
         private int _labelTop;
+
+        /// <summary>Mirror and label reverse in force. Persistent for the same reason and
+        /// on the manual's own word: each "remains active" until its own N form arrives or
+        /// the printer is turned off.</summary>
+        private bool _mirror;
+        private bool _reverseAll;
 
         private int _homeX;
         private int _homeY;
@@ -246,6 +267,8 @@ public static class ZplDocumentImport
                 _current.Print.MediaHandling = _mediaHandling;
                 _current.Print.Prepeel = _prepeel;
                 _current.Print.LabelTopDots = _labelTop;
+                _current.Print.Mirror = _mirror;
+                _current.Print.ReverseAll = _reverseAll;
                 _blocks.Add(_current);
                 ResetField();
                 _homeX = 0;
@@ -318,6 +341,39 @@ public static class ZplDocumentImport
                     if (_current is { } topBlock)
                     {
                         topBlock.Print.LabelTopDots = _labelTop;
+                    }
+
+                    return;
+
+                case "PM":
+                    // "If the parameter is missing or invalid, the command is ignored",
+                    // which the manual says of this one and of no other here, so an
+                    // unreadable ^PM leaves the mirror where it was rather than
+                    // clearing it.
+                    if (Flag(command.Arg(0)) is { } mirror)
+                    {
+                        _mirror = mirror;
+                    }
+
+                    if (_current is { } mirrorBlock)
+                    {
+                        mirrorBlock.Print.Mirror = _mirror;
+                    }
+
+                    return;
+
+                case "LR":
+                    // A bare ^LR turns reverse off. The manual gives the default as "N or
+                    // last permanently saved value", which decides nothing on its own, so
+                    // this follows the renderer the canvas draws with: measured, it prints
+                    // ^LR with no parameter exactly as ^LRN.
+                    _reverseAll = Flag(command.Arg(0)) ?? false;
+                    if (_current is { } reverseBlock)
+                    {
+                        // What a block with no fields of its own carries. Which fields it
+                        // reaches is worked out as they arrive, in Add, since "only fields
+                        // following this command are affected".
+                        reverseBlock.Print.ReverseAll = _reverseAll;
                     }
 
                     return;
@@ -563,10 +619,21 @@ public static class ZplDocumentImport
             document.Print.Prepeel = block.Print.Prepeel;
             document.Print.CutAfterLabels = block.Print.CutAfterLabels;
             document.Print.LabelTopDots = block.Print.LabelTopDots;
+            document.Print.Mirror = block.Print.Mirror;
+            document.Print.ReverseAll = ReverseAllOf(block);
 
             for (int i = 0; i < block.Elements.Count; i++)
             {
                 block.Elements[i].ZOrder = i;
+
+                // Under a label-wide reverse a field keeps only the ^FR it wrote itself,
+                // or the flag would be stated twice and a label of ours would come back
+                // with an ^FR on every field it never had.
+                if (document.Print.ReverseAll && i < block.OwnReverse.Count)
+                {
+                    block.Elements[i].IsReversed = block.OwnReverse[i];
+                }
+
                 document.Elements.Add(block.Elements[i]);
             }
 
@@ -608,6 +675,31 @@ public static class ZplDocumentImport
             return new ZplDocumentImportResult(
                 document, _blocks.Count, index, warnings, counts, measured);
         }
+
+        /// <summary>
+        /// Whether the label can carry ^LR as a flag of its own.
+        ///
+        /// It can when the reverse covered every field the block drew, which is what our
+        /// own output looks like and what a label written this way looks like. A file that
+        /// turns reverse on or off part way through is saying something one document-wide
+        /// flag cannot: those fields keep the reverse folded into them one by one, which
+        /// prints exactly the same label, because that is what the command means. What
+        /// changes is the bytes it regenerates as, and the alternative would be worse -
+        /// hoisting a partial ^LR would reverse fields the file left alone.
+        /// </summary>
+        private static bool ReverseAllOf(BlockDraft block) => block.Elements.Count == 0
+            ? block.Print.ReverseAll
+            : block.ReverseFromFirstField && !block.ReverseMixed;
+
+        /// <summary>Reads a Y/N argument, or null when it says neither. Case-insensitive
+        /// because a file writes what it writes; the generator only ever emits "Y".</summary>
+        private static bool? Flag(string argument) =>
+            argument.Trim().ToUpperInvariant() switch
+            {
+                "Y" => true,
+                "N" => false,
+                _ => null,
+            };
 
         /// <summary>
         /// Sets the label's size, and says so when the file did not.
@@ -1060,7 +1152,26 @@ public static class ZplDocumentImport
         private void Add(Element element)
         {
             element.Orientation = _orientation;
-            element.IsReversed = _reversed;
+
+            // ^LR is "identical to placing an ^FR command in all current and subsequent
+            // fields", so it is folded into the fields it reaches rather than trusted to
+            // survive as a flag. Build lifts it back out when it covered the whole block,
+            // which is why the field's own ^FR is remembered separately: the two do not
+            // cancel on a printer, but a label carrying both has to regenerate with both.
+            element.IsReversed = _reversed || _reverseAll;
+            if (_current is { } reverseBlock)
+            {
+                if (reverseBlock.Elements.Count == 0)
+                {
+                    reverseBlock.ReverseFromFirstField = _reverseAll;
+                }
+                else if (_reverseAll != reverseBlock.ReverseFromFirstField)
+                {
+                    reverseBlock.ReverseMixed = true;
+                }
+
+                reverseBlock.OwnReverse.Add(_reversed);
+            }
 
             // A ^FT origin is the field's bottom left, and it is kept as one rather than
             // converted to a top-left ^FO. Which matters twice over: where a ^FT field

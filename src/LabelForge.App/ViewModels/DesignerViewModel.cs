@@ -679,6 +679,62 @@ public partial class DesignerViewModel : ViewModelBase
             v => Document.Print.LabelTopDots = v, "print-label-top");
     }
 
+    /// <summary>^PM: the print comes out flipped left to right. The canvas keeps drawing
+    /// it unflipped, which <see cref="MirrorHint"/> says out loud.</summary>
+    public bool PrintMirror
+    {
+        get => Document.Print.Mirror;
+        set
+        {
+            if (value == Document.Print.Mirror)
+            {
+                return;
+            }
+
+            Document.Print.Mirror = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(MirrorHint));
+            if (!_restoring)
+            {
+                RecordUndo("print-mirror");
+                ScheduleRender();
+            }
+        }
+    }
+
+    /// <summary>^LR: every field reversed, for white-on-black stock and pre-printed
+    /// backgrounds. This one the canvas can show, so it rides the preview.</summary>
+    public bool PrintReverseAll
+    {
+        get => Document.Print.ReverseAll;
+        set
+        {
+            if (value == Document.Print.ReverseAll)
+            {
+                return;
+            }
+
+            Document.Print.ReverseAll = value;
+            OnPropertyChanged();
+            if (!_restoring)
+            {
+                RecordUndo("print-reverse-all");
+                ScheduleRender();
+            }
+        }
+    }
+
+    /// <summary>
+    /// What the canvas cannot show about a mirrored label, said rather than pretended.
+    ///
+    /// Measured both ways: a printer mirrors, the offline engine ignores ^PM outright. The
+    /// mode's own purpose makes the unmirrored canvas the useful picture anyway, since
+    /// mirroring is for stock read through its face.
+    /// </summary>
+    public string MirrorHint => Document.Print.Mirror
+        ? "The preview cannot mirror: it draws the side this label is meant to be read from."
+        : string.Empty;
+
     /// <summary>Whether the prepeel control has anything to act on.</summary>
     public bool IsPeelOff => Document.Print.MediaHandling == MediaHandling.PeelOff;
 
@@ -1019,6 +1075,9 @@ public partial class DesignerViewModel : ViewModelBase
         OnPropertyChanged(nameof(PrintPrepeel));
         OnPropertyChanged(nameof(PrintCutAfter));
         OnPropertyChanged(nameof(PrintLabelTop));
+        OnPropertyChanged(nameof(PrintMirror));
+        OnPropertyChanged(nameof(PrintReverseAll));
+        OnPropertyChanged(nameof(MirrorHint));
         OnPropertyChanged(nameof(IsPeelOff));
         OnPropertyChanged(nameof(CutHint));
         OnPropertyChanged(nameof(CornerRadiusMm));

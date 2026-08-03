@@ -1482,6 +1482,47 @@ if (mode == "designer")
         + $"pane={d.GeneratedZpl.Contains("^LT15", StringComparison.Ordinal)} "
         + "(expected True True)");
 
+    // The two label-wide options, and the difference between them is the thing worth
+    // reaching from here: reverse is ink the canvas can draw, so the underlay has to
+    // change; mirror is a transform the engine does not implement, so the canvas keeps
+    // the picture and the panel says which side it is showing.
+    d.NewDocumentCommand.Execute(null);
+    d.WidthMm = 50m;
+    d.HeightMm = 30m;
+    d.Document.Elements.Add(new LabelForge.Core.Model.BoxElement
+    {
+        X = 20, Y = 20, WidthDots = 240, HeightDots = 80, ThicknessDots = 80,
+    });
+    d.Document.Elements.Add(new LabelForge.Core.Model.TextElement
+    {
+        X = 40, Y = 40, Text = "REVERSE", FontHeightDots = 40, ZOrder = 1,
+    });
+    d.NotifyDocumentEdited();
+    Pump(700);
+    var beforeReverse = d.Underlay;
+
+    d.PrintReverseAll = true;
+    Pump(700);
+    Console.WriteLine(
+        $"reverse redraws the canvas: {!ReferenceEquals(d.Underlay, beforeReverse) && d.Underlay is not null} "
+        + $"preview carries it={d.GeneratedZpl.Contains("^LRY", StringComparison.Ordinal)} "
+        + "(expected True True)");
+
+    var beforeMirror = d.Underlay;
+    d.PrintMirror = true;
+    Pump(700);
+    Console.WriteLine(
+        $"mirror leaves the picture alone: {ReferenceEquals(d.Underlay, beforeMirror)} "
+        + $"and says so={d.MirrorHint.Length > 0} "
+        + $"job={d.BuildPrintJob().Zpl.Contains("^PMY", StringComparison.Ordinal)} "
+        + "(expected True True True)");
+
+    d.UndoCommand.Execute(null);
+    Pump(300);
+    Console.WriteLine(
+        $"mirror undone on its own: {!d.PrintMirror} still reversed={d.PrintReverseAll} "
+        + "(expected True True)");
+
     // Crash recovery: the snapshot follows the edits, a real save clears it because the
     // work is safe elsewhere, and a snapshot left by a dead session is offered on start.
     d.NewDocumentCommand.Execute(null);

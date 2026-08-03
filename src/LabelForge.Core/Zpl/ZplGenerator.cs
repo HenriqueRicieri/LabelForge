@@ -99,10 +99,30 @@ public sealed class ZplGenerator : IElementVisitor
         Line($"^LL{document.HeightDots + 2 * offsetDots}");
         Line("^LH0,0");
 
+        // Label reverse is the one job setting that is ink rather than machine setup, so
+        // it rides the preview as well: the offline engine honours ^LR exactly as it
+        // honours ^FR, measured, and a canvas drawing the label the other way round would
+        // be lying about what prints. It has to precede the fields either way, since the
+        // manual is explicit that "only fields following this command are affected".
+        if (document.Print.ReverseAll)
+        {
+            Line("^LRY");
+        }
+
         // Job settings ride only the printable output; the preview renderer would
         // just flag them as unknown commands.
         if (!includeOffLabel)
         {
+            // ^PM mirrors the whole printable area. A printer does it and the offline
+            // engine ignores the command outright, both measured, so emitting it into
+            // the preview would buy an unknown-command diagnostic on every render and
+            // change nothing. The properties panel is where the canvas says it cannot
+            // show this.
+            if (document.Print.Mirror)
+            {
+                Line("^PMY");
+            }
+
             // ^LT is a registration nudge, so it is stated before any field and only
             // when it was asked for: a label that emitted ^LT0 would be overwriting a
             // setting the operator made on the front panel.
