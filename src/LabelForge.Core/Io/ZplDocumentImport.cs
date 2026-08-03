@@ -819,6 +819,20 @@ public static class ZplDocumentImport
         {
             if (_symbology is { } symbology)
             {
+                // A font stated inside a barcode field is not the barcode's: the manual
+                // says the interpretation line "can be printed in any font by placing the
+                // font command before the barcode command", and that is the one thing
+                // about a barcode this model does not carry. Named rather than dropped in
+                // silence, because the printed line changes size and nothing else in the
+                // file says so. See B4: the offline engine ignores the font entirely, so a
+                // control for it would edit something the canvas could never show.
+                if (_haveFont && _interpretation)
+                {
+                    Warn($"^A{_font} set the interpretation line's font, which is not "
+                        + "modelled: the line prints at the size the module width gives it. "
+                        + "For a line of your own size, turn it off and add a text field.");
+                }
+
                 Add(new BarcodeElement
                 {
                     Symbology = symbology,

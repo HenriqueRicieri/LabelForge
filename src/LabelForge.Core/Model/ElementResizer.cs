@@ -61,8 +61,12 @@ public static class ElementResizer
 
             case BarcodeElement barcode:
             {
+                // The interpretation line comes off the target before the bars are sized,
+                // and it is worked out at the module the drag started from, since the new
+                // one is not known until the width below is resolved. Off by a dot or two
+                // during a drag that changes both; the bars are what the pointer follows.
                 barcode.HeightDots = Math.Max(
-                    targetHeight - (barcode.PrintInterpretationLine ? 30 : 0), 10);
+                    targetHeight - BarcodeInterpretation.HeightDots(barcode), 10);
 
                 int modules = Bounds.GetUnrotatedBounds(barcode).Width / Math.Max(barcode.ModuleWidthDots, 1);
                 if (modules > 0)

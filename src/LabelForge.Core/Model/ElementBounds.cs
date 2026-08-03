@@ -114,7 +114,7 @@ public sealed class ElementBoundsCalculator : IElementVisitor
                 0,
                 0,
                 Interleaved2of5.WidthDots(element),
-                element.HeightDots + (element.PrintInterpretationLine ? 30 : 0));
+                element.HeightDots + BarcodeInterpretation.HeightDots(element));
             return;
         }
 
@@ -136,7 +136,11 @@ public sealed class ElementBoundsCalculator : IElementVisitor
             _ => Zpl.Code128Encoding.WidthModules(element.Data),
         };
 
-        int height = element.HeightDots + (element.PrintInterpretationLine ? 30 : 0);
+        // The interpretation line is the one part of a barcode's footprint that is not the
+        // symbol, and it scales with the module rather than being a fixed strip; see
+        // BarcodeInterpretation. What it does NOT cover is the leading digit EAN-13 and
+        // UPC-A print outside their own guard bars, which is B4a.
+        int height = element.HeightDots + BarcodeInterpretation.HeightDots(element);
         _result = new DotRect(0, 0, modules * element.ModuleWidthDots, height);
     }
 
