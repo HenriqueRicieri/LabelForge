@@ -69,7 +69,7 @@ else
     var d = vm.Designer;
 
     Console.WriteLine($"blank start: {d.Document.Elements.Count} elements (expected 0)");
-    d.LoadSampleCommand.Execute(null);
+    d.LoadStarter(LabelForge.Core.Starters.StarterCatalog.Tour);
 
     // Exercise undo/redo end to end and report each check.
     int baseline = d.Document.Elements.Count;
@@ -1656,6 +1656,52 @@ if (mode == "designer")
     Console.WriteLine($"association removed on uninstall: {gone} (expected True)");
     Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\LabelForge.E2E", false);
 
+    // The starter gallery. Every card has to come back with a picture: a starter that
+    // renders empty is exactly what the gallery exists to show, and a name alone would
+    // hide it. Then the density check, which is the reason a starter is a layout rather
+    // than a stored document: picked at 300 dpi it has to be the same physical label, so
+    // the millimetres match and the dot coordinates do not.
+    d.SelectedDensity = d.Densities.First(o => o.Dpmm == 12);
+    Pump(400);
+    var gallery = new StarterGalleryViewModel(d.Document.Dpmm);
+
+    // Through the window rather than the view model alone: the pictures are loaded by the
+    // window opening, and a gallery whose cards never fill in looks identical to a gallery
+    // that has no cards.
+    var galleryWindow = new StarterGalleryWindow { DataContext = gallery };
+    galleryWindow.Show();
+    for (int i = 0; i < 40 && gallery.Cards.Any(c => c.Preview is null); i++)
+    {
+        Pump(250);
+    }
+
+    Pump(400);
+    Console.WriteLine(
+        $"gallery: {gallery.Cards.Count} starters (expected 5), "
+        + $"all drawn={gallery.Cards.All(c => c.Preview is not null)} (expected True), "
+        + $"selected={gallery.Selected?.Name}");
+    Capture("gallery.png", galleryWindow);
+    galleryWindow.Close();
+    Pump(200);
+
+    LabelForge.Core.Starters.StarterLabel shipping = gallery.Cards[0].Starter;
+    d.LoadStarter(shipping);
+    Pump(600);
+    var at203 = shipping.Create(8);
+    Console.WriteLine(
+        $"start from \"{shipping.Name}\": {d.Document.Elements.Count} elements, "
+        + $"{d.Document.WidthMm} x {d.Document.HeightMm} mm at {d.Document.Dpmm} dpmm "
+        + "(expected 101.6 x 152.4 at 12), "
+        + $"file={d.CurrentFilePath ?? "none"} (expected none)");
+    Console.WriteLine(
+        $"  same label, denser dots: 300 dpi X={d.Document.Elements[1].X} vs 203 dpi "
+        + $"X={at203.Elements[1].X} (expected 1.5x), "
+        + $"same millimetres={Math.Abs((d.Document.Elements[1].X / 12.0) - (at203.Elements[1].X / 8.0)) < 0.1} "
+        + "(expected True)");
+    Console.WriteLine(
+        $"  markers have samples: {d.Variables.Count} variables (expected 12), "
+        + $"every one seeded={d.Variables.All(v => v.Sample.Length > 0)} (expected True)");
+
     d.NewDocumentCommand.Execute(null);
     Pump(200);
     d.FieldCatalogs[0].RemoveCommand.Execute(null);
@@ -1710,9 +1756,9 @@ void Pump(int ms)
     }
 }
 
-void Capture(string name)
+void Capture(string name, Window? target = null)
 {
-    var frame = window.CaptureRenderedFrame();
+    var frame = (target ?? window).CaptureRenderedFrame();
     if (frame is null)
     {
         Console.WriteLine($"{name}: CaptureRenderedFrame returned null");

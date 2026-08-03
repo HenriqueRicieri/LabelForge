@@ -1,0 +1,59 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LabelForge.App.ViewModels"
+        x:Class="LabelForge.App.Views.StarterGalleryWindow"
+        x:DataType="vm:StarterGalleryViewModel"
+        Title="Start from a Sample Label"
+        Width="900" Height="740"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppPanelBackground}">
+
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top" Text="Start from a sample label"
+                   FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Opacity="0.65" FontSize="12"
+                   Margin="0,0,0,12"
+                   Text="Each one is a working label on a real stock size, editable from the first click. The fields a data system fills carry ##MARKER## placeholders, and the canvas shows a sample value in each one." />
+
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" Margin="0,12,0,0">
+            <TextBlock Grid.Column="0" Text="{Binding DensityText}" Opacity="0.6" FontSize="11"
+                       VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+            <Button Grid.Column="1" Content="Cancel" Click="OnCancel" IsCancel="True"
+                    Margin="0,0,8,0" />
+            <Button Grid.Column="2" Content="Create Label" Click="OnCreate" IsDefault="True"
+                    Classes="accent" IsEnabled="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </Grid>
+
+        <ListBox ItemsSource="{Binding Cards}" SelectedItem="{Binding Selected}"
+                 DoubleTapped="OnCardDoubleTapped"
+                 Background="Transparent" BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel />
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="vm:StarterCardViewModel">
+                    <StackPanel Width="248" Margin="0,0,4,4">
+                        <!-- White behind the label whatever the app theme: a monochrome
+                             render is black ink on nothing, and on a dark panel that is
+                             black on dark. -->
+                        <Border Background="White" CornerRadius="3" Height="170"
+                                BorderBrush="{DynamicResource AppSeparator}" BorderThickness="1"
+                                Padding="8">
+                            <Image Source="{Binding Preview}" Stretch="Uniform"
+                                   RenderOptions.BitmapInterpolationMode="HighQuality" />
+                        </Border>
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="0,8,0,0"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding SizeText}" Opacity="0.6" FontSize="11"
+                                   Margin="0,1,0,0" />
+                        <TextBlock Text="{Binding Summary}" Opacity="0.75" FontSize="11"
+                                   TextWrapping="Wrap" Margin="0,4,0,0" Height="60" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </DockPanel>
+</Window>

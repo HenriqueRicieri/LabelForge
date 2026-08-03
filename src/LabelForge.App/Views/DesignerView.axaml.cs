@@ -226,6 +226,33 @@ public partial class DesignerView : UserControl
         }
     }
 
+    /// <summary>
+    /// Opens the gallery of starter labels, and starts a new label from whichever was
+    /// picked.
+    ///
+    /// Built at the density the designer is already set to, so the gallery's pictures and
+    /// the label it creates are the same label. No prompt about unsaved work, which is
+    /// what File > New does too: the crash snapshot is what stands behind that, and one
+    /// dialog here and not there would only look like an inconsistency.
+    /// </summary>
+    private async void OnNewFromSample(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        var window = new StarterGalleryWindow
+        {
+            DataContext = new StarterGalleryViewModel(vm.Document.Dpmm),
+        };
+
+        if (await window.ShowDialog<Core.Starters.StarterLabel?>(owner) is { } starter)
+        {
+            vm.LoadStarter(starter);
+        }
+    }
+
     /// <summary>Opens the keyboard and mouse reference. Modal to the window, because it
     /// is something you consult and close rather than work beside.</summary>
     private async void OnShowShortcuts(object? sender, RoutedEventArgs e)

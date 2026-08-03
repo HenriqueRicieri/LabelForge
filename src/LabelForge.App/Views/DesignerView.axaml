@@ -298,7 +298,7 @@
                 <Menu DockPanel.Dock="Left" VerticalAlignment="Center">
                     <MenuItem Header="_File">
                         <MenuItem Header="_New" Command="{Binding NewDocumentCommand}" InputGesture="Ctrl+N" />
-                        <MenuItem Header="New from _Sample" Command="{Binding LoadSampleCommand}" />
+                        <MenuItem Header="New from _Sample..." Click="OnNewFromSample" />
                         <MenuItem Header="_Open..." Click="OnOpenFile" InputGesture="Ctrl+O" />
                         <MenuItem x:Name="RecentMenu" Header="Open _Recent" IsEnabled="{Binding HasRecentFiles}" />
                         <MenuItem Header="_Import ZPL..." Click="OnImportZpl" />

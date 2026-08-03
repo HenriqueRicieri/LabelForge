@@ -1099,13 +1099,19 @@ public partial class DesignerViewModel : ViewModelBase
     private void NewDocument() =>
         LoadDocument(new LabelDocument { WidthMm = 100, HeightMm = 60, Dpmm = 8 }, path: null);
 
-    /// <summary>A demo label showing each element type; reachable from File.</summary>
-    [RelayCommand]
-    private void LoadSample()
+    /// <summary>
+    /// Starts a new label from one of the gallery's starters.
+    ///
+    /// Built at the density already selected rather than at the one the starter was drawn
+    /// against, which is the whole reason a starter is a layout and not a saved document:
+    /// the same design has to be the same size on a 203 and a 600 dpi printer. Everything
+    /// else is an ordinary new document, file path included, so saving asks where.
+    /// </summary>
+    public void LoadStarter(Core.Starters.StarterLabel starter)
     {
-        var doc = new LabelDocument { WidthMm = 100, HeightMm = 60, Dpmm = 8 };
-        SeedSampleLabel(doc);
-        LoadDocument(doc, path: null);
+        ArgumentNullException.ThrowIfNull(starter);
+        LoadDocument(starter.Create(Document.Dpmm), path: null);
+        Notify($"Started from {starter.Name}, {starter.SizeText}");
     }
 
     [RelayCommand]
@@ -2671,23 +2677,4 @@ public partial class DesignerViewModel : ViewModelBase
             _ => "Element",
         };
 
-    private static void SeedSampleLabel(LabelDocument doc)
-    {
-        doc.Elements.Add(new BoxElement
-        {
-            Name = "Border", X = 15, Y = 15, WidthDots = 770, HeightDots = 450, ThicknessDots = 3, ZOrder = 0,
-        });
-        doc.Elements.Add(new TextElement
-        {
-            Name = "Title", X = 50, Y = 50, Text = "LabelForge", FontHeightDots = 60, ZOrder = 1,
-        });
-        doc.Elements.Add(new BarcodeElement
-        {
-            Name = "Barcode", X = 50, Y = 170, Data = "LF-000123", HeightDots = 140, ModuleWidthDots = 3, ZOrder = 2,
-        });
-        doc.Elements.Add(new QrCodeElement
-        {
-            Name = "QR", X = 600, Y = 170, Data = "https://labelforge.app", Magnification = 6, ZOrder = 3,
-        });
-    }
 }
