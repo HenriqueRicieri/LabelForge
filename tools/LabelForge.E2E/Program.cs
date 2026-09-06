@@ -241,6 +241,16 @@ if (mode == "designer")
     var d = vm.Designer;
     Console.WriteLine($"placement warning: '{d.PlacementWarning}' (expect QR outside, will not print)");
     Console.WriteLine($"underlay margin: {d.UnderlayMarginDots} dots (expected 160 at 8 dpmm)");
+
+    // The canvas draws the underlay into a rectangle taken from Bitmap.Size, which is
+    // device-independent pixels, while the label is counted in printer dots. The two are
+    // only the same number while the bitmap says 96 dpi, so this is the contract that
+    // decides whether a dot is a pixel. It survived the switch from a decoded PNG to a
+    // raw pixel buffer because the buffer is built with the same dpi the decoder used;
+    // build it with any other and the label silently changes size on screen.
+    Console.WriteLine(
+        $"underlay is dot for dot: {d.Underlay?.PixelSize} px, {d.Underlay?.Size} dip, "
+        + $"{d.Underlay?.Dpi} dpi (expected equal sizes at 96, 96)");
     Console.WriteLine($"export skips parked QR: {!d.GeneratedZpl.Contains("^BQ")} (expected True)");
 
     var reloaded = LabelForge.Core.Io.LabelDocumentJson.Deserialize(d.SerializeDocument());

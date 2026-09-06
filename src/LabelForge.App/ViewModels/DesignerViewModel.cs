@@ -3,9 +3,12 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LabelForge.Core.Editing;
@@ -1010,6 +1013,49 @@ public partial class DesignerViewModel : ViewModelBase
 
     /// <summary>Serializes the current document in the .lfl format.</summary>
     public string SerializeDocument() => LabelDocumentJson.Serialize(Document);
+
+    /// <summary>
+    /// A render turned into something the canvas can draw, on whatever thread asked. The
+    /// pixel buffer is copied into the bitmap here, so the array is free the moment this
+    /// returns and nothing later holds a pinned reference to it.
+    ///
+    /// 96 dpi is not arbitrary: the canvas sizes the underlay from <c>Bitmap.Size</c>,
+    /// which is device-independent pixels, and the label is counted in printer dots. They
+    /// are the same number only at 96, which is what decoding the PNG used to produce.
+    /// The harness prints both sizes so the day that stops being true is visible.
+    ///
+    /// Null when the render produced no picture, which the caller shows as an empty canvas
+    /// beside whatever the engine said went wrong.
+    /// </summary>
+    private static Bitmap? ToBitmap(RenderResult result)
+    {
+        if (!result.HasImage)
+        {
+            return null;
+        }
+
+        if (result.Pixels is null)
+        {
+            using var stream = new MemoryStream(result.Png);
+            return new Bitmap(stream);
+        }
+
+        GCHandle handle = GCHandle.Alloc(result.Pixels, GCHandleType.Pinned);
+        try
+        {
+            return new Bitmap(
+                PixelFormat.Bgra8888,
+                AlphaFormat.Premul,
+                handle.AddrOfPinnedObject(),
+                new PixelSize(result.PixelWidth, result.PixelHeight),
+                new Vector(96, 96),
+                result.Stride);
+        }
+        finally
+        {
+            handle.Free();
+        }
+    }
 
     /// <summary>Renders the current document to PNG bytes (for export).</summary>
     public Task<byte[]> RenderPngAsync()
@@ -2471,8 +2517,8 @@ public partial class DesignerViewModel : ViewModelBase
             // value it owns, and only the UI thread ever writes the field.
             string? renderedFrom = _renderedFrom;
 
-            (string zpl, RenderResult? result, int marginDots, string placementWarning,
-                    string variableWarning, string renderKey) =
+            (string zpl, RenderResult? result, Bitmap? drawn, int marginDots,
+                    string placementWarning, string variableWarning, string renderKey) =
                 await Task.Run(
                     () =>
                     {
@@ -2520,19 +2566,29 @@ public partial class DesignerViewModel : ViewModelBase
                         // and undoing back to where you were, all land here.
                         if (string.Equals(key, renderedFrom, StringComparison.Ordinal))
                         {
-                            return (generated, (RenderResult?)null, margin,
+                            return (generated, (RenderResult?)null, (Bitmap?)null, margin,
                                 DescribePlacement(offLabel), string.Join(" ", run.Warnings), key);
                         }
 
+                        // Pixels rather than a PNG: encoding one and decoding it again is
+                        // most of a preview frame (tools/LabelForge.Bench) and the canvas
+                        // wants a buffer at the end of it either way. The bitmap is built
+                        // here, on this thread, so the UI thread is handed something ready
+                        // to draw rather than bytes to decode.
                         RenderResult rendered = _renderer.Render(
-                            previewZpl, widthMm + 2 * marginMm, heightMm + 2 * marginMm, dpmm);
-                        return (generated, (RenderResult?)rendered, margin,
+                            previewZpl, widthMm + 2 * marginMm, heightMm + 2 * marginMm, dpmm,
+                            0, RenderOutput.Pixels);
+                        return (generated, (RenderResult?)rendered, ToBitmap(rendered), margin,
                             DescribePlacement(offLabel), string.Join(" ", run.Warnings), key);
                     },
                     cts.Token);
 
             if (cts.IsCancellationRequested)
             {
+                // A newer edit superseded this render while it was running. The bitmap it
+                // built holds unmanaged pixels, so it is dropped explicitly rather than
+                // left for whenever a finalizer gets to it.
+                drawn?.Dispose();
                 return;
             }
 
@@ -2547,17 +2603,11 @@ public partial class DesignerViewModel : ViewModelBase
 
             if (result is not null)
             {
+                // Always a new instance, never an update in place: the render cache is
+                // checked by reference identity, in the harness and here, so reusing one
+                // would make an unchanged picture indistinguishable from a redrawn one.
                 Bitmap? previous = Underlay;
-                if (result.Png.Length > 0)
-                {
-                    using var stream = new MemoryStream(result.Png);
-                    Underlay = new Bitmap(stream);
-                }
-                else
-                {
-                    Underlay = null;
-                }
-
+                Underlay = drawn;
                 previous?.Dispose();
                 _renderedFrom = renderKey;
             }
@@ -2577,7 +2627,7 @@ public partial class DesignerViewModel : ViewModelBase
             var diagnosis = new List<string>(2);
             if (result is not null)
             {
-                if ((result.Errors.Count > 0 || result.Png.Length == 0) && barcodeProblems.Count > 0)
+                if ((result.Errors.Count > 0 || !result.HasImage) && barcodeProblems.Count > 0)
                 {
                     diagnosis.Add(barcodeProblems[0]);
                 }

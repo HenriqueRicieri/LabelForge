@@ -62,8 +62,20 @@ public sealed class LabelaryRenderer : IZplRenderer, IDisposable
     /// thread would freeze the window. Callers already run rendering off it; this one has
     /// to. <see cref="HttpClient.Send(HttpRequestMessage)"/> is a real synchronous send
     /// rather than a blocking wait on an async one, which is what keeps that safe.
+    ///
+    /// PNG whatever is asked for. The service returns an encoded image and nothing else,
+    /// so a pixel request is answered with the picture in the only form there is, and
+    /// <see cref="RenderResult.Pixels"/> stays null to say so. Decoding it here to satisfy
+    /// the letter of the request would hide the network round trip behind a signature that
+    /// promises a cheap buffer.
     /// </summary>
-    public RenderResult Render(string zpl, double widthMm, double heightMm, int dpmm, int labelIndex = 0)
+    public RenderResult Render(
+        string zpl,
+        double widthMm,
+        double heightMm,
+        int dpmm,
+        int labelIndex = 0,
+        RenderOutput output = RenderOutput.Png)
     {
         ArgumentNullException.ThrowIfNull(zpl);
 

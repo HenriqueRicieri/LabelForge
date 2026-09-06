@@ -1,8 +1,5 @@
 using System.Globalization;
-using System.Runtime.InteropServices;
-using BinaryKits.Zpl.Label.Elements;
 using BinaryKits.Zpl.Viewer;
-using BinaryKits.Zpl.Viewer.Models;
 using LabelForge.Bench;
 using LabelForge.Core.Io;
 using LabelForge.Core.Model;
@@ -89,9 +86,16 @@ foreach ((string name, LabelDocument document) in scenarios)
         using SKData data = image.Encode(SKEncodedImageFormat.Png, 100);
     });
 
-    double rawPixels = Measure.Time(() => RawDraw(preview, document));
+    // The path the designer actually takes since H2. The pasteboard variant is the one
+    // every frame becomes the moment a single element sits off the label.
+    double drawPixels = Measure.Time(() => renderer.Render(
+        preview, widthMm, heightMm, dpmm, 0, RenderOutput.Pixels));
+    double drawPixelsPasteboard = Measure.Time(() => renderer.Render(
+        previewPasteboard, widthMm + 2 * marginMm, heightMm + 2 * marginMm, dpmm,
+        0, RenderOutput.Pixels));
 
-    // What a gesture layer costs: the moving element rendered by itself at label size.
+    // What a gesture layer costs: the moving element rendered by itself at label size,
+    // on transparency so it composites over the rest.
     Element? sample = document.Elements.FirstOrDefault(e => e is BarcodeElement)
         ?? document.Elements.FirstOrDefault();
     double oneElement = 0;
@@ -100,7 +104,8 @@ foreach ((string name, LabelDocument document) in scenarios)
         var alone = new LabelDocument { WidthMm = widthMm, HeightMm = heightMm, Dpmm = dpmm };
         alone.Elements.Add(sample);
         string alonePreview = Preview(alone, 0);
-        oneElement = Measure.Time(() => renderer.Render(alonePreview, widthMm, heightMm, dpmm));
+        oneElement = Measure.Time(() => renderer.Render(
+            alonePreview, widthMm, heightMm, dpmm, 0, RenderOutput.TransparentPixels));
     }
 
     frames.Add([
@@ -108,9 +113,10 @@ foreach ((string name, LabelDocument document) in scenarios)
         $"{document.WidthDots}x{document.HeightDots}",
         Measure.Ms(drawPng),
         Measure.Ms(drawPasteboard),
-        Measure.Ms(pngEncode),
-        Measure.Ms(rawPixels),
+        Measure.Ms(drawPixels),
+        Measure.Ms(drawPixelsPasteboard),
         sample is null ? "n/a" : Measure.Ms(oneElement),
+        Measure.Ms(pngEncode),
         Measure.Ms(pngDecode),
     ]);
 
@@ -160,8 +166,9 @@ Console.WriteLine($"Median of {Measure.Runs} runs after warm-up. Build: {Configu
 Console.WriteLine();
 
 Table(
-    ["Label", "Size (dots)", "Draw to PNG", "Draw to PNG, pasteboard", "PNG encode alone",
-        "DrawSurface, raw pixels", "One element alone, PNG", "PNG decode"],
+    ["Label", "Size (dots)", "Draw to PNG", "Draw to PNG, pasteboard", "Draw to pixels",
+        "Draw to pixels, pasteboard", "One element alone, pixels", "PNG encode alone",
+        "PNG decode"],
     frames);
 
 Console.WriteLine();
@@ -196,34 +203,3 @@ static string Configuration() =>
 #else
     "Release";
 #endif
-
-/// <summary>The picture with no PNG on either end: BinaryKits draws into a surface we own
-/// and the pixels are read back out. This is the column H2 turns into an IZplRenderer
-/// output, and the direct call to the drawing library goes away with it.</summary>
-static void RawDraw(string zpl, LabelDocument document)
-{
-    var storage = new PrinterStorage();
-    AnalyzeInfo info = new ZplAnalyzer(storage).Analyze(zpl);
-    ZplElementBase[] elements = info.LabelInfos.Length > 0
-        ? info.LabelInfos[0].ZplElements
-        : [];
-
-    var drawer = new ZplElementDrawer(storage, BinaryKitsRenderer.CreateDefaultOptions());
-    var imageInfo = new SKImageInfo(
-        document.WidthDots, document.HeightDots, SKColorType.Bgra8888, SKAlphaType.Premul);
-
-    using SKSurface surface = SKSurface.Create(imageInfo);
-    surface.Canvas.Clear(SKColors.White);
-    drawer.DrawSurface(surface, elements, document.WidthMm, document.HeightMm, document.Dpmm);
-
-    var pixels = new byte[imageInfo.RowBytes * imageInfo.Height];
-    GCHandle handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
-    try
-    {
-        surface.ReadPixels(imageInfo, handle.AddrOfPinnedObject(), imageInfo.RowBytes, 0, 0);
-    }
-    finally
-    {
-        handle.Free();
-    }
-}

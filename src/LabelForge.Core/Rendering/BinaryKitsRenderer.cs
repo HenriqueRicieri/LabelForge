@@ -1,10 +1,12 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 using LabelForge.Core.Model;
 using LabelForge.Core.Zpl;
 using BinaryKits.Zpl.Label.Elements;
 using BinaryKits.Zpl.Viewer;
 using BinaryKits.Zpl.Viewer.ElementDrawers;
 using BinaryKits.Zpl.Viewer.Models;
+using SkiaSharp;
 
 namespace LabelForge.Core.Rendering;
 
@@ -19,6 +21,11 @@ namespace LabelForge.Core.Rendering;
 ///   they hold mutable ~DG downloaded-graphic state, and construction is cheap.
 /// - Draw is CPU-bound and synchronous. Callers driving a live preview must run it
 ///   off the UI thread (see the App's render pipeline).
+/// - Two ways out, same picture: <see cref="RenderOutput.Png"/> goes through the engine's
+///   own Draw, and the pixel outputs go through its DrawSurface into a surface we own.
+///   DrawSurface clears that surface itself, to transparency, and ignores
+///   <see cref="DrawerOptions.OpaqueBackground"/> (both measured), so a white background
+///   is composited UNDER the finished ink rather than cleared to beforehand.
 /// </summary>
 public sealed class BinaryKitsRenderer : IZplRenderer
 {
@@ -57,7 +64,13 @@ public sealed class BinaryKitsRenderer : IZplRenderer
         return options;
     }
 
-    public RenderResult Render(string zpl, double widthMm, double heightMm, int dpmm, int labelIndex = 0)
+    public RenderResult Render(
+        string zpl,
+        double widthMm,
+        double heightMm,
+        int dpmm,
+        int labelIndex = 0,
+        RenderOutput output = RenderOutput.Png)
     {
         ArgumentNullException.ThrowIfNull(zpl);
 
@@ -69,7 +82,7 @@ public sealed class BinaryKitsRenderer : IZplRenderer
         try
         {
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-            return RenderCore(zpl, widthMm, heightMm, dpmm, labelIndex);
+            return RenderCore(zpl, widthMm, heightMm, dpmm, labelIndex, output);
         }
         finally
         {
@@ -77,7 +90,8 @@ public sealed class BinaryKitsRenderer : IZplRenderer
         }
     }
 
-    private RenderResult RenderCore(string zpl, double widthMm, double heightMm, int dpmm, int labelIndex)
+    private RenderResult RenderCore(
+        string zpl, double widthMm, double heightMm, int dpmm, int labelIndex, RenderOutput output)
     {
         var storage = new PrinterStorage();
         var analyzer = new ZplAnalyzer(storage);
@@ -106,25 +120,118 @@ public sealed class BinaryKitsRenderer : IZplRenderer
 
         var drawer = new ZplElementDrawer(storage, _options);
 
-        // Draw can throw when an element cannot be rendered, most notably when an
+        int widthDots = Units.MmToDots(widthMm, dpmm);
+        int heightDots = Units.MmToDots(heightMm, dpmm);
+
+        // Drawing can throw when an element cannot be rendered, most notably when an
         // Atak template marker (e.g. "##CODIGO_BARRAS##") lands inside a barcode
         // field, because a linear barcode cannot encode non-conforming characters.
         // The viewer must never crash on real input, so we degrade: record the
-        // engine error and return an empty image rather than propagating.
-        byte[] png;
+        // engine error and return an empty image rather than propagating. Both ways
+        // out do it the same way, and the empty image keeps the shape of the output
+        // that was asked for so a caller can still tell which one it got.
+        if (output == RenderOutput.Png)
+        {
+            byte[] png;
+            try
+            {
+                png = drawer.Draw(elements, widthMm, heightMm, dpmm);
+            }
+            catch (Exception ex)
+            {
+                errors.Add(ex.Message);
+                png = Array.Empty<byte>();
+            }
+
+            return new RenderResult(png, widthDots, heightDots, unknownCommands, errors, labelCount);
+        }
+
+        byte[] pixels;
+        int stride;
         try
         {
-            png = drawer.Draw(elements, widthMm, heightMm, dpmm);
+            (pixels, stride) = DrawPixels(
+                drawer, elements, widthMm, heightMm, dpmm, widthDots, heightDots,
+                transparent: output == RenderOutput.TransparentPixels);
         }
         catch (Exception ex)
         {
             errors.Add(ex.Message);
-            png = Array.Empty<byte>();
+            pixels = Array.Empty<byte>();
+            stride = 0;
         }
 
-        int widthDots = Units.MmToDots(widthMm, dpmm);
-        int heightDots = Units.MmToDots(heightMm, dpmm);
+        return new RenderResult(
+            Array.Empty<byte>(), widthDots, heightDots, unknownCommands, errors, labelCount,
+            pixels,
+            stride,
+            pixels.Length > 0 ? widthDots : 0,
+            pixels.Length > 0 ? heightDots : 0);
+    }
 
-        return new RenderResult(png, widthDots, heightDots, unknownCommands, errors, labelCount);
+    /// <summary>
+    /// The same drawing with no PNG on either end: the engine draws into a surface we own
+    /// and the pixels come straight back out. BGRA premultiplied because that is what a
+    /// desktop compositor wants and what Avalonia's raw-pixel bitmap takes.
+    ///
+    /// The background is put on afterwards, and that is not a preference. DrawSurface
+    /// clears the surface it is handed before drawing and ignores
+    /// <see cref="DrawerOptions.OpaqueBackground"/>, so anything cleared in front of it is
+    /// discarded: measured, and the reason this does not simply clear to white. Drawing
+    /// white through DstOver instead puts it under the finished ink, which reproduces the
+    /// encoded render byte for byte (RenderOutputTests). Leaving it off is what a gesture
+    /// layer wants: ink on nothing, compositing over the rest of the label.
+    ///
+    /// A reversed field (^FR) knocks out to what it is drawn over, so over transparency it
+    /// knocks a hole rather than painting white. That is correct for the opaque output,
+    /// where the white is already there, and it is the one thing a transparent layer gets
+    /// wrong while it stands in for the whole label.
+    /// </summary>
+    private static (byte[] Pixels, int Stride) DrawPixels(
+        ZplElementDrawer drawer,
+        ZplElementBase[] elements,
+        double widthMm,
+        double heightMm,
+        int dpmm,
+        int widthDots,
+        int heightDots,
+        bool transparent)
+    {
+        if (widthDots <= 0 || heightDots <= 0)
+        {
+            return (Array.Empty<byte>(), 0);
+        }
+
+        var info = new SKImageInfo(widthDots, heightDots, SKColorType.Bgra8888, SKAlphaType.Premul);
+        using SKSurface? surface = SKSurface.Create(info);
+        if (surface is null)
+        {
+            // Skia refuses a surface it cannot allocate, most plausibly a label so large
+            // the buffer does not fit. Reported like any other render failure.
+            throw new InvalidOperationException(
+                $"Could not allocate a {widthDots} x {heightDots} rendering surface.");
+        }
+
+        drawer.DrawSurface(surface, elements, widthMm, heightMm, dpmm);
+        if (!transparent)
+        {
+            surface.Canvas.DrawColor(SKColors.White, SKBlendMode.DstOver);
+        }
+
+        var pixels = new byte[(long)info.RowBytes * info.Height];
+        GCHandle handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+        try
+        {
+            if (!surface.ReadPixels(info, handle.AddrOfPinnedObject(), info.RowBytes, 0, 0))
+            {
+                throw new InvalidOperationException("Could not read the rendered pixels back.");
+            }
+        }
+        finally
+        {
+            handle.Free();
+        }
+
+        return (pixels, info.RowBytes);
     }
 }
