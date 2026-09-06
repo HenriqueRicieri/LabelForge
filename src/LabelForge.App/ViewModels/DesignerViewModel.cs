@@ -34,6 +34,10 @@ public partial class DesignerViewModel : ViewModelBase
 
     private readonly IZplRenderer _renderer = new BinaryKitsRenderer();
     private readonly TemplateSubstitutor _substitutor = new();
+
+    /// <summary>One render at a time, and the one waiting is always the newest. Built in
+    /// the constructor because it needs an instance method to call.</summary>
+    private readonly RenderQueue<RenderRequest, RenderPass> _renderQueue;
     private readonly Core.Media.UserMediaStore _userMediaStore;
     private readonly Core.Fields.FieldCatalogStore _fieldCatalogStore;
     private readonly RecoveryStore _recovery;
@@ -854,6 +858,7 @@ public partial class DesignerViewModel : ViewModelBase
         Core.Fields.FieldCatalogStore? fieldCatalogStore = null,
         RecoveryStore? recoveryStore = null)
     {
+        _renderQueue = new RenderQueue<RenderRequest, RenderPass>(Render);
         _userMediaStore = userMediaStore ?? new Core.Media.UserMediaStore();
         _fieldCatalogStore = fieldCatalogStore ?? new Core.Fields.FieldCatalogStore();
         _recovery = recoveryStore ?? new RecoveryStore();
@@ -987,11 +992,13 @@ public partial class DesignerViewModel : ViewModelBase
 
     /// <summary>Called continuously while the canvas drags or resizes: the model is
     /// already updated, so re-render and refresh the panel, but record no undo.
-    /// Uses a much shorter debounce than typing so content tracks the pointer.</summary>
+    /// No delay at all, unlike typing: a pointer position is not going to be revised a
+    /// moment later the way a half-typed word is, and the render queue is what stops the
+    /// requests piling up. Waiting a fixed 40 ms only ever made the picture 40 ms older.</summary>
     public void NotifyDocumentPreview()
     {
         SelectionProperties?.Refresh();
-        ScheduleRender(delayMs: 40);
+        ScheduleRender(delayMs: 0);
     }
 
     private void OnSelectionChanged()
@@ -2488,6 +2495,102 @@ public partial class DesignerViewModel : ViewModelBase
         _restoring = restoring;
     }
 
+    /// <summary>Everything one render pass needs, captured on the UI thread before it is
+    /// handed over. The document is passed rather than read from the property so a pass
+    /// cannot see a swap that happened while it queued.</summary>
+    /// <param name="RenderedFrom">What the bitmap currently on screen was rendered from,
+    /// for the cache check. Only the UI thread writes it, so a pass compares against the
+    /// value it was given.</param>
+    private sealed record RenderRequest(LabelDocument Document, DateTime Now, string? RenderedFrom);
+
+    /// <summary>What one render pass produced. <c>Result</c> and <c>Drawn</c> are null
+    /// when the cache said the picture on screen is already the answer.</summary>
+    private sealed record RenderPass(
+        string Zpl,
+        RenderResult? Result,
+        Bitmap? Drawn,
+        int MarginDots,
+        string PlacementWarning,
+        string VariableWarning,
+        string RenderKey);
+
+    /// <summary>
+    /// One pass: generate, classify, render, and turn the pixels into a bitmap. Runs on a
+    /// thread pool thread through the queue, never on the UI thread and never beside
+    /// another copy of itself.
+    ///
+    /// The token is deliberately not observed. Nothing in the engine's draw loop can be
+    /// interrupted, so checking it would only mean throwing away a picture that has
+    /// already been paid for; the queue's job is to not START work, not to abandon it.
+    /// </summary>
+    private RenderPass Render(RenderRequest request, CancellationToken token)
+    {
+        LabelDocument document = request.Document;
+        double widthMm = document.WidthMm;
+        double heightMm = document.HeightMm;
+        int dpmm = document.Dpmm;
+        DateTime now = request.Now;
+
+        // A generator instance carries the state of one pass, so never share one.
+        var generator = new ZplGenerator();
+        string generated = generator.Generate(document, new GenerationContext { Now = now });
+        GenerationInfo run = generator.LastRun;
+
+        var bounds = new ElementBoundsCalculator();
+        var offLabel = document.Elements
+            .Where(e => e.IsVisible)
+            .Select(e => (Element: e, Status: ElementPlacement.Classify(
+                e, bounds.GetBounds(e), document)))
+            .Where(t => t.Status != PlacementStatus.Inside)
+            .ToList();
+
+        // Only pay for the expanded pasteboard render when something actually sits off
+        // the label.
+        int margin = offLabel.Count > 0
+            ? Units.MmToDots(ElementPlacement.PasteboardMarginMm, dpmm)
+            : 0;
+        double marginMm = Units.DotsToMm(margin, dpmm);
+
+        // Always the preview variant, even at margin 0: it keeps job settings and
+        // printer-side clock codes out of the render, which the offline engine would
+        // report as unknown commands or draw literally instead of as a date.
+        string previewZpl = new ZplGenerator().GeneratePreview(document, margin);
+
+        // The preview resolves every marker to something renderable: the user's sample,
+        // the counter's first value, or the current date. Exported and printed ZPL keeps
+        // external markers literal.
+        previewZpl = _substitutor.Substitute(
+            previewZpl, inner => VariableValues.ForPreview(document, inner, now));
+
+        // Everything the drawn bitmap depends on. A clock variable makes this differ
+        // whenever its formatted value does, which is exactly when the picture would
+        // change, so it needs no special case.
+        string key = FormattableString.Invariant(
+            $"{widthMm}x{heightMm}@{dpmm}+{margin}|{previewZpl}");
+
+        // Nothing that reaches the renderer has changed, so the bitmap on screen is
+        // already the answer. Naming and locking an element, and undoing back to where
+        // you were, all land here.
+        if (string.Equals(key, request.RenderedFrom, StringComparison.Ordinal))
+        {
+            return new RenderPass(
+                generated, null, null, margin,
+                DescribePlacement(offLabel), string.Join(" ", run.Warnings), key);
+        }
+
+        // Pixels rather than a PNG: encoding one and decoding it again is most of a
+        // preview frame (tools/LabelForge.Bench) and the canvas wants a buffer at the end
+        // of it either way. The bitmap is built here, on this thread, so the UI thread is
+        // handed something ready to draw rather than bytes to decode.
+        RenderResult rendered = _renderer.Render(
+            previewZpl, widthMm + 2 * marginMm, heightMm + 2 * marginMm, dpmm,
+            0, RenderOutput.Pixels);
+
+        return new RenderPass(
+            generated, rendered, ToBitmap(rendered), margin,
+            DescribePlacement(offLabel), string.Join(" ", run.Warnings), key);
+    }
+
     private async void ScheduleRender(int delayMs = 150)
     {
         if (Document.IsContinuous)
@@ -2502,95 +2605,45 @@ public partial class DesignerViewModel : ViewModelBase
 
         try
         {
-            await Task.Delay(delayMs, cts.Token);
+            // The wait before asking, which is a different thing from what happens after.
+            // Typing pauses so a half-typed word is not rendered letter by letter; a
+            // gesture does not, because a pointer position is never revised.
+            if (delayMs > 0)
+            {
+                await Task.Delay(delayMs, cts.Token);
+            }
 
             LabelDocument document = Document;
-            double widthMm = document.WidthMm;
-            double heightMm = document.HeightMm;
-            int dpmm = document.Dpmm;
 
             // One timestamp for the whole pass so the ZPL pane and the canvas agree on
-            // what a date variable currently reads.
-            DateTime now = DateTime.Now;
+            // what a date variable currently reads. Captured with the document, and
+            // _renderedFrom with it, so the work compares against values it owns and only
+            // the UI thread ever writes the field.
+            RenderPass? pass = await _renderQueue.RequestAsync(
+                new RenderRequest(document, DateTime.Now, _renderedFrom), cts.Token);
 
-            // Captured before the work starts so the background task compares against a
-            // value it owns, and only the UI thread ever writes the field.
-            string? renderedFrom = _renderedFrom;
-
-            (string zpl, RenderResult? result, Bitmap? drawn, int marginDots,
-                    string placementWarning, string variableWarning, string renderKey) =
-                await Task.Run(
-                    () =>
-                    {
-                        // A generator instance carries the state of one pass, and a
-                        // superseded render can still be in flight, so never share one.
-                        var generator = new ZplGenerator();
-                        string generated = generator.Generate(
-                            document, new GenerationContext { Now = now });
-                        GenerationInfo run = generator.LastRun;
-
-                        var bounds = new ElementBoundsCalculator();
-                        var offLabel = document.Elements
-                            .Where(e => e.IsVisible)
-                            .Select(e => (Element: e, Status: ElementPlacement.Classify(
-                                e, bounds.GetBounds(e), document)))
-                            .Where(t => t.Status != PlacementStatus.Inside)
-                            .ToList();
-
-                        // Only pay for the expanded pasteboard render when something
-                        // actually sits off the label.
-                        int margin = offLabel.Count > 0
-                            ? Units.MmToDots(ElementPlacement.PasteboardMarginMm, dpmm)
-                            : 0;
-                        double marginMm = Units.DotsToMm(margin, dpmm);
-
-                        // Always the preview variant, even at margin 0: it keeps job
-                        // settings and printer-side clock codes out of the render, which
-                        // the offline engine would report as unknown commands or draw
-                        // literally instead of as a date.
-                        string previewZpl = new ZplGenerator().GeneratePreview(document, margin);
-
-                        // The preview resolves every marker to something renderable: the
-                        // user's sample, the counter's first value, or the current date.
-                        // Exported and printed ZPL keeps external markers literal.
-                        previewZpl = _substitutor.Substitute(
-                            previewZpl, inner => VariableValues.ForPreview(document, inner, now));
-                        // Everything the drawn bitmap depends on. A clock variable makes
-                        // this differ whenever its formatted value does, which is exactly
-                        // when the picture would change, so it needs no special case.
-                        string key = FormattableString.Invariant(
-                            $"{widthMm}x{heightMm}@{dpmm}+{margin}|{previewZpl}");
-
-                        // Nothing that reaches the renderer has changed, so the bitmap on
-                        // screen is already the answer. Naming and locking an element,
-                        // and undoing back to where you were, all land here.
-                        if (string.Equals(key, renderedFrom, StringComparison.Ordinal))
-                        {
-                            return (generated, (RenderResult?)null, (Bitmap?)null, margin,
-                                DescribePlacement(offLabel), string.Join(" ", run.Warnings), key);
-                        }
-
-                        // Pixels rather than a PNG: encoding one and decoding it again is
-                        // most of a preview frame (tools/LabelForge.Bench) and the canvas
-                        // wants a buffer at the end of it either way. The bitmap is built
-                        // here, on this thread, so the UI thread is handed something ready
-                        // to draw rather than bytes to decode.
-                        RenderResult rendered = _renderer.Render(
-                            previewZpl, widthMm + 2 * marginMm, heightMm + 2 * marginMm, dpmm,
-                            0, RenderOutput.Pixels);
-                        return (generated, (RenderResult?)rendered, ToBitmap(rendered), margin,
-                            DescribePlacement(offLabel), string.Join(" ", run.Warnings), key);
-                    },
-                    cts.Token);
-
-            if (cts.IsCancellationRequested)
+            // Null means this request never ran: something newer replaced it while it
+            // waited its turn, or the document it was for has been swapped out. There is
+            // nothing to show and a newer render is already on its way.
+            if (pass is null)
             {
-                // A newer edit superseded this render while it was running. The bitmap it
-                // built holds unmanaged pixels, so it is dropped explicitly rather than
-                // left for whenever a finalizer gets to it.
-                drawn?.Dispose();
                 return;
             }
+
+            // A render that DID run is shown, even though something newer may already be
+            // queued behind it. That is the point of the queue: the picture on screen is
+            // never more than one render old. The only thing worth throwing away is a
+            // render of a document that is no longer open.
+            if (!ReferenceEquals(document, Document))
+            {
+                // The bitmap holds unmanaged pixels, so it goes now rather than whenever
+                // a finalizer gets to it.
+                pass.Drawn?.Dispose();
+                return;
+            }
+
+            (string zpl, RenderResult? result, Bitmap? drawn, int marginDots,
+                    string placementWarning, string variableWarning, string renderKey) = pass;
 
             GeneratedZpl = zpl;
             CanvasRevision++;

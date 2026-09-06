@@ -187,6 +187,19 @@ Table(
         };
     })]);
 
+foreach (int interval in DragBench.PointerIntervalsMs)
+{
+    Console.WriteLine();
+    Console.WriteLine($"A two second drag, a pointer position every {interval} ms, "
+        + "the element moved each time. Same pixel render both sides; only the scheduling differs.");
+    Console.WriteLine();
+
+    Table(
+        ["Label", "Frames shown, before H3", "Frames shown, with the queue",
+            "Renders started, before / after", "Renders at once, before / after"],
+        DragBench.Run(scenarios, interval));
+}
+
 static void Table(string[] header, List<string[]> rows)
 {
     Console.WriteLine("| " + string.Join(" | ", header) + " |");
