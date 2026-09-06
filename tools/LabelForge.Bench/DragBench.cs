@@ -22,10 +22,19 @@ namespace LabelForge.Bench;
 ///
 /// Two pointer intervals, because the old scheme failed in two different ways. Below its
 /// debounce every request cancelled the one before it and no render ever started, so the
-/// canvas simply stopped following until the hand paused. Above it, renders started faster
-/// than they finished and several ran at once, each slower for the company. Only the
-/// scheduling differs between the columns; both draw through the same pixel path, so what
-/// is measured here is H3 and not H2.
+/// canvas stopped following until the hand paused. Above it a render started, finished, and
+/// was thrown away because a newer request had arrived meanwhile. Only the scheduling
+/// differs between the columns; both draw through the same pixel path, so what is measured
+/// here is H3 and not H2.
+///
+/// Read the "before" column as a worst case rather than as a description of the app people
+/// used. This drives a position at a fixed interval and never pauses, and a real hand pauses
+/// constantly: those pauses are what let the old debounce expire and some frames land, which
+/// is what CANVAS-PLAN.md measured as the content trailing the pointer by two to four
+/// positions rather than stopping altogether. The 311.zpl row at 50 ms shows the same thing
+/// from the other side - a 13 ms render fits inside the tick, so the old scheme showed
+/// nearly every frame of it. What the columns establish is that the old scheme's output
+/// depended on the label and on how the hand happened to move, and the queue's does not.
 /// </summary>
 internal static class DragBench
 {
