@@ -23,8 +23,10 @@ namespace LabelForge.App.ViewModels;
 /// <summary>
 /// The visual designer. The LabelDocument is the source of truth: the canvas and the
 /// properties panel edit it, the ZPL generator turns it into code, and the offline
-/// renderer turns that code into the canvas underlay (WYSIWYG rule). Rendering is
-/// debounced, background, latest-wins, mirroring the viewer pipeline.
+/// renderer turns that code into the canvas underlay (WYSIWYG rule). Rendering runs on a
+/// background thread through <see cref="RenderQueue{TRequest,TResult}"/>: one at a time,
+/// the newest request waiting, and whatever finished is shown. Typing waits before asking;
+/// a gesture does not.
 /// Undo/redo is snapshot-based: every committed edit records the serialized document
 /// (the same JSON as the .lfl file format); bursts of small edits coalesce into one step.
 /// </summary>
