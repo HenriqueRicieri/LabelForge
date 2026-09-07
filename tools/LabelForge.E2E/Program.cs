@@ -1210,16 +1210,94 @@ if (mode == "designer")
     Console.WriteLine(
         $"ctrl click in place removes it: {d.Selection.Count} selected (expected 1)");
 
+    // Crossing the threshold means the press was a grab, so the toggle never happens. What
+    // the grab then does is H11's business (it duplicates), and is checked below; all this
+    // asks is that nothing left the selection.
     SelectBoth();
-    int secondX = d.Document.Elements[1].X;
     window.MouseDown(ctrlOn, MouseButton.Left, RawInputModifiers.Control);
     window.MouseMove(new Avalonia.Point(ctrlOn.X + 30, ctrlOn.Y), RawInputModifiers.Control);
     window.MouseUp(new Avalonia.Point(ctrlOn.X + 30, ctrlOn.Y), MouseButton.Left, RawInputModifiers.Control);
     Pump(700);
     Console.WriteLine(
-        $"ctrl drag keeps the selection: {d.Selection.Count} selected (expected 2), "
-        + $"and moved it: {d.Document.Elements[1].X != secondX} (expected True)");
+        $"ctrl drag does not toggle: {d.Selection.Count} selected (expected 2)");
 
+    d.UndoCommand.Execute(null);
+    Pump(700);
+
+    // Shift locks a move to whichever axis the pointer commits to. Dragged 60 px right
+    // and 12 down, the vertical part is dropped.
+    var locked = d.Document.Elements[^1];
+    d.Selection.Set(locked);
+    d.NotifyDocumentEdited();
+    Pump(700);
+    int lockStartX = locked.X;
+    int lockStartY = locked.Y;
+    var lockFrom = canvas.TranslatePoint(canvas.DotsToView(locked.X + 40, locked.Y + 30), window)!.Value;
+    window.MouseDown(lockFrom, MouseButton.Left);
+    window.MouseMove(new Avalonia.Point(lockFrom.X + 60, lockFrom.Y + 12), RawInputModifiers.Shift);
+    window.MouseUp(new Avalonia.Point(lockFrom.X + 60, lockFrom.Y + 12), MouseButton.Left, RawInputModifiers.Shift);
+    Pump(700);
+    Console.WriteLine(
+        $"shift drag locks to one axis: moved x by {locked.X - lockStartX}, "
+        + $"y by {locked.Y - lockStartY} (expected a change in x and 0 in y)");
+
+    // Ctrl held across the threshold copies instead of moving: the count goes up, the
+    // original stays where it was, and the copies are what is selected.
+    int beforeDuplicate = d.Document.Elements.Count;
+    var original = locked;
+    int originalX = original.X;
+    var dupFrom = canvas.TranslatePoint(canvas.DotsToView(original.X + 40, original.Y + 30), window)!.Value;
+    d.Selection.Set(original);
+    Pump(200);
+    window.MouseDown(dupFrom, MouseButton.Left, RawInputModifiers.Control);
+    window.MouseMove(new Avalonia.Point(dupFrom.X + 40, dupFrom.Y), RawInputModifiers.Control);
+    window.MouseUp(new Avalonia.Point(dupFrom.X + 40, dupFrom.Y), MouseButton.Left, RawInputModifiers.Control);
+    Pump(700);
+    Console.WriteLine(
+        $"ctrl drag duplicates: {beforeDuplicate} -> {d.Document.Elements.Count} elements "
+        + $"(expected {beforeDuplicate + 1}), original left at {original.X} (expected {originalX}), "
+        + $"the copy is selected: {d.Selection.Count == 1 && !d.Selection.Contains(original)} (expected True)");
+
+    // And one undo step covers the copy and the move together.
+    d.UndoCommand.Execute(null);
+    Pump(700);
+    Console.WriteLine(
+        $"one undo takes the copy back out: {d.Document.Elements.Count} elements "
+        + $"(expected {beforeDuplicate})");
+
+    // Alt-click walks down the stack instead of picking the top one again. Two boxes are
+    // parked on the same spot so there is a stack to walk.
+    var lower = new LabelForge.Core.Model.BoxElement
+    {
+        X = 600, Y = 300, WidthDots = 140, HeightDots = 100, ThicknessDots = 3, ZOrder = 90,
+    };
+    var upper = new LabelForge.Core.Model.BoxElement
+    {
+        X = 600, Y = 300, WidthDots = 140, HeightDots = 100, ThicknessDots = 3, ZOrder = 91,
+    };
+    d.Document.Elements.Add(lower);
+    d.Document.Elements.Add(upper);
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    var stacked = canvas.TranslatePoint(canvas.DotsToView(660, 340), window)!.Value;
+    window.MouseDown(stacked, MouseButton.Left);
+    window.MouseUp(stacked, MouseButton.Left);
+    Pump(300);
+    bool topFirst = ReferenceEquals(d.Selection.Primary, upper);
+    window.MouseDown(stacked, MouseButton.Left, RawInputModifiers.Alt);
+    window.MouseUp(stacked, MouseButton.Left, RawInputModifiers.Alt);
+    Pump(300);
+    bool thenBelow = ReferenceEquals(d.Selection.Primary, lower);
+    window.MouseDown(stacked, MouseButton.Left, RawInputModifiers.Alt);
+    window.MouseUp(stacked, MouseButton.Left, RawInputModifiers.Alt);
+    Pump(300);
+    Console.WriteLine(
+        $"alt click selects through: top first={topFirst}, then the one under it={thenBelow}, "
+        + $"then wraps={ReferenceEquals(d.Selection.Primary, upper)} (expected True, True, True)");
+
+    d.Document.Elements.Remove(lower);
+    d.Document.Elements.Remove(upper);
     d.Document.Elements.Remove(second);
     d.NotifyDocumentEdited();
     d.GridPitchMm = 0;

@@ -163,6 +163,18 @@ public sealed class DesignerCanvas : Control
     private Element? _pressHit;
     private Element? _pressPendingToggle;
 
+    // Shift locks a move to one axis. Decided once the pointer has committed to a
+    // direction and kept until the other axis clearly wins, so a drag along a lock does
+    // not flicker between the two near the diagonal.
+    private bool _axisLockX;
+    private bool _axisLockY;
+
+    // Set when the drag in progress created the elements it is moving, so the release
+    // records a step even if the pointer came back to where it started: the copies are
+    // the change, whether or not they ended up somewhere new.
+    private bool _duplicated;
+
+
     // Group drag.
     private bool _dragging;
     private Point _dragStartDots;
@@ -246,6 +258,10 @@ public sealed class DesignerCanvas : Control
     /// zoom and less than one at 25, so a click would be impossible at one end and
     /// unavoidable at the other. Four is what a hand holds still to.</summary>
     private const double DragThresholdPx = 4;
+
+    /// <summary>How far one axis has to lead the other before a shifted drag commits to
+    /// it. Without a margin the choice flips back and forth near the diagonal.</summary>
+    private const double AxisLockLeadPx = 3;
 
     public DesignerCanvas()
     {
@@ -1281,6 +1297,27 @@ public sealed class DesignerCanvas : Control
         bool additive = e.KeyModifiers.HasFlag(KeyModifiers.Control) ||
                         e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
+        // Alt picks the next element DOWN from the one selected, at the same point, and
+        // wraps at the bottom. On the dense labels this is written for, the thing you want
+        // is often under two others and there is no other way to reach it on the canvas.
+        // Alt is already "no snapping" on a drag; the two never collide, because that one
+        // needs movement and this one is over before any happens.
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !additive)
+        {
+            List<Element> stack = ElementsAt(doc, dotX, dotY);
+            if (stack.Count > 0)
+            {
+                // Step one below whatever is selected, wrapping at the bottom. The
+                // selection is the whole state this needs: no remembered point, no
+                // remembered index, and clicking a different stack starts at its top
+                // because nothing selected is in it.
+                int current = selection.Primary is { } chosen ? stack.IndexOf(chosen) : -1;
+                selection.Set(stack[current >= 0 ? (current + 1) % stack.Count : 0]);
+                InvalidateVisual();
+                return;
+            }
+        }
+
         Element? hit = ElementAt(doc, dotX, dotY);
 
         if (hit is null)
@@ -1342,10 +1379,39 @@ public sealed class DesignerCanvas : Control
     /// <summary>The press turned out to be a grab: set up the drag it was always going to
     /// be. Separated from the press so everything here happens once the pointer has
     /// travelled, on the state the selection is in by then.</summary>
-    private void PromoteToDrag(LabelDocument doc, SelectionSet selection, double dotX, double dotY)
+    /// <param name="duplicate">Ctrl was held as the pointer crossed the threshold, so the
+    /// originals stay where they are and copies of them are what moves.</param>
+    private void PromoteToDrag(
+        LabelDocument doc, SelectionSet selection, double dotX, double dotY, bool duplicate)
     {
         _pressArmed = false;
         _pressPendingToggle = null;
+        _axisLockX = false;
+        _axisLockY = false;
+
+        // Ctrl held across the threshold copies instead of moving. What gets copied is the
+        // whole selection when the pressed element was part of it, and that element alone
+        // otherwise, which is what pressing on something outside the selection meant.
+        // The copies become the selection, so the drag below moves them, the originals are
+        // left behind, and the one undo step recorded on release covers both.
+        if (duplicate && _pressHit is { } pressed)
+        {
+            IEnumerable<Element> source = selection.Contains(pressed)
+                ? selection.Items.Where(el => !el.IsLocked)
+                : [pressed];
+
+            List<Element> clones = ElementDuplicator.Clone(doc, source);
+            if (clones.Count > 0)
+            {
+                foreach (Element clone in clones)
+                {
+                    doc.Elements.Add(clone);
+                }
+
+                selection.SetMany(clones);
+                _duplicated = true;
+            }
+        }
 
         // Drag the whole (unlocked part of the) selection together.
         _dragItems.Clear();
@@ -1461,6 +1527,12 @@ public sealed class DesignerCanvas : Control
             .Where(el => el.IsVisible)
             .OrderByDescending(el => el.ZOrder)
             .FirstOrDefault(el => _bounds.GetBounds(el).Contains((int)dotX, (int)dotY));
+
+    /// <summary>Everything under the point, front to back. What Alt-click walks down.</summary>
+    private List<Element> ElementsAt(LabelDocument doc, double dotX, double dotY) =>
+        [.. doc.Elements
+            .Where(el => el.IsVisible && _bounds.GetBounds(el).Contains((int)dotX, (int)dotY))
+            .OrderByDescending(el => el.ZOrder)];
 
     /// <summary>Right-click on a ruler: insert a guide at the pointer (rounded to the
     /// nearest whole millimeter) or clear all guides.</summary>
@@ -1592,7 +1664,8 @@ public sealed class DesignerCanvas : Control
                 pressDoc,
                 pressSelection,
                 (_pressPoint.X - pressOrigin.X) / pressScale,
-                (_pressPoint.Y - pressOrigin.Y) / pressScale);
+                (_pressPoint.Y - pressOrigin.Y) / pressScale,
+                duplicate: e.KeyModifiers.HasFlag(KeyModifiers.Control));
 
             if (!_dragging)
             {
@@ -1648,7 +1721,11 @@ public sealed class DesignerCanvas : Control
 
         if (_resizing)
         {
-            ComputeGestureRect(dotX, dotY);
+            ComputeGestureRect(
+                dotX,
+                dotY,
+                aboutCenter: e.KeyModifiers.HasFlag(KeyModifiers.Control),
+                freeCorner: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
             _snapX = null;
             _snapY = null;
             if (!e.KeyModifiers.HasFlag(KeyModifiers.Alt))
@@ -1664,6 +1741,41 @@ public sealed class DesignerCanvas : Control
         {
             int dx = (int)Math.Round(dotX - _dragStartDots.X);
             int dy = (int)Math.Round(dotY - _dragStartDots.Y);
+
+            // Shift keeps the move on one axis. Which axis is decided by whichever the
+            // pointer has committed to and then kept, rather than recomputed every frame:
+            // near the diagonal the two are within a pixel of each other and a per-frame
+            // choice flickers between them. The lock only changes when the other axis wins
+            // by a clear margin, and it is released the moment Shift is.
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                int lead = Math.Max(
+                    (int)Math.Round(AxisLockLeadPx / scale), 1);
+                if (Math.Abs(dx) > Math.Abs(dy) + lead)
+                {
+                    _axisLockX = true;
+                    _axisLockY = false;
+                }
+                else if (Math.Abs(dy) > Math.Abs(dx) + lead)
+                {
+                    _axisLockY = true;
+                    _axisLockX = false;
+                }
+
+                if (_axisLockX)
+                {
+                    dy = 0;
+                }
+                else if (_axisLockY)
+                {
+                    dx = 0;
+                }
+            }
+            else
+            {
+                _axisLockX = false;
+                _axisLockY = false;
+            }
 
             // Snap the moved selection to the targets collected at drag start (guides,
             // label edges and center, other elements); Alt drags free. Snap first,
@@ -1752,7 +1864,14 @@ public sealed class DesignerCanvas : Control
     /// <summary>The pointer-true gesture rect: the dragged edge or corner follows the
     /// pointer exactly, the opposite side stays anchored, and corners scale both axes
     /// by the smooth distance ratio from the anchor (no dominant-axis flip-flopping).</summary>
-    private void ComputeGestureRect(double dotX, double dotY)
+    /// <param name="aboutCenter">Ctrl: the element grows from its middle, both sides at
+    /// once, instead of pinning the opposite edge. Photoshop puts this on Alt; Alt here
+    /// already means ignore snapping and keeps meaning it.</param>
+    /// <param name="freeCorner">Shift on a corner: let the two axes go their own way.
+    /// Corners are proportional by default here, so Shift is the escape from that rather
+    /// than the way into it, which is the opposite of most tools and follows from the
+    /// default. Edge handles are one axis already and ignore it.</param>
+    private void ComputeGestureRect(double dotX, double dotY, bool aboutCenter, bool freeCorner)
     {
         double startX = _resizeStartBounds.X;
         double startY = _resizeStartBounds.Y;
@@ -1760,6 +1879,8 @@ public sealed class DesignerCanvas : Control
         double startH = Math.Max(_resizeStartBounds.Height, 1);
         double right = startX + startW;
         double bottom = startY + startH;
+        double midX = startX + startW / 2;
+        double midY = startY + startH / 2;
 
         bool left = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Left or ResizeHandle.BottomLeft;
         bool top = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Top or ResizeHandle.TopRight;
@@ -1767,31 +1888,84 @@ public sealed class DesignerCanvas : Control
         switch (_activeHandle)
         {
             case ResizeHandle.Left:
-                _gestureW = Math.Max(right - dotX, 4);
-                _gestureX = right - _gestureW;
-                break;
-
             case ResizeHandle.Right:
-                _gestureW = Math.Max(dotX - startX, 4);
+            {
+                if (aboutCenter)
+                {
+                    // Half the new width is the pointer's distance from the middle, so the
+                    // far edge moves out by whatever the near one moved in.
+                    _gestureW = Math.Max(Math.Abs(dotX - midX) * 2, 4);
+                    _gestureX = midX - _gestureW / 2;
+                    break;
+                }
+
+                if (left)
+                {
+                    _gestureW = Math.Max(right - dotX, 4);
+                    _gestureX = right - _gestureW;
+                }
+                else
+                {
+                    _gestureW = Math.Max(dotX - startX, 4);
+                }
+
                 break;
+            }
 
             case ResizeHandle.Top:
-                _gestureH = Math.Max(bottom - dotY, 4);
-                _gestureY = bottom - _gestureH;
-                break;
-
             case ResizeHandle.Bottom:
-                _gestureH = Math.Max(dotY - startY, 4);
+            {
+                if (aboutCenter)
+                {
+                    _gestureH = Math.Max(Math.Abs(dotY - midY) * 2, 4);
+                    _gestureY = midY - _gestureH / 2;
+                    break;
+                }
+
+                if (top)
+                {
+                    _gestureH = Math.Max(bottom - dotY, 4);
+                    _gestureY = bottom - _gestureH;
+                }
+                else
+                {
+                    _gestureH = Math.Max(dotY - startY, 4);
+                }
+
                 break;
+            }
 
             default:
             {
-                // Corner: proportional scale by the distance ratio anchor -> pointer
-                // over anchor -> original corner. Smooth and monotonic under the cursor.
-                double anchorX = left ? right : startX;
-                double anchorY = top ? bottom : startY;
+                // Corner. The anchor is the opposite corner, or the middle when Ctrl says
+                // to grow both ways; either way the shape scales by the distance ratio
+                // anchor -> pointer over anchor -> original corner, which is smooth and
+                // monotonic under the cursor. Shift drops the ratio and lets each axis
+                // follow the pointer on its own.
+                double anchorX = aboutCenter ? midX : left ? right : startX;
+                double anchorY = aboutCenter ? midY : top ? bottom : startY;
                 double cornerX = left ? startX : right;
                 double cornerY = top ? startY : bottom;
+
+                if (freeCorner)
+                {
+                    if (aboutCenter)
+                    {
+                        _gestureW = Math.Max(Math.Abs(dotX - midX) * 2, 4);
+                        _gestureH = Math.Max(Math.Abs(dotY - midY) * 2, 4);
+                        _gestureX = midX - _gestureW / 2;
+                        _gestureY = midY - _gestureH / 2;
+                    }
+                    else
+                    {
+                        _gestureW = Math.Max(Math.Abs(dotX - anchorX), 4);
+                        _gestureH = Math.Max(Math.Abs(dotY - anchorY), 4);
+                        _gestureX = left ? anchorX - _gestureW : anchorX;
+                        _gestureY = top ? anchorY - _gestureH : anchorY;
+                    }
+
+                    break;
+                }
 
                 double startDist = Math.Max(
                     Math.Sqrt(Math.Pow(cornerX - anchorX, 2) + Math.Pow(cornerY - anchorY, 2)), 1);
@@ -1801,8 +1975,18 @@ public sealed class DesignerCanvas : Control
 
                 _gestureW = Math.Max(startW * factor, 4);
                 _gestureH = Math.Max(startH * factor, 4);
-                _gestureX = left ? anchorX - _gestureW : anchorX;
-                _gestureY = top ? anchorY - _gestureH : anchorY;
+
+                if (aboutCenter)
+                {
+                    _gestureX = midX - _gestureW / 2;
+                    _gestureY = midY - _gestureH / 2;
+                }
+                else
+                {
+                    _gestureX = left ? anchorX - _gestureW : anchorX;
+                    _gestureY = top ? anchorY - _gestureH : anchorY;
+                }
+
                 break;
             }
         }
@@ -2100,11 +2284,16 @@ public sealed class DesignerCanvas : Control
 
         // The model was updated live during the gesture; the release only decides
         // whether an undo step should be recorded.
+        // A duplicating drag changed the document the moment it made the copies, so it
+        // records a step whether or not the pointer ended up anywhere new.
         bool changed = wasResizing
             ? _candidateWidth != _resizeStartBounds.Width ||
               _candidateHeight != _resizeStartBounds.Height ||
               Selection?.Primary is { } r && (r.X != _resizeStartX || r.Y != _resizeStartY)
-            : _dragDx != 0 || _dragDy != 0;
+            : _duplicated || _dragDx != 0 || _dragDy != 0;
+        _duplicated = false;
+        _axisLockX = false;
+        _axisLockY = false;
         if (changed)
         {
             DocumentEdited?.Invoke(this, EventArgs.Empty);
