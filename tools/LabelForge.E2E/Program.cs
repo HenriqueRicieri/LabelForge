@@ -1594,6 +1594,47 @@ if (mode == "designer")
         + $"z-orders {string.Join(",", d.Document.Elements.Select(el => el.ZOrder).OrderBy(z => z))} "
         + $"(expected {zBefore})");
 
+    // Cut is a copy and a delete, and it has to be ONE undo step: the copy records nothing,
+    // because a clipboard is not part of the document.
+    d.Selection.Set(tabMiddle);
+    Pump(200);
+    int beforeCut = d.Document.Elements.Count;
+    window.KeyPress(Key.X, RawInputModifiers.Control, PhysicalKey.X, "x");
+    Pump(700);
+    int afterCut = d.Document.Elements.Count;
+    d.UndoCommand.Execute(null);
+    Pump(700);
+    Console.WriteLine(
+        $"ctrl+x cuts: {beforeCut} -> {afterCut} elements (expected {beforeCut - 1}), "
+        + $"one undo brings it back: {d.Document.Elements.Count} (expected {beforeCut})");
+
+    // Paste in place puts the copy exactly where the original was; the plain paste walks it
+    // along instead. Cutting again first, so the clipboard holds a known position.
+    var placed = d.Document.Elements.First(el => el is LabelForge.Core.Model.BoxElement b && b.X == 200);
+    int placedX = placed.X;
+    int placedY = placed.Y;
+    d.Selection.Set(placed);
+    Pump(200);
+    window.KeyPress(Key.C, RawInputModifiers.Control, PhysicalKey.C, "c");
+    Pump(300);
+    window.KeyPress(
+        Key.V, RawInputModifiers.Control | RawInputModifiers.Shift, PhysicalKey.V, "v");
+    Pump(700);
+    var inPlace = d.Selection.Primary!;
+    Console.WriteLine(
+        $"ctrl+shift+v pastes in place: {inPlace.X},{inPlace.Y} (expected {placedX},{placedY}), "
+        + $"and it is a copy: {!ReferenceEquals(inPlace, placed)} (expected True)");
+
+    window.KeyPress(Key.V, RawInputModifiers.Control, PhysicalKey.V, "v");
+    Pump(700);
+    var cascaded = d.Selection.Primary!;
+    Console.WriteLine(
+        $"and plain ctrl+v still walks it along: {cascaded.X},{cascaded.Y} "
+        + $"(expected past {placedX},{placedY})");
+
+    d.Selection.Clear();
+    Pump(200);
+
     // Render caching. Observable without a test hook: a skipped render leaves the very
     // bitmap that is already on screen, so the reference is unchanged.
     d.NewDocumentCommand.Execute(null);

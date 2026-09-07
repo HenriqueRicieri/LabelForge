@@ -41,8 +41,10 @@ public sealed class ShortcutsViewModel
         [
             new("Ctrl + Z", "Undo"),
             new("Ctrl + Y  /  Ctrl + Shift + Z", "Redo"),
+            new("Ctrl + X", "Cut the selection"),
             new("Ctrl + C", "Copy the selection"),
             new("Ctrl + V", "Paste, cascaded from the last one"),
+            new("Ctrl + Shift + V", "Paste where it was copied from"),
             new("Ctrl + D", "Duplicate the selection"),
             new("Ctrl + ]  /  Ctrl + [", "One step forward or back in the stacking order"),
             new("Ctrl + Shift + Up / Down", "The same, for keyboards where the brackets do not carry"),

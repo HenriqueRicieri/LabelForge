@@ -113,6 +113,7 @@ public partial class DesignerViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(SendToBackCommand))]
     [NotifyCanExecuteChangedFor(nameof(BringForwardCommand))]
     [NotifyCanExecuteChangedFor(nameof(SendBackwardCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CutCommand))]
     [NotifyCanExecuteChangedFor(nameof(AlignLeftCommand))]
     [NotifyCanExecuteChangedFor(nameof(AlignCenterHorizontalCommand))]
     [NotifyCanExecuteChangedFor(nameof(AlignRightCommand))]
@@ -134,6 +135,7 @@ public partial class DesignerViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(PasteCommand))]
+    [NotifyCanExecuteChangedFor(nameof(PasteInPlaceCommand))]
     public partial bool CanPaste { get; set; }
 
     /// <summary>Per-type property editor for the selection; DataTemplates pick the view.</summary>
@@ -1827,6 +1829,21 @@ public partial class DesignerViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Copy and delete in one go. One undo step, because the copy records nothing
+    /// (the clipboard is not part of the document) and the delete records the whole
+    /// removal.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void Cut()
+    {
+        if (Selection.Count == 0)
+        {
+            return;
+        }
+
+        Copy();
+        DeleteSelected();
+    }
+
     [RelayCommand(CanExecute = nameof(CanPaste))]
     private void Paste()
     {
@@ -1866,8 +1883,42 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         // One delta for the whole group, so the copies keep their relative layout.
-        int dx = x - clones.Min(e => e.X);
-        int dy = y - clones.Min(e => e.Y);
+        PlaceCopies(clones, x - clones.Min(e => e.X), y - clones.Min(e => e.Y), clamp: true);
+    }
+
+    /// <summary>
+    /// Pastes the copies exactly where they were copied from, which is what you want when
+    /// the copy is going into another label, or on top of the original to be edited into a
+    /// variant. The plain paste cascades instead, because repeated pastes from the keyboard
+    /// have said nothing about position and stacking them invisibly would look like nothing
+    /// happened.
+    ///
+    /// The clipboard is left alone rather than re-serialized, so pressing it twice puts a
+    /// second copy in the same place rather than walking away from it.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanPaste))]
+    private void PasteInPlace()
+    {
+        if (_clipboardElement is null)
+        {
+            return;
+        }
+
+        List<Element> clones = LabelDocumentJson.DeserializeElements(_clipboardElement);
+        if (clones.Count == 0)
+        {
+            return;
+        }
+
+        // No clamping: in place means in place, and an element parked on the pasteboard has
+        // a position outside the label on purpose.
+        PlaceCopies(clones, 0, 0, clamp: false);
+    }
+
+    /// <summary>Adds copies to the document at an offset, stacked on top, selected, as one
+    /// undo step. Shared by the three pastes so they cannot drift apart.</summary>
+    private void PlaceCopies(List<Element> clones, int dx, int dy, bool clamp)
+    {
         int nextZ = Document.Elements.Count == 0
             ? 0
             : Document.Elements.Max(e => e.ZOrder) + 1;
@@ -1875,8 +1926,12 @@ public partial class DesignerViewModel : ViewModelBase
         foreach (Element element in clones)
         {
             element.Id = Guid.NewGuid();
-            element.X = Math.Clamp(element.X + dx, 0, Math.Max(Document.WidthDots - 1, 0));
-            element.Y = Math.Clamp(element.Y + dy, 0, Math.Max(Document.HeightDots - 1, 0));
+            element.X = clamp
+                ? Math.Clamp(element.X + dx, 0, Math.Max(Document.WidthDots - 1, 0))
+                : element.X + dx;
+            element.Y = clamp
+                ? Math.Clamp(element.Y + dy, 0, Math.Max(Document.HeightDots - 1, 0))
+                : element.Y + dy;
             element.ZOrder = nextZ++;
             Document.Elements.Add(element);
         }

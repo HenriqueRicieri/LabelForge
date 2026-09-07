@@ -79,6 +79,7 @@ public partial class DesignerView : UserControl
     private MenuFlyout ElementMenu(DesignerViewModel vm, LabelForge.Core.Model.Element element)
     {
         var menu = new MenuFlyout();
+        Add(menu, "Cut", vm.CutCommand);
         Add(menu, "Copy", vm.CopyCommand);
         Add(menu, "Duplicate", vm.DuplicateCommand);
         Add(menu, "Delete", vm.DeleteSelectedCommand);
@@ -145,6 +146,7 @@ public partial class DesignerView : UserControl
         pasteHere.Click += (_, _) => vm.PasteAt(x, y);
         menu.Items.Add(pasteHere);
         Add(menu, "Paste", vm.PasteCommand);
+        Add(menu, "Paste in Place", vm.PasteInPlaceCommand);
         Add(menu, "Select All", vm.SelectAllCommand);
         menu.Items.Add(new Separator());
 
@@ -913,6 +915,24 @@ public partial class DesignerView : UserControl
                 if (vm.CopyCommand.CanExecute(null))
                 {
                     vm.CopyCommand.Execute(null);
+                }
+
+                e.Handled = true;
+                break;
+
+            case Key.X:
+                if (vm.CutCommand.CanExecute(null))
+                {
+                    vm.CutCommand.Execute(null);
+                }
+
+                e.Handled = true;
+                break;
+
+            case Key.V when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                if (vm.PasteInPlaceCommand.CanExecute(null))
+                {
+                    vm.PasteInPlaceCommand.Execute(null);
                 }
 
                 e.Handled = true;

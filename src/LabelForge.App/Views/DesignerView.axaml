@@ -317,8 +317,11 @@
                         <MenuItem Header="_Undo" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
                         <MenuItem Header="_Redo" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" />
                         <Separator />
+                        <MenuItem Header="Cu_t" Command="{Binding CutCommand}" InputGesture="Ctrl+X" />
                         <MenuItem Header="_Copy" Command="{Binding CopyCommand}" InputGesture="Ctrl+C" />
                         <MenuItem Header="_Paste" Command="{Binding PasteCommand}" InputGesture="Ctrl+V" />
+                        <MenuItem Header="Paste in Pl_ace" Command="{Binding PasteInPlaceCommand}"
+                                  InputGesture="Ctrl+Shift+V" />
                         <MenuItem Header="D_uplicate" Command="{Binding DuplicateCommand}" InputGesture="Ctrl+D" />
                         <Separator />
                         <MenuItem Header="Bring to _Front" Command="{Binding BringToFrontCommand}" />
