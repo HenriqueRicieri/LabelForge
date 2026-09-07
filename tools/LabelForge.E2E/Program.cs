@@ -1937,6 +1937,50 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(300);
 
+    // Snap toggles. A grid line to land on, and a drag that ends three dots away from one.
+    d.Document.Elements.Clear();
+    d.GridPitchMm = 5;
+    var snapBox = new LabelForge.Core.Model.BoxElement
+    {
+        X = 200, Y = 200, WidthDots = 80, HeightDots = 60, ThicknessDots = 3,
+    };
+    d.Document.Elements.Add(snapBox);
+    d.Selection.Set(snapBox);
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    var snapFrom = canvas.TranslatePoint(canvas.DotsToView(240, 230), window)!.Value;
+    double dotsPerPx = 40.0 / (canvas.DotsToView(240, 230).X - canvas.DotsToView(200, 230).X);
+    var snapTo = new Avalonia.Point(snapFrom.X + (37 / dotsPerPx), snapFrom.Y);
+    window.MouseDown(snapFrom, MouseButton.Left);
+    window.MouseMove(snapTo);
+    window.MouseUp(snapTo, MouseButton.Left);
+    Pump(700);
+    Console.WriteLine(
+        $"with grid snapping on, a drag lands on a line: x {snapBox.X} "
+        + $"(expected a multiple of {5 * d.Document.Dpmm})");
+
+    d.SnapToGrid = false;
+    Pump(300);
+    int offGridStart = snapBox.X;
+    var offFrom = canvas.TranslatePoint(canvas.DotsToView(snapBox.X + 40, 230), window)!.Value;
+    var offTo = new Avalonia.Point(offFrom.X + (37 / dotsPerPx), offFrom.Y);
+    window.MouseDown(offFrom, MouseButton.Left);
+    window.MouseMove(offTo);
+    window.MouseUp(offTo, MouseButton.Left);
+    Pump(700);
+    Console.WriteLine(
+        $"with it off, the same drag does not: moved {snapBox.X - offGridStart} dots "
+        + "(expected 37, the distance dragged)");
+    Console.WriteLine(
+        $"and the status line says which are on: '{d.SnapSummary}' "
+        + "(expected guides and objects, not grid)");
+
+    d.SnapToGrid = true;
+    d.GridPitchMm = 0;
+    d.Selection.Clear();
+    Pump(300);
+
     // Render caching. Observable without a test hook: a skipped render leaves the very
     // bitmap that is already on screen, so the reference is unchanged.
     d.NewDocumentCommand.Execute(null);

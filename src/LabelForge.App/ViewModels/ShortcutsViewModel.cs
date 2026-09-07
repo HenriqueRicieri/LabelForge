@@ -62,7 +62,7 @@ public sealed class ShortcutsViewModel
             new("Drag", "Move the whole selection together"),
             new("Shift + drag", "Move along one axis only"),
             new("Ctrl + drag", "Leave a copy behind and move the copy"),
-            new("Alt + drag", "Move without snapping to anything"),
+            new("Alt + drag", "Move without snapping to anything, whatever View has switched on"),
             new("Drag a handle", "Resize; barcodes step in whole modules"),
             new("Ctrl + drag a handle", "Resize from the middle, both sides at once"),
             new("Shift + drag a corner", "Resize the two sides independently"),

@@ -372,6 +372,14 @@
                     <MenuItem Header="_View">
                         <MenuItem x:Name="GridMenu" Header="_Grid" />
                         <Separator />
+                        <MenuItem Header="Snap to g_uides" ToggleType="CheckBox"
+                                  IsChecked="{Binding SnapToGuides}" />
+                        <MenuItem Header="Snap to g_rid" ToggleType="CheckBox"
+                                  IsChecked="{Binding SnapToGrid}" />
+                        <MenuItem Header="Snap to _objects" ToggleType="CheckBox"
+                                  IsChecked="{Binding SnapToObjects}"
+                                  ToolTip.Tip="Holding Alt escapes all three for one gesture" />
+                        <Separator />
                         <MenuItem Header="Theme: _System" Click="OnThemeSystem" />
                         <MenuItem Header="Theme: _Light" Click="OnThemeLight" />
                         <MenuItem Header="Theme: _Dark" Click="OnThemeDark" />
@@ -930,7 +938,10 @@
                                      CanvasRevision="{Binding CanvasRevision}"
                                      Document="{Binding Document}"
                                      Selection="{Binding Selection}"
-                                     IsPlacing="{Binding IsPlacing}" />
+                                     IsPlacing="{Binding IsPlacing}"
+                                     SnapToGuides="{Binding SnapToGuides}"
+                                     SnapToGrid="{Binding SnapToGrid}"
+                                     SnapToObjects="{Binding SnapToObjects}" />
             <ScrollBar Name="CanvasVScroll" Grid.Column="1" Orientation="Vertical"
                        AllowAutoHide="False" Visibility="Visible" />
             <ScrollBar Name="CanvasHScroll" Grid.Row="1" Orientation="Horizontal"
@@ -946,7 +957,10 @@
                     Background="{DynamicResource AppPanelBackground}"
                     BorderBrush="{DynamicResource AppSeparator}" BorderThickness="1"
                     CornerRadius="4" Padding="8,3">
-                <TextBlock Text="{Binding CanvasReadout}" FontSize="12" Opacity="0.75" />
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock Text="{Binding CanvasReadout}" FontSize="12" Opacity="0.75" />
+                    <TextBlock Text="{Binding SnapSummary}" FontSize="12" Opacity="0.55" />
+                </StackPanel>
             </Border>
 
             <!-- Floating zoom control over the canvas corner -->

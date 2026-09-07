@@ -1864,6 +1864,78 @@ public partial class DesignerViewModel : ViewModelBase
     /// <summary>What the menu item reads, so the answer is visible without opening it.</summary>
     public string AlignTargetName => AlignToLabel ? "to label" : "to selection";
 
+    /// <summary>
+    /// What a gesture snaps to. Each on by default: a designer that does not snap is the
+    /// surprise, and Alt is still the momentary way out of all three without touching a
+    /// menu. Per machine rather than per label, because how somebody likes to work should
+    /// not travel inside a file to somebody else.
+    ///
+    /// The label's own edges and centre are not toggleable and are always snapped to; see
+    /// the canvas.
+    /// </summary>
+    public bool SnapToGuides
+    {
+        get => _settings.SnapToGuides;
+        set => SetSnap(value, _settings with { SnapToGuides = value });
+    }
+
+    public bool SnapToGrid
+    {
+        get => _settings.SnapToGrid;
+        set => SetSnap(value, _settings with { SnapToGrid = value });
+    }
+
+    public bool SnapToObjects
+    {
+        get => _settings.SnapToObjects;
+        set => SetSnap(value, _settings with { SnapToObjects = value });
+    }
+
+    /// <summary>Reads as "Snapping: guides, grid" or "Snapping: off", which is the whole
+    /// point of a status indicator: knowing why something did or did not line up without
+    /// opening a menu to find out.</summary>
+    public string SnapSummary
+    {
+        get
+        {
+            List<string> on = [];
+            if (SnapToGuides)
+            {
+                on.Add("guides");
+            }
+
+            if (SnapToGrid)
+            {
+                on.Add("grid");
+            }
+
+            if (SnapToObjects)
+            {
+                on.Add("objects");
+            }
+
+            return on.Count == 0 ? "Snapping: off" : "Snapping: " + string.Join(", ", on);
+        }
+    }
+
+    private void SetSnap(bool value, UserSettings next)
+    {
+        if (next == _settings)
+        {
+            return;
+        }
+
+        _settings = next;
+        OnPropertyChanged(nameof(SnapToGuides));
+        OnPropertyChanged(nameof(SnapToGrid));
+        OnPropertyChanged(nameof(SnapToObjects));
+        OnPropertyChanged(nameof(SnapSummary));
+        if (_settingsStore.Save(_settings) is { } error)
+        {
+            Notify($"Could not save the setting: {error}");
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private void CenterOnLabel()
     {

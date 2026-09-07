@@ -36,6 +36,15 @@ public sealed class DesignerCanvas : Control
     public static readonly StyledProperty<bool> IsPlacingProperty =
         AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(IsPlacing));
 
+    public static readonly StyledProperty<bool> SnapToGuidesProperty =
+        AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(SnapToGuides), defaultValue: true);
+
+    public static readonly StyledProperty<bool> SnapToGridProperty =
+        AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(SnapToGrid), defaultValue: true);
+
+    public static readonly StyledProperty<bool> SnapToObjectsProperty =
+        AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(SnapToObjects), defaultValue: true);
+
     /// <summary>
     /// Bumped by the designer whenever the label may need redrawing for a reason the
     /// underlay cannot express.
@@ -348,6 +357,27 @@ public sealed class DesignerCanvas : Control
     {
         get => GetValue(IsPlacingProperty);
         set => SetValue(IsPlacingProperty, value);
+    }
+
+    /// <summary>Which kinds of thing a gesture snaps to. The label's own edges and centre
+    /// are not among them and are always on: they are the label, not something added to
+    /// it, and nobody turning off guides means to stop snapping flush to the edge.</summary>
+    public bool SnapToGuides
+    {
+        get => GetValue(SnapToGuidesProperty);
+        set => SetValue(SnapToGuidesProperty, value);
+    }
+
+    public bool SnapToGrid
+    {
+        get => GetValue(SnapToGridProperty);
+        set => SetValue(SnapToGridProperty, value);
+    }
+
+    public bool SnapToObjects
+    {
+        get => GetValue(SnapToObjectsProperty);
+        set => SetValue(SnapToObjectsProperty, value);
     }
 
     /// <summary>Pasteboard margin baked into the underlay bitmap, in dots (see the
@@ -1764,16 +1794,31 @@ public sealed class DesignerCanvas : Control
         _snapTargetsX.Clear();
         _snapTargetsY.Clear();
 
-        _snapTargetsX.AddRange(doc.VerticalGuides);
+        // The label's own edges and centre are always in, whatever the toggles say: they
+        // are the label rather than something laid over it, and turning off guides is not
+        // a way of asking to stop snapping flush to the edge.
         _snapTargetsX.AddRange([0, doc.WidthDots / 2, doc.WidthDots]);
-        _snapTargetsY.AddRange(doc.HorizontalGuides);
         _snapTargetsY.AddRange([0, doc.HeightDots / 2, doc.HeightDots]);
+
+        if (SnapToGuides)
+        {
+            _snapTargetsX.AddRange(doc.VerticalGuides);
+            _snapTargetsY.AddRange(doc.HorizontalGuides);
+        }
 
         // The grid joins the same list rather than getting a rule of its own. The snapper
         // takes the closest target, so a guide a dot away still beats a grid line three
         // away, and Alt still escapes the lot.
-        _snapTargetsX.AddRange(DesignGrid.Lines(doc, doc.WidthDots));
-        _snapTargetsY.AddRange(DesignGrid.Lines(doc, doc.HeightDots));
+        if (SnapToGrid)
+        {
+            _snapTargetsX.AddRange(DesignGrid.Lines(doc, doc.WidthDots));
+            _snapTargetsY.AddRange(DesignGrid.Lines(doc, doc.HeightDots));
+        }
+
+        if (!SnapToObjects)
+        {
+            return;
+        }
 
         foreach (Element element in doc.Elements)
         {
