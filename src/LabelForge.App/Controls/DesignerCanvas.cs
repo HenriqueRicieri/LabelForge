@@ -167,7 +167,7 @@ public sealed class DesignerCanvas : Control
     private bool _pressArmed;
     private Point _pressPoint;
     private Element? _pressHit;
-    private Element? _pressPendingToggle;
+    private IReadOnlyList<Element>? _pressPendingToggle;
 
     // Shift locks a move to one axis. Decided once the pointer has committed to a
     // direction and kept until the other axis clearly wins, so a drag along a lock does
@@ -245,6 +245,11 @@ public sealed class DesignerCanvas : Control
     /// <summary>What the pointer is over, worked out in <see cref="UpdateHoverCursor"/>
     /// because that already runs on every move.</summary>
     private Element? _hover;
+
+    /// <summary>The group currently opened, inside which clicks pick one member instead of
+    /// all of them. A way of looking at the label rather than a fact about it, so it lives
+    /// here and never reaches the document, the .lfl or the undo stack.</summary>
+    private Guid? _enteredGroup;
 
     // Guides. Holding the left button on a ruler shows a transient guide that follows
     // the pointer and vanishes on release; permanent guides (inserted from the ruler
@@ -1419,6 +1424,7 @@ public sealed class DesignerCanvas : Control
         }
 
         Element? hit = ElementAt(doc, dotX, dotY);
+        LeaveGroupUnlessInside(hit);
 
         if (hit is null)
         {
@@ -1428,6 +1434,7 @@ public sealed class DesignerCanvas : Control
                 selection.Clear();
             }
 
+            _enteredGroup = null;
             _marquee = true;
             _marqueeStartDots = new Point(dotX, dotY);
             _marqueeCurrent = p;
@@ -1450,26 +1457,30 @@ public sealed class DesignerCanvas : Control
         _pressHit = hit;
         _pressPendingToggle = null;
 
+        // A click takes the whole group, so everything below works on what the click takes
+        // rather than on the one element under the pointer.
+        IReadOnlyList<Element> picked = Picked(doc, hit, alone: false);
+
         if (!additive)
         {
-            if (!selection.Contains(hit))
+            if (!picked.All(selection.Contains))
             {
-                selection.Set(hit);
+                selection.SetMany(picked);
             }
         }
-        else if (selection.Contains(hit))
+        else if (picked.All(selection.Contains))
         {
-            _pressPendingToggle = hit;
+            _pressPendingToggle = picked;
         }
         else if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
-            selection.Toggle(hit);
+            TogglePicked(selection, picked);
         }
         else
         {
             // Ctrl on something not selected. Held through a drag it duplicates (H11), so
             // it must not change the selection until the release says it was a click.
-            _pressPendingToggle = hit;
+            _pressPendingToggle = picked;
         }
 
         e.Pointer.Capture(this);
@@ -1499,7 +1510,7 @@ public sealed class DesignerCanvas : Control
         bool pressedAlone =
             duplicate && _pressHit is { } pressed && !selection.Contains(pressed);
         IEnumerable<Element> candidates = pressedAlone ? [_pressHit!] : selection.Items;
-        List<Element> movable = [.. candidates.Where(el => !el.IsLocked)];
+        List<Element> movable = [.. candidates.Where(el => !Groups.IsHeld(doc, el))];
 
         if (movable.Count == 0)
         {
@@ -1527,7 +1538,7 @@ public sealed class DesignerCanvas : Control
 
         // Drag the whole (unlocked part of the) selection together.
         _dragItems.Clear();
-        foreach (Element element in selection.Items.Where(el => !el.IsLocked))
+        foreach (Element element in selection.Items.Where(el => !Groups.IsHeld(doc, el)))
         {
             _dragItems.Add((element, element.X, element.Y));
         }
@@ -1830,21 +1841,76 @@ public sealed class DesignerCanvas : Control
     /// <returns>False when there was nothing to step to, so the caller can leave Tab alone.</returns>
     private bool CycleSelection(LabelDocument doc, SelectionSet selection, bool deeper)
     {
-        List<Element> order =
-            [.. doc.Elements.Where(el => el.IsVisible).OrderByDescending(el => el.ZOrder)];
+        List<Element> order = [];
+        HashSet<Guid> seen = [];
+        foreach (Element element in doc.Elements
+                     .Where(el => el.IsVisible)
+                     .OrderByDescending(el => el.ZOrder))
+        {
+            // One stop per group: without this, stepping from one member lands on the next
+            // member, which selects the same group again and the cycle appears stuck.
+            if (element.GroupId is { } id && !seen.Add(id))
+            {
+                continue;
+            }
+
+            order.Add(element);
+        }
+
         if (order.Count == 0)
         {
             return false;
         }
 
-        int current = selection.Primary is { } primary ? order.IndexOf(primary) : -1;
+        int current = selection.Primary is { } primary
+            ? order.FindIndex(el => el == primary || (primary.GroupId is { } g && el.GroupId == g))
+            : -1;
         int next = current < 0
             ? (deeper ? 0 : order.Count - 1)
             : (current + (deeper ? 1 : -1) + order.Count) % order.Count;
 
-        selection.Set(order[next]);
+        _enteredGroup = null;
+        selection.SetMany(Groups.Members(doc, order[next]));
         InvalidateVisual();
         return true;
+    }
+
+    /// <summary>
+    /// What a click on this element takes: the whole group it belongs to, or the element
+    /// alone when the group has been opened, or when the caller asked for the member
+    /// (Alt-click, which is already this canvas's key for reaching past what is on top).
+    /// </summary>
+    private IReadOnlyList<Element> Picked(LabelDocument doc, Element hit, bool alone) =>
+        alone || (_enteredGroup is { } inside && hit.GroupId == inside)
+            ? [hit]
+            : Groups.Members(doc, hit);
+
+    /// <summary>Closes an opened group as soon as the click lands outside it, which is what
+    /// every editor does: the group stops being open the moment you leave it.</summary>
+    private void LeaveGroupUnlessInside(Element? hit)
+    {
+        if (_enteredGroup is { } inside && hit?.GroupId != inside)
+        {
+            _enteredGroup = null;
+        }
+    }
+
+    /// <summary>A Ctrl or Shift click, applied to everything the click takes rather than to
+    /// one element, so a group joins or leaves the selection whole. One Changed rather than
+    /// one per member.</summary>
+    private static void TogglePicked(SelectionSet selection, IReadOnlyList<Element> picked)
+    {
+        List<Element> next = [.. selection.Items];
+        if (picked.All(next.Contains))
+        {
+            next.RemoveAll(picked.Contains);
+        }
+        else
+        {
+            next.AddRange(picked.Where(e => !next.Contains(e)));
+        }
+
+        selection.SetMany(next);
     }
 
     /// <summary>Everything under the point, front to back. What Alt-click walks down.</summary>
@@ -2178,8 +2244,25 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
+        // A group opens on the first double-click and takes the one member under the
+        // pointer; a second double-click on that member is what reaches its text. That is
+        // the order Illustrator uses, and it is what lets one gesture mean both.
+        if (Document is { } doc && Selection is { } selection)
+        {
+            var (scale, origin) = GetTransform();
+            Element? hit = ElementAt(doc, (p.X - origin.X) / scale, (p.Y - origin.Y) / scale);
+            if (hit is { GroupId: { } id } && _enteredGroup != id)
+            {
+                _enteredGroup = id;
+                selection.Set(hit);
+                InvalidateVisual();
+                e.Handled = true;
+                return;
+            }
+        }
+
         // The first click of the pair already selected whatever is under the pointer, so
-        // there is nothing to hit test here: if that landed on an element, edit it.
+        // there is nothing more to work out: if that landed on an element, edit it.
         if (Selection is { Count: 1 })
         {
             EditRequested?.Invoke(this, EventArgs.Empty);
@@ -2658,13 +2741,13 @@ public sealed class DesignerCanvas : Control
         // an element out of a multiple selection, or adding one with Ctrl.
         if (_pressArmed)
         {
-            Element? toggle = _pressPendingToggle;
+            IReadOnlyList<Element>? toggle = _pressPendingToggle;
             e.Pointer.Capture(null);
             EndGestureState();
 
-            if (toggle is not null)
+            if (toggle is not null && Selection is { } toggleSelection)
             {
-                Selection?.Toggle(toggle);
+                TogglePicked(toggleSelection, toggle);
             }
 
             InvalidateVisual();
@@ -2721,7 +2804,7 @@ public sealed class DesignerCanvas : Control
 
         if (hits.Count > 0)
         {
-            selection.SetMany(hits);
+            selection.SetMany(Groups.Expand(doc, hits));
         }
     }
 
@@ -2743,6 +2826,21 @@ public sealed class DesignerCanvas : Control
             if (IsPlacing)
             {
                 CancelRequested?.Invoke(this, EventArgs.Empty);
+                e.Handled = true;
+                return;
+            }
+
+            // Inside a group, Escape steps back out of it and leaves the whole group
+            // selected, rather than dropping the selection altogether.
+            if (_enteredGroup is not null)
+            {
+                _enteredGroup = null;
+                if (Document is { } groupDoc && Selection is { Primary: { } member } groupSelection)
+                {
+                    groupSelection.SetMany(Groups.Members(groupDoc, member));
+                }
+
+                InvalidateVisual();
                 e.Handled = true;
                 return;
             }
@@ -2809,7 +2907,7 @@ public sealed class DesignerCanvas : Control
 
         // Nudge the whole selection with the same clamped delta.
         _dragItems.Clear();
-        foreach (Element element in selection.Items.Where(el => !el.IsLocked))
+        foreach (Element element in selection.Items.Where(el => !Groups.IsHeld(doc, el)))
         {
             _dragItems.Add((element, element.X, element.Y));
         }

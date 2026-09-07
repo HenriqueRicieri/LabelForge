@@ -1718,6 +1718,151 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(200);
 
+    // Groups. Three elements, two of them about to become one thing.
+    d.Document.Elements.Clear();
+    var gLeft = new LabelForge.Core.Model.BoxElement
+    {
+        X = 60, Y = 60, WidthDots = 120, HeightDots = 80, ThicknessDots = 3, ZOrder = 1,
+    };
+    var gRight = new LabelForge.Core.Model.TextElement
+    {
+        X = 240, Y = 100, Text = "in a group", FontHeightDots = 40, ZOrder = 2,
+    };
+    var gLoose = new LabelForge.Core.Model.BoxElement
+    {
+        X = 500, Y = 60, WidthDots = 120, HeightDots = 80, ThicknessDots = 3, ZOrder = 3,
+    };
+    d.Document.Elements.Add(gLeft);
+    d.Document.Elements.Add(gRight);
+    d.Document.Elements.Add(gLoose);
+    d.Selection.SetMany([gLeft, gRight]);
+    canvas.Focus();
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    window.KeyPress(Key.G, RawInputModifiers.Control, PhysicalKey.G, "g");
+    Pump(700);
+    Console.WriteLine(
+        $"ctrl+g groups: both carry an id: {gLeft.GroupId is not null && gLeft.GroupId == gRight.GroupId} "
+        + $"(expected True), the loose one does not: {gLoose.GroupId is null} (expected True)");
+
+    // Clicking one member takes the whole group, which is the point of having one.
+    d.Selection.Clear();
+    Pump(200);
+    var memberPoint = canvas.TranslatePoint(canvas.DotsToView(120, 100), window)!.Value;
+    window.MouseDown(memberPoint, MouseButton.Left);
+    window.MouseUp(memberPoint, MouseButton.Left);
+    Pump(400);
+    Console.WriteLine(
+        $"clicking a member takes the group: {d.Selection.Count} selected (expected 2)");
+
+    // And it moves as one thing: dragging one member carries the other by the same amount.
+    // Grabbed at another point and after a pause, or the press that starts the drag lands
+    // inside the double-click window of the click above and opens the group instead, which
+    // is what a real editor does too.
+    Pump(900);
+    int leftBefore = gLeft.X;
+    int rightBefore = gRight.X;
+    var dragPoint = canvas.TranslatePoint(canvas.DotsToView(100, 125), window)!.Value;
+    window.MouseDown(dragPoint, MouseButton.Left);
+    window.MouseMove(new Avalonia.Point(dragPoint.X + 60, dragPoint.Y));
+    window.MouseUp(new Avalonia.Point(dragPoint.X + 60, dragPoint.Y), MouseButton.Left);
+    Pump(700);
+    Console.WriteLine(
+        $"dragging one member moves both: left by {gLeft.X - leftBefore}, "
+        + $"right by {gRight.X - rightBefore} (expected the same non-zero number twice)");
+
+    // A double-click opens the group and takes the one member under the pointer; a second
+    // one on that member is what reaches its text (the H15 gesture, one step further in).
+    var textPoint = canvas.TranslatePoint(
+        canvas.DotsToView(
+            new LabelForge.Core.Model.ElementBoundsCalculator().GetBounds(gRight).X + 40,
+            new LabelForge.Core.Model.ElementBoundsCalculator().GetBounds(gRight).Y + 20),
+        window)!.Value;
+    window.MouseDown(textPoint, MouseButton.Left);
+    window.MouseUp(textPoint, MouseButton.Left);
+    Pump(120);
+    window.MouseDown(textPoint, MouseButton.Left);
+    window.MouseUp(textPoint, MouseButton.Left);
+    Pump(500);
+    Console.WriteLine(
+        $"double-click opens the group: {d.Selection.Count} selected (expected 1), "
+        + $"and it is the member under the pointer: {d.Selection.Primary == gRight} (expected True)");
+
+    window.MouseDown(textPoint, MouseButton.Left);
+    window.MouseUp(textPoint, MouseButton.Left);
+    Pump(120);
+    window.MouseDown(textPoint, MouseButton.Left);
+    window.MouseUp(textPoint, MouseButton.Left);
+    Pump(600);
+    var groupFocus = Avalonia.Controls.TopLevel.GetTopLevel(canvas)?.FocusManager?.GetFocusedElement();
+    Console.WriteLine(
+        "a second double-click reaches the text: "
+        + $"'{(groupFocus is Avalonia.Controls.TextBox gtb ? gtb.SelectedText : "not a text box")}' "
+        + "(expected 'in a group')");
+
+    // Escape steps back out and leaves the whole group selected.
+    window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+    Pump(300);
+    canvas.Focus();
+    Pump(200);
+    window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+    Pump(400);
+    Console.WriteLine(
+        $"escape leaves the group: {d.Selection.Count} selected (expected 2)");
+
+    // One locked member holds all of it, because a group that half moves is not a group.
+    gLeft.IsLocked = true;
+    d.NotifyDocumentEdited();
+    Pump(700);
+    int heldLeft = gLeft.X;
+    int heldRight = gRight.X;
+    var heldPoint = canvas.TranslatePoint(canvas.DotsToView(gLeft.X + 60, gLeft.Y + 40), window)!.Value;
+    window.MouseDown(heldPoint, MouseButton.Left);
+    window.MouseMove(new Avalonia.Point(heldPoint.X + 60, heldPoint.Y));
+    window.MouseUp(new Avalonia.Point(heldPoint.X + 60, heldPoint.Y), MouseButton.Left);
+    Pump(700);
+    Console.WriteLine(
+        $"a locked member holds the group: left {gLeft.X} (expected {heldLeft}), "
+        + $"right {gRight.X} (expected {heldRight})");
+    gLeft.IsLocked = false;
+    d.NotifyDocumentEdited();
+    Pump(400);
+
+    // A copy of a group is its own group rather than more members of the original.
+    d.Selection.SetMany([gLeft, gRight]);
+    Pump(200);
+    d.DuplicateCommand.Execute(null);
+    Pump(700);
+    var copies = d.Selection.Items.ToList();
+    Console.WriteLine(
+        $"a duplicated group is its own: {copies.Count} copies (expected 2), "
+        + $"same id as each other: {copies.Count == 2 && copies[0].GroupId == copies[1].GroupId} "
+        + $"(expected True), different from the original: {copies[0].GroupId != gLeft.GroupId} "
+        + "(expected True)");
+    d.UndoCommand.Execute(null);
+    Pump(700);
+
+    // The outline lists a group as a header with its members under it.
+    Console.WriteLine(
+        $"the outline shows the group: {d.Outline.Count} rows for 3 elements (expected 4), "
+        + $"header reads '{d.Outline.FirstOrDefault(r => r.IsGroupHeader)?.Display}' "
+        + "(expected Group of 2)");
+
+    // Ungroup puts them back to being separate things.
+    d.Selection.SetMany(d.Document.Elements.Where(el => el.GroupId is not null).ToList());
+    canvas.Focus();
+    Pump(300);
+    window.KeyPress(
+        Key.G, RawInputModifiers.Control | RawInputModifiers.Shift, PhysicalKey.G, "g");
+    Pump(700);
+    Console.WriteLine(
+        $"ctrl+shift+g ungroups: {d.Document.Elements.Count(el => el.GroupId is not null)} still grouped "
+        + "(expected 0)");
+
+    d.Selection.Clear();
+    Pump(200);
+
     // Render caching. Observable without a test hook: a skipped render leaves the very
     // bitmap that is already on screen, so the reference is unchanged.
     d.NewDocumentCommand.Execute(null);

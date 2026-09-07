@@ -1,4 +1,4 @@
-using LabelForge.Core.Io;
+﻿using LabelForge.Core.Io;
 using LabelForge.Core.Model;
 
 namespace LabelForge.Core.Editing;
@@ -48,6 +48,9 @@ public static class ElementDuplicator
             clone.ZOrder = nextZ++;
         }
 
+        // A copied group is a group of its own, not more members of the original, and a
+        // copy of only part of one is not a group at all.
+        Groups.Remap(clones);
         return clones;
     }
 }

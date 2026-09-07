@@ -324,6 +324,10 @@
                                   InputGesture="Ctrl+Shift+V" />
                         <MenuItem Header="D_uplicate" Command="{Binding DuplicateCommand}" InputGesture="Ctrl+D" />
                         <Separator />
+                        <MenuItem Header="_Group" Command="{Binding GroupSelectionCommand}"
+                                  InputGesture="Ctrl+G" />
+                        <MenuItem Header="Un_group" Command="{Binding UngroupSelectionCommand}"
+                                  InputGesture="Ctrl+Shift+G" />
                         <MenuItem Header="_Rotate 90" Command="{Binding Rotate90Command}"
                                   InputGesture="Ctrl+R" />
                         <MenuItem Header="Bring to _Front" Command="{Binding BringToFrontCommand}" />
@@ -657,10 +661,12 @@
                                      BorderThickness="0" Padding="0">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate DataType="vm:ElementOutlineViewModel">
-                                        <DockPanel MinWidth="180">
+                                        <DockPanel MinWidth="180" Margin="{Binding Indent}">
                                             <CheckBox DockPanel.Dock="Right" IsChecked="{Binding IsLocked}"
+                                                      IsVisible="{Binding !IsGroupHeader}"
                                                       Margin="2,0,0,0" ToolTip.Tip="Lock position" />
                                             <CheckBox DockPanel.Dock="Right" IsChecked="{Binding IsVisible}"
+                                                      IsVisible="{Binding !IsGroupHeader}"
                                                       ToolTip.Tip="Show on the canvas" />
                                             <TextBlock Text="{Binding Display}" FontSize="12"
                                                        VerticalAlignment="Center"

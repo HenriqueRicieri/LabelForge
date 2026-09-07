@@ -222,7 +222,8 @@ public partial class DesignerViewModel : ViewModelBase
             return;
         }
 
-        Selection.Set(value.Element);
+        // A row selects what a click on the canvas would: the whole group.
+        Selection.SetMany(Groups.Members(Document, value.Element));
     }
 
     /// <summary>Template variables found on the label, with editable preview samples.
@@ -1115,8 +1116,10 @@ public partial class DesignerViewModel : ViewModelBase
         RefreshReadout();
 
         // Whether a rotation is possible depends on WHAT is selected, not on how much, so
-        // it cannot ride on HasSelection changing.
+        // it cannot ride on HasSelection changing. Same for the two group commands.
         Rotate90Command.NotifyCanExecuteChanged();
+        GroupSelectionCommand.NotifyCanExecuteChanged();
+        UngroupSelectionCommand.NotifyCanExecuteChanged();
         HasSelection = Selection.Count > 0;
         SelectionCount = Selection.Count;
         IsSingleSelection = Selection.Count == 1;
@@ -1128,7 +1131,8 @@ public partial class DesignerViewModel : ViewModelBase
         // Selecting on the canvas highlights the row, guarded so the row's own setter
         // does not bounce the selection straight back.
         _syncingOutline = true;
-        SelectedOutlineRow = Outline.FirstOrDefault(r => ReferenceEquals(r.Element, Selection.Primary));
+        SelectedOutlineRow = Outline.FirstOrDefault(
+            r => !r.IsGroupHeader && ReferenceEquals(r.Element, Selection.Primary));
         _syncingOutline = false;
     }
 
@@ -1799,9 +1803,28 @@ public partial class DesignerViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanDistribute))]
     private void DistributeVertical() => ApplyDistribute(horizontal: false);
 
+    /// <summary>The selection as things that line up: a group is one box that keeps its
+    /// internal layout, everything else is itself.</summary>
+    private List<IReadOnlyList<Element>> SelectedUnits()
+    {
+        List<IReadOnlyList<Element>> units = [];
+        HashSet<Guid> seen = [];
+        foreach (Element element in Selection.Items)
+        {
+            if (element.GroupId is { } id && !seen.Add(id))
+            {
+                continue;
+            }
+
+            units.Add(Groups.Members(Document, element));
+        }
+
+        return units;
+    }
+
     private void ApplyAlign(AlignEdge edge)
     {
-        if (Aligner.Align(Selection.Items.ToList(), edge, Document.WidthDots, Document.HeightDots))
+        if (Aligner.AlignUnits(SelectedUnits(), edge, Document.WidthDots, Document.HeightDots))
         {
             SelectionProperties?.Refresh();
             RefreshReadout();
@@ -1812,7 +1835,7 @@ public partial class DesignerViewModel : ViewModelBase
 
     private void ApplyDistribute(bool horizontal)
     {
-        if (Aligner.Distribute(Selection.Items.ToList(), horizontal))
+        if (Aligner.DistributeUnits(SelectedUnits(), horizontal))
         {
             SelectionProperties?.Refresh();
             RefreshReadout();
@@ -1923,6 +1946,10 @@ public partial class DesignerViewModel : ViewModelBase
     /// undo step. Shared by the three pastes so they cannot drift apart.</summary>
     private void PlaceCopies(List<Element> clones, int dx, int dy, bool clamp)
     {
+        // A pasted group is its own group rather than more members of the original, which
+        // is the same rule a Ctrl-drag's copies go through.
+        Groups.Remap(clones);
+
         int nextZ = Document.Elements.Count == 0
             ? 0
             : Document.Elements.Max(e => e.ZOrder) + 1;
@@ -2048,6 +2075,41 @@ public partial class DesignerViewModel : ViewModelBase
             element.ZOrder = nextZ++;
         }
 
+        RecordUndo();
+        ScheduleRender();
+    }
+
+    /// <summary>True while there is something that could become a group: two elements, or
+    /// one that already belongs to one and so has an Ungroup to offer.</summary>
+    private bool CanGroup => Selection.Count > 1;
+
+    private bool CanUngroup => Selection.Items.Any(e => e.GroupId is not null);
+
+    /// <summary>Puts the selection into one group and selects the whole of it, which is
+    /// what a group is for: the next click picks all of it.</summary>
+    [RelayCommand(CanExecute = nameof(CanGroup))]
+    private void GroupSelection()
+    {
+        if (!Groups.Group(Document, Selection.Items))
+        {
+            return;
+        }
+
+        Selection.SetMany(Groups.Expand(Document, Selection.Items));
+        RefreshOutline();
+        RecordUndo();
+        ScheduleRender();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUngroup))]
+    private void UngroupSelection()
+    {
+        if (!Groups.Ungroup(Groups.Expand(Document, Selection.Items)))
+        {
+            return;
+        }
+
+        RefreshOutline();
         RecordUndo();
         ScheduleRender();
     }
@@ -2444,7 +2506,8 @@ public partial class DesignerViewModel : ViewModelBase
     {
         Element[] elements = Document.Elements.OrderByDescending(e => e.ZOrder).ToArray();
         string signature = string.Join(
-            "|", elements.Select(e => $"{e.Id}:{OutlineLabel(e)}:{e.IsVisible}:{e.IsLocked}"));
+            "|",
+            elements.Select(e => $"{e.Id}:{OutlineLabel(e)}:{e.IsVisible}:{e.IsLocked}:{e.GroupId}"));
         if (string.Equals(signature, _outlineSignature, StringComparison.Ordinal))
         {
             return;
@@ -2455,12 +2518,29 @@ public partial class DesignerViewModel : ViewModelBase
         try
         {
             Outline.Clear();
+            Guid? openGroup = null;
             foreach (Element element in elements)
             {
+                // A group gets a header row with its members listed under it. Members are
+                // contiguous in z-order because grouping stacks them that way, so this reads
+                // the list in one pass rather than re-sorting it.
+                if (element.GroupId is { } id && id != openGroup)
+                {
+                    openGroup = id;
+                    int count = Groups.Members(Document, element).Count;
+                    Outline.Add(new ElementOutlineViewModel(
+                        element, $"Group of {count}", OnOutlineEdited, isGroupHeader: true));
+                }
+                else if (element.GroupId is null)
+                {
+                    openGroup = null;
+                }
+
                 Outline.Add(new ElementOutlineViewModel(element, OutlineLabel(element), OnOutlineEdited));
             }
 
-            SelectedOutlineRow = Outline.FirstOrDefault(r => ReferenceEquals(r.Element, Selection.Primary));
+            SelectedOutlineRow = Outline.FirstOrDefault(
+            r => !r.IsGroupHeader && ReferenceEquals(r.Element, Selection.Primary));
         }
         finally
         {
