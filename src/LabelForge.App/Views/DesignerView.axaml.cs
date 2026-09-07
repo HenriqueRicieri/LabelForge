@@ -856,6 +856,16 @@ public partial class DesignerView : UserControl
         // where a key held with Ctrl reports no character at all.
         switch (e.KeySymbol)
         {
+            case "=" or "+":
+                Canvas.ZoomBy(1.25);
+                e.Handled = true;
+                return;
+
+            case "-" or "_":
+                Canvas.ZoomBy(1 / 1.25);
+                e.Handled = true;
+                return;
+
             case "[" or "{":
                 if (vm.SendBackwardCommand.CanExecute(null))
                 {
@@ -1005,6 +1015,11 @@ public partial class DesignerView : UserControl
 
             case Key.D0 or Key.NumPad0:
                 Canvas.ResetView();
+                e.Handled = true;
+                break;
+
+            case Key.D1 or Key.NumPad1:
+                Canvas.SetZoom(1);
                 e.Handled = true;
                 break;
 

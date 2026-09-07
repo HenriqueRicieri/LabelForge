@@ -260,6 +260,10 @@ public sealed class DesignerCanvas : Control
     /// here and never reaches the document, the .lfl or the undo stack.</summary>
     private Guid? _enteredGroup;
 
+    /// <summary>Space is held, so a left drag pans instead of selecting. Photoshop's, and
+    /// the reason it exists is that the middle button is not on every pointing device.</summary>
+    private bool _spaceHeld;
+
     // Guides. Holding the left button on a ruler shows a transient guide that follows
     // the pointer and vanishes on release; permanent guides (inserted from the ruler
     // context menu) live in the document, so undo and save cover them. Dragging a
@@ -321,6 +325,11 @@ public sealed class DesignerCanvas : Control
     public DesignerCanvas()
     {
         Focusable = true;
+
+        // A Space released while another control has the keyboard never reaches OnKeyUp,
+        // and a canvas stuck in pan mode is a canvas that has stopped selecting for no
+        // reason anyone can see.
+        LostFocus += (_, _) => ReleaseSpace();
 
         // Pasteboard content and rulers can extend to the control edges; without an
         // explicit clip they would paint over sibling panels.
@@ -1267,8 +1276,9 @@ public sealed class DesignerCanvas : Control
         var (scale, origin) = GetTransform();
         Point p = e.GetPosition(this);
 
-        // Middle button pans the view; it never touches the selection.
-        if (e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed)
+        // Middle button pans the view, and so does a left drag with Space held; neither
+        // ever touches the selection.
+        if (e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed || _spaceHeld)
         {
             EnsureExplicitTransform();
             _panning = true;
@@ -2322,6 +2332,30 @@ public sealed class DesignerCanvas : Control
         }
     }
 
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+        if (e.Key == Key.Space)
+        {
+            ReleaseSpace();
+            e.Handled = true;
+        }
+    }
+
+    private void ReleaseSpace()
+    {
+        if (!_spaceHeld)
+        {
+            return;
+        }
+
+        _spaceHeld = false;
+        if (!_panning)
+        {
+            Cursor = Cursor.Default;
+        }
+    }
+
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
@@ -2863,6 +2897,20 @@ public sealed class DesignerCanvas : Control
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+
+        // Space turns the next left drag into a pan, for as long as it is held. Not while
+        // a gesture is already running: the hand is in the middle of saying something else.
+        if (e.Key == Key.Space && !_dragging && !_resizing && !_rotating && !_marquee)
+        {
+            if (!_spaceHeld)
+            {
+                _spaceHeld = true;
+                Cursor = new Cursor(StandardCursorType.SizeAll);
+            }
+
+            e.Handled = true;
+            return;
+        }
 
         if (e.Key == Key.Escape)
         {

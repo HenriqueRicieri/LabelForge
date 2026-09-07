@@ -1981,6 +1981,46 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(300);
 
+    // Keyboard zoom, about the middle of the view rather than the pointer, and actual size.
+    canvas.SetZoom(1);
+    canvas.Focus();
+    Pump(300);
+    double zoomBefore = canvas.GetZoom();
+    window.KeyPress(Key.OemPlus, RawInputModifiers.Control, PhysicalKey.Equal, "=");
+    Pump(400);
+    double zoomedIn = canvas.GetZoom();
+    window.KeyPress(Key.OemMinus, RawInputModifiers.Control, PhysicalKey.Minus, "-");
+    Pump(400);
+    // Invariant, or this line reads 1,00 here and 1.00 on anyone else's machine.
+    static string Zoom(double value) =>
+        value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+    Console.WriteLine(
+        $"ctrl+= and ctrl+- zoom: {Zoom(zoomBefore)} -> {Zoom(zoomedIn)} -> {Zoom(canvas.GetZoom())} "
+        + "(expected up then back)");
+
+    canvas.ZoomBy(2);
+    Pump(300);
+    window.KeyPress(Key.D1, RawInputModifiers.Control, PhysicalKey.Digit1, "1");
+    Pump(400);
+    Console.WriteLine(
+        $"ctrl+1 is actual size: {Zoom(canvas.GetZoom())} (expected 1.00)");
+
+    // Space turns a left drag into a pan, for a mouse with no middle button.
+    double panOriginBefore = canvas.DotsToView(0, 0).X;
+    var spaceFrom = canvas.TranslatePoint(canvas.DotsToView(200, 200), window)!.Value;
+    window.KeyPress(Key.Space, RawInputModifiers.None, PhysicalKey.Space, " ");
+    window.MouseDown(spaceFrom, MouseButton.Left);
+    window.MouseMove(new Avalonia.Point(spaceFrom.X - 40, spaceFrom.Y));
+    window.MouseUp(new Avalonia.Point(spaceFrom.X - 40, spaceFrom.Y), MouseButton.Left);
+    Pump(500);
+    Console.WriteLine(
+        $"space turns a drag into a pan: label origin {panOriginBefore:0} -> "
+        + $"{canvas.DotsToView(0, 0).X:0} (expected to have moved left), "
+        + $"and nothing was selected: {d.Selection.Count == 0} (expected True)");
+
+    canvas.ResetView();
+    Pump(300);
+
     // Render caching. Observable without a test hook: a skipped render leaves the very
     // bitmap that is already on screen, so the reference is unchanged.
     d.NewDocumentCommand.Execute(null);
