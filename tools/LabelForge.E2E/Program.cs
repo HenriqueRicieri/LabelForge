@@ -1911,6 +1911,29 @@ if (mode == "designer")
         + $"(expected {aRight.WidthDots}x{aRight.HeightDots})");
 
     d.AlignToLabel = false;
+
+    // A size can be typed in millimetres, the same toggle X and Y already answer to. The
+    // model stays in dots whatever the panel is showing.
+    d.Selection.Set(aLeft);
+    Pump(400);
+    var sizeEditor = (LabelForge.App.ViewModels.BoxPropertiesViewModel)d.SelectionProperties!;
+    sizeEditor.UseMm = true;
+    Console.WriteLine(
+        $"size shows in mm: {sizeEditor.BoxWidth} mm for {aLeft.WidthDots} dots at "
+        + $"{d.Document.Dpmm} dpmm (expected {aLeft.WidthDots / d.Document.Dpmm}), "
+        + $"label reads '{sizeEditor.UnitSuffix}' (expected mm)");
+
+    sizeEditor.BoxWidth = 25;
+    Pump(500);
+    Console.WriteLine(
+        $"and a size typed in mm lands in dots: {aLeft.WidthDots} "
+        + $"(expected {25 * d.Document.Dpmm})");
+
+    sizeEditor.UseMm = false;
+    Console.WriteLine(
+        $"back in dots: {sizeEditor.BoxWidth} (expected {aLeft.WidthDots}), "
+        + $"label reads '{sizeEditor.UnitSuffix}' (expected dots)");
+
     d.Selection.Clear();
     Pump(300);
 

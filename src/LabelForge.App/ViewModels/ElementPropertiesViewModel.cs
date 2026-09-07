@@ -150,6 +150,10 @@ public abstract class ElementPropertiesViewModel : ObservableObject
 
     public string PositionFormat => UseMm ? "0.##" : "0";
 
+    /// <summary>How much a size spinner steps by. Ten dots is a sensible nudge; ten
+    /// millimetres is most of a small label.</summary>
+    public decimal SizeIncrement => UseMm ? 1 : 10;
+
     public decimal X
     {
         get => UseMm ? (decimal)Math.Round(Units.DotsToMm(Element.X, _document.Dpmm), 2) : Element.X;
@@ -162,7 +166,15 @@ public abstract class ElementPropertiesViewModel : ObservableObject
         set => Edit(Element.Y, ToDots(value), v => Element.Y = v);
     }
 
-    private int ToDots(decimal value) =>
+    /// <summary>A stored dot count as the unit currently on show. Sizes use it for the same
+    /// reason X and Y do: a size you can type is the other half of a typed position, and
+    /// having one in millimetres and the other in dots is the confusing arrangement.</summary>
+    protected decimal FromDots(int dots) =>
+        UseMm ? (decimal)Math.Round(Units.DotsToMm(dots, _document.Dpmm), 2) : dots;
+
+    /// <summary>What the user typed, in dots. Minimums stay in DOTS at the call site: they
+    /// are limits of the ZPL command, not of the unit someone chose to type in.</summary>
+    protected int ToDots(decimal value) =>
         UseMm ? Units.MmToDots((double)value, _document.Dpmm) : (int)value;
 
     /// <summary>Whether to offer a rotation at all. ZPL's graphic primitives take no
@@ -761,14 +773,14 @@ public sealed class ImagePropertiesViewModel : ElementPropertiesViewModel
 
     public decimal ImageWidth
     {
-        get => _image.WidthDots;
-        set => Edit(_image.WidthDots, Math.Max((int)value, 8), v => _image.WidthDots = v);
+        get => FromDots(_image.WidthDots);
+        set => Edit(_image.WidthDots, Math.Max(ToDots(value), 8), v => _image.WidthDots = v);
     }
 
     public decimal ImageHeight
     {
-        get => _image.HeightDots;
-        set => Edit(_image.HeightDots, Math.Max((int)value, 8), v => _image.HeightDots = v);
+        get => FromDots(_image.HeightDots);
+        set => Edit(_image.HeightDots, Math.Max(ToDots(value), 8), v => _image.HeightDots = v);
     }
 
     /// <summary>Re-derives the height from the width using the source pixel aspect.</summary>
@@ -796,8 +808,8 @@ public sealed class LinePropertiesViewModel : ElementPropertiesViewModel
 
     public decimal Length
     {
-        get => _line.LengthDots;
-        set => Edit(_line.LengthDots, Math.Max((int)value, 1), v => _line.LengthDots = v);
+        get => FromDots(_line.LengthDots);
+        set => Edit(_line.LengthDots, Math.Max(ToDots(value), 1), v => _line.LengthDots = v);
     }
 
     public decimal Thickness
@@ -832,14 +844,14 @@ public sealed class BoxPropertiesViewModel : ElementPropertiesViewModel
 
     public decimal BoxWidth
     {
-        get => _box.WidthDots;
-        set => Edit(_box.WidthDots, Math.Max((int)value, 4), v => _box.WidthDots = v);
+        get => FromDots(_box.WidthDots);
+        set => Edit(_box.WidthDots, Math.Max(ToDots(value), 4), v => _box.WidthDots = v);
     }
 
     public decimal BoxHeight
     {
-        get => _box.HeightDots;
-        set => Edit(_box.HeightDots, Math.Max((int)value, 4), v => _box.HeightDots = v);
+        get => FromDots(_box.HeightDots);
+        set => Edit(_box.HeightDots, Math.Max(ToDots(value), 4), v => _box.HeightDots = v);
     }
 
     public decimal Thickness
@@ -878,7 +890,7 @@ public sealed partial class EllipsePropertiesViewModel : ElementPropertiesViewMo
 
     public decimal EllipseWidth
     {
-        get => _ellipse.WidthDots;
+        get => FromDots(_ellipse.WidthDots);
         set
         {
             Edit(_ellipse.WidthDots, Clamp(value), v => _ellipse.WidthDots = v);
@@ -888,7 +900,7 @@ public sealed partial class EllipsePropertiesViewModel : ElementPropertiesViewMo
 
     public decimal EllipseHeight
     {
-        get => _ellipse.HeightDots;
+        get => FromDots(_ellipse.HeightDots);
         set
         {
             Edit(_ellipse.HeightDots, Clamp(value), v => _ellipse.HeightDots = v);
@@ -940,8 +952,8 @@ public sealed partial class EllipsePropertiesViewModel : ElementPropertiesViewMo
         OnPropertyChanged(nameof(TypeName));
     }
 
-    private static int Clamp(decimal value) => Math.Clamp(
-        (int)value, ElementResizer.MinShapeSideDots, ElementResizer.MaxEllipseSideDots);
+    private int Clamp(decimal value) => Math.Clamp(
+        ToDots(value), ElementResizer.MinShapeSideDots, ElementResizer.MaxEllipseSideDots);
 }
 
 public sealed class DiagonalPropertiesViewModel : ElementPropertiesViewModel
@@ -956,19 +968,19 @@ public sealed class DiagonalPropertiesViewModel : ElementPropertiesViewModel
 
     public decimal DiagonalWidth
     {
-        get => _diagonal.WidthDots;
+        get => FromDots(_diagonal.WidthDots);
         set => Edit(
             _diagonal.WidthDots,
-            Math.Max((int)value, ElementResizer.MinShapeSideDots),
+            Math.Max(ToDots(value), ElementResizer.MinShapeSideDots),
             v => _diagonal.WidthDots = v);
     }
 
     public decimal DiagonalHeight
     {
-        get => _diagonal.HeightDots;
+        get => FromDots(_diagonal.HeightDots);
         set => Edit(
             _diagonal.HeightDots,
-            Math.Max((int)value, ElementResizer.MinShapeSideDots),
+            Math.Max(ToDots(value), ElementResizer.MinShapeSideDots),
             v => _diagonal.HeightDots = v);
     }
 

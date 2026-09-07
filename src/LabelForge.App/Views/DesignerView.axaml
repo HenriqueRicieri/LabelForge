@@ -195,12 +195,14 @@
         <DataTemplate DataType="vm:ImagePropertiesViewModel">
             <StackPanel Spacing="4">
                 <TextBlock Text="{Binding SourceInfo}" Opacity="0.6" FontSize="12" />
-                <TextBlock Classes="propLabel" Text="Width (dots)" />
-                <NumericUpDown Value="{Binding ImageWidth}" Minimum="8" Maximum="5000"
-                               Increment="10" FormatString="0" />
-                <TextBlock Classes="propLabel" Text="Height (dots)" />
-                <NumericUpDown Value="{Binding ImageHeight}" Minimum="8" Maximum="5000"
-                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Width ({0})'}" />
+                <NumericUpDown Value="{Binding ImageWidth}" Minimum="0" Maximum="5000"
+                               Increment="{Binding SizeIncrement}"
+                               FormatString="{Binding PositionFormat}" />
+                <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Height ({0})'}" />
+                <NumericUpDown Value="{Binding ImageHeight}" Minimum="0" Maximum="5000"
+                               Increment="{Binding SizeIncrement}"
+                               FormatString="{Binding PositionFormat}" />
                 <Button Content="Restore aspect ratio" Command="{Binding RestoreAspectCommand}"
                         HorizontalAlignment="Stretch"
                         ToolTip.Tip="Re-derives the height from the width using the source image proportions" />
@@ -214,9 +216,10 @@
 
         <DataTemplate DataType="vm:LinePropertiesViewModel">
             <StackPanel Spacing="4">
-                <TextBlock Classes="propLabel" Text="Length (dots)" />
-                <NumericUpDown Value="{Binding Length}" Minimum="1" Maximum="5000"
-                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Length ({0})'}" />
+                <NumericUpDown Value="{Binding Length}" Minimum="0" Maximum="5000"
+                               Increment="{Binding SizeIncrement}"
+                               FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="Thickness (dots)" />
                 <NumericUpDown Value="{Binding Thickness}" Minimum="1" Maximum="200"
                                Increment="1" FormatString="0" />
@@ -228,12 +231,14 @@
 
         <DataTemplate DataType="vm:BoxPropertiesViewModel">
             <StackPanel Spacing="4">
-                <TextBlock Classes="propLabel" Text="Width (dots)" />
-                <NumericUpDown Value="{Binding BoxWidth}" Minimum="4" Maximum="5000"
-                               Increment="10" FormatString="0" />
-                <TextBlock Classes="propLabel" Text="Height (dots)" />
-                <NumericUpDown Value="{Binding BoxHeight}" Minimum="4" Maximum="5000"
-                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Width ({0})'}" />
+                <NumericUpDown Value="{Binding BoxWidth}" Minimum="0" Maximum="5000"
+                               Increment="{Binding SizeIncrement}"
+                               FormatString="{Binding PositionFormat}" />
+                <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Height ({0})'}" />
+                <NumericUpDown Value="{Binding BoxHeight}" Minimum="0" Maximum="5000"
+                               Increment="{Binding SizeIncrement}"
+                               FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="Border thickness (dots)" />
                 <NumericUpDown Value="{Binding Thickness}" Minimum="1" Maximum="200"
                                Increment="1" FormatString="0" />
@@ -248,12 +253,14 @@
 
         <DataTemplate DataType="vm:EllipsePropertiesViewModel">
             <StackPanel Spacing="4">
-                <TextBlock Classes="propLabel" Text="Width (dots)" />
-                <NumericUpDown Value="{Binding EllipseWidth}" Minimum="3" Maximum="4095"
-                               Increment="10" FormatString="0" />
-                <TextBlock Classes="propLabel" Text="Height (dots)" />
-                <NumericUpDown Value="{Binding EllipseHeight}" Minimum="3" Maximum="4095"
-                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Width ({0})'}" />
+                <NumericUpDown Value="{Binding EllipseWidth}" Minimum="0" Maximum="4095"
+                               Increment="{Binding SizeIncrement}"
+                               FormatString="{Binding PositionFormat}" />
+                <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Height ({0})'}" />
+                <NumericUpDown Value="{Binding EllipseHeight}" Minimum="0" Maximum="4095"
+                               Increment="{Binding SizeIncrement}"
+                               FormatString="{Binding PositionFormat}" />
                 <Button Content="Make it a circle" Command="{Binding MakeCircleCommand}"
                         HorizontalAlignment="Stretch"
                         ToolTip.Tip="Matches the height to the width. A circle is an ellipse with equal sides; ZPL's own ^GC draws exactly that." />
@@ -270,12 +277,14 @@
 
         <DataTemplate DataType="vm:DiagonalPropertiesViewModel">
             <StackPanel Spacing="4">
-                <TextBlock Classes="propLabel" Text="Width (dots)" />
-                <NumericUpDown Value="{Binding DiagonalWidth}" Minimum="3" Maximum="5000"
-                               Increment="10" FormatString="0" />
-                <TextBlock Classes="propLabel" Text="Height (dots)" />
-                <NumericUpDown Value="{Binding DiagonalHeight}" Minimum="3" Maximum="5000"
-                               Increment="10" FormatString="0" />
+                <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Width ({0})'}" />
+                <NumericUpDown Value="{Binding DiagonalWidth}" Minimum="0" Maximum="5000"
+                               Increment="{Binding SizeIncrement}"
+                               FormatString="{Binding PositionFormat}" />
+                <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Height ({0})'}" />
+                <NumericUpDown Value="{Binding DiagonalHeight}" Minimum="0" Maximum="5000"
+                               Increment="{Binding SizeIncrement}"
+                               FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="Thickness (dots)" />
                 <NumericUpDown Value="{Binding Thickness}" Minimum="1" Maximum="200"
                                Increment="1" FormatString="0" />
