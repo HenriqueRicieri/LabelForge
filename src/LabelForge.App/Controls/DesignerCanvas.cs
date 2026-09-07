@@ -2169,6 +2169,15 @@ public sealed class DesignerCanvas : Control
     {
         base.OnDoubleTapped(e);
 
+        // Not on the rulers, where a double-click already means "leave a guide here". Doing
+        // both would move the caret into a properties field nobody was looking at, and the
+        // next keystroke would land in it.
+        Point p = e.GetPosition(this);
+        if (p.X < RulerSize || p.Y < RulerSize)
+        {
+            return;
+        }
+
         // The first click of the pair already selected whatever is under the pointer, so
         // there is nothing to hit test here: if that landed on an element, edit it.
         if (Selection is { Count: 1 })
@@ -2748,7 +2757,10 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
-        if (e.Key == Key.Tab && Document is { } tabDoc && Selection is { } tabSelection)
+        // Ctrl + Tab belongs to whatever is switching between panes or windows, so only a
+        // bare Tab and Shift + Tab step the selection.
+        if (e.Key == Key.Tab && !e.KeyModifiers.HasFlag(KeyModifiers.Control) &&
+            Document is { } tabDoc && Selection is { } tabSelection)
         {
             // Handled only when there was something to step to. On an empty label Tab keeps
             // its usual meaning and moves focus off the canvas, which is the one way out for

@@ -1989,24 +1989,14 @@ public partial class DesignerViewModel : ViewModelBase
             return false;
         }
 
-        int nextZ = Document.Elements.Count == 0
-            ? 0
-            : Document.Elements.Max(e => e.ZOrder) + 1;
-        int dx = CascadeDelta(clones.Min(e => e.X), clones.Max(e => e.X), Math.Max(Document.WidthDots - 1, 0));
-        int dy = CascadeDelta(clones.Min(e => e.Y), clones.Max(e => e.Y), Math.Max(Document.HeightDots - 1, 0));
-
-        foreach (Element element in clones)
-        {
-            element.Id = Guid.NewGuid();
-            element.X += dx;
-            element.Y += dy;
-            element.ZOrder = nextZ++;
-            Document.Elements.Add(element);
-        }
-
-        Selection.SetMany(clones);
-        RecordUndo();
-        ScheduleRender();
+        // No clamping: the cascade already keeps the group inside the label by wrapping it
+        // back when it would not fit, and clamping on top of that would flatten a group
+        // against the edge instead of moving it as one.
+        PlaceCopies(
+            clones,
+            CascadeDelta(clones.Min(e => e.X), clones.Max(e => e.X), Math.Max(Document.WidthDots - 1, 0)),
+            CascadeDelta(clones.Min(e => e.Y), clones.Max(e => e.Y), Math.Max(Document.HeightDots - 1, 0)),
+            clamp: false);
         return true;
     }
 
