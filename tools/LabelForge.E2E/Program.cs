@@ -1296,6 +1296,56 @@ if (mode == "designer")
         $"alt click selects through: top first={topFirst}, then the one under it={thenBelow}, "
         + $"then wraps={ReferenceEquals(d.Selection.Primary, upper)} (expected True, True, True)");
 
+    // Escape mid-drag puts the element back where the gesture started and records
+    // nothing, so undo still lands on the edit before it rather than on the cancelled
+    // gesture. The pointer is never released here: cancelling has to end the gesture on
+    // its own, or the release afterwards would commit it.
+    d.Selection.Set(upper);
+    upper.X = 600;
+    upper.Y = 300;
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    var escFrom = canvas.TranslatePoint(canvas.DotsToView(660, 340), window)!.Value;
+    window.MouseDown(escFrom, MouseButton.Left);
+    window.MouseMove(new Avalonia.Point(escFrom.X + 50, escFrom.Y + 40));
+    Pump(300);
+    bool movedFirst = upper.X != 600 || upper.Y != 300;
+    window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+    Pump(700);
+    Console.WriteLine(
+        $"escape cancels a drag: moved to {movedFirst}, back at {upper.X},{upper.Y} "
+        + "(expected True, 600,300)");
+
+    window.MouseUp(new Avalonia.Point(escFrom.X + 50, escFrom.Y + 40), MouseButton.Left);
+    Pump(700);
+    Console.WriteLine(
+        $"and the release does not commit it: {upper.X},{upper.Y} (expected 600,300)");
+
+    // Escape on a duplicating drag has to take the copies back out as well.
+    int beforeEscapeDuplicate = d.Document.Elements.Count;
+    d.Selection.Set(d.Document.Elements[^1]);
+    Pump(200);
+    window.MouseDown(escFrom, MouseButton.Left, RawInputModifiers.Control);
+    window.MouseMove(new Avalonia.Point(escFrom.X + 50, escFrom.Y), RawInputModifiers.Control);
+    Pump(300);
+    int duringDuplicate = d.Document.Elements.Count;
+    window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+    Pump(700);
+    window.MouseUp(new Avalonia.Point(escFrom.X + 50, escFrom.Y), MouseButton.Left, RawInputModifiers.Control);
+    Pump(700);
+    Console.WriteLine(
+        $"escape takes a duplicate back out: {beforeEscapeDuplicate} -> {duringDuplicate} "
+        + $"-> {d.Document.Elements.Count} (expected up by one, then back down)");
+
+    // With no gesture running, Escape clears the selection the way it does everywhere.
+    d.Selection.Set(upper);
+    Pump(200);
+    window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+    Pump(300);
+    Console.WriteLine(
+        $"escape with nothing running clears the selection: {d.Selection.Count} (expected 0)");
+
     d.Document.Elements.Remove(lower);
     d.Document.Elements.Remove(upper);
     d.Document.Elements.Remove(second);

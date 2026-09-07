@@ -174,6 +174,13 @@ public sealed class DesignerCanvas : Control
     // the change, whether or not they ended up somewhere new.
     private bool _duplicated;
 
+    // What the moving elements looked like the moment the gesture began, and the copies
+    // the gesture made. Escape puts the first back and takes the second out. A move could
+    // be reversed from the X and Y it started at, but a resize cannot: the resizer
+    // quantizes, so the size before is not recoverable from the size after.
+    private string? _gestureBefore;
+    private readonly List<Element> _gestureAdded = [];
+
 
     // Group drag.
     private bool _dragging;
@@ -1244,6 +1251,8 @@ public sealed class DesignerCanvas : Control
                 _rotateVisualDeg = _rotateStartDeg;
                 _rotateStartBounds = b;
                 _rotateGestureStart = primary.Orientation;
+                _gestureBefore = ElementSnapshot.Capture([primary]);
+                _gestureAdded.Clear();
                 Cursor = new Cursor(StandardCursorType.Hand);
                 e.Pointer.Capture(this);
                 InvalidateVisual();
@@ -1270,6 +1279,8 @@ public sealed class DesignerCanvas : Control
                 _gestureY = _resizeStartBounds.Y;
                 _gestureW = _resizeStartBounds.Width;
                 _gestureH = _resizeStartBounds.Height;
+                _gestureBefore = ElementSnapshot.Capture([primary]);
+                _gestureAdded.Clear();
                 e.Pointer.Capture(this);
                 InvalidateVisual();
                 return;
@@ -1409,6 +1420,7 @@ public sealed class DesignerCanvas : Control
                 }
 
                 selection.SetMany(clones);
+                _gestureAdded.AddRange(clones);
                 _duplicated = true;
             }
         }
@@ -1442,7 +1454,75 @@ public sealed class DesignerCanvas : Control
         }
 
         _dragStartBounds = new DotRect(minX, minY, maxX - minX, maxY - minY);
+        _gestureBefore = ElementSnapshot.Capture(_dragItems.Select(i => i.Element));
         BuildSnapTargets(doc, _dragItems.Select(i => i.Element).ToHashSet());
+    }
+
+    /// <summary>
+    /// Escape mid-gesture: put the elements back the way they were when it started, take
+    /// out anything it created, and record nothing. The gesture is over either way, so the
+    /// pointer is released and every piece of gesture state is cleared, or the release that
+    /// follows would commit a gesture that was cancelled.
+    /// </summary>
+    /// <returns>False when there was no gesture to cancel.</returns>
+    private bool CancelGesture()
+    {
+        if (!_dragging && !_resizing && !_rotating && !_pressArmed)
+        {
+            return false;
+        }
+
+        if (_gestureBefore is { } before && Document is { } doc)
+        {
+            ElementSnapshot.Restore(before, doc.Elements);
+
+            if (_gestureAdded.Count > 0)
+            {
+                foreach (Element added in _gestureAdded)
+                {
+                    doc.Elements.Remove(added);
+                }
+
+                Selection?.SetMany(
+                    _dragItems.Select(i => i.Element).Where(el => !_gestureAdded.Contains(el)));
+            }
+        }
+
+        bool wasGesturing = _dragging || _resizing || _rotating;
+        EndGestureState();
+
+        if (wasGesturing)
+        {
+            // The model changed back, so the canvas has to be told; nothing is recorded,
+            // because as far as the document is concerned nothing happened.
+            LiveEdited?.Invoke(this, EventArgs.Empty);
+        }
+
+        InvalidateVisual();
+        return true;
+    }
+
+    /// <summary>Everything a gesture leaves behind, cleared in one place so a cancel and a
+    /// release cannot forget different halves of it.</summary>
+    private void EndGestureState()
+    {
+        _dragging = false;
+        _resizing = false;
+        _rotating = false;
+        _pressArmed = false;
+        _pressHit = null;
+        _pressPendingToggle = null;
+        _activeHandle = ResizeHandle.None;
+        _dragItems.Clear();
+        _gestureAdded.Clear();
+        _gestureBefore = null;
+        _duplicated = false;
+        _axisLockX = false;
+        _axisLockY = false;
+        _dragDx = 0;
+        _dragDy = 0;
+        _snapX = null;
+        _snapY = null;
     }
 
     /// <summary>Collects the snap targets for a starting gesture: guides, label edges
@@ -2239,10 +2319,12 @@ public sealed class DesignerCanvas : Control
 
         if (_rotating)
         {
-            _rotating = false;
             Cursor = Cursor.Default;
             e.Pointer.Capture(null);
-            if (Selection?.Primary is { } rotated && rotated.Orientation != _rotateGestureStart)
+            bool turned = Selection?.Primary is { } rotated
+                && rotated.Orientation != _rotateGestureStart;
+            EndGestureState();
+            if (turned)
             {
                 DocumentEdited?.Invoke(this, EventArgs.Empty);
             }
@@ -2256,11 +2338,9 @@ public sealed class DesignerCanvas : Control
         // an element out of a multiple selection, or adding one with Ctrl.
         if (_pressArmed)
         {
-            _pressArmed = false;
             Element? toggle = _pressPendingToggle;
-            _pressPendingToggle = null;
-            _pressHit = null;
             e.Pointer.Capture(null);
+            EndGestureState();
 
             if (toggle is not null)
             {
@@ -2277,9 +2357,6 @@ public sealed class DesignerCanvas : Control
         }
 
         bool wasResizing = _resizing;
-        _dragging = false;
-        _resizing = false;
-        _activeHandle = ResizeHandle.None;
         e.Pointer.Capture(null);
 
         // The model was updated live during the gesture; the release only decides
@@ -2291,20 +2368,14 @@ public sealed class DesignerCanvas : Control
               _candidateHeight != _resizeStartBounds.Height ||
               Selection?.Primary is { } r && (r.X != _resizeStartX || r.Y != _resizeStartY)
             : _duplicated || _dragDx != 0 || _dragDy != 0;
-        _duplicated = false;
-        _axisLockX = false;
-        _axisLockY = false;
+
+        EndGestureState();
+
         if (changed)
         {
             DocumentEdited?.Invoke(this, EventArgs.Empty);
         }
 
-        _dragItems.Clear();
-        _dragDx = 0;
-        _dragDy = 0;
-        _snapX = null;
-        _snapY = null;
-        _pressHit = null;
         InvalidateVisual();
     }
 
@@ -2338,10 +2409,31 @@ public sealed class DesignerCanvas : Control
     {
         base.OnKeyDown(e);
 
-        if (e.Key == Key.Escape && IsPlacing)
+        if (e.Key == Key.Escape)
         {
-            CancelRequested?.Invoke(this, EventArgs.Empty);
-            e.Handled = true;
+            // A gesture in progress outranks everything: it is the thing the key is most
+            // likely aimed at, and leaving it running while doing something else would
+            // commit it on release.
+            if (CancelGesture())
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (IsPlacing)
+            {
+                CancelRequested?.Invoke(this, EventArgs.Empty);
+                e.Handled = true;
+                return;
+            }
+
+            // Nothing to cancel, so Escape means what it means in every editor.
+            if (Selection is { Count: > 0 })
+            {
+                Selection.Clear();
+                e.Handled = true;
+            }
+
             return;
         }
 

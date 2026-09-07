@@ -63,6 +63,7 @@ public sealed class ShortcutsViewModel
             new("Ctrl + drag a handle", "Resize from the middle, both sides at once"),
             new("Shift + drag a corner", "Resize the two sides independently"),
             new("Drag the round handle", "Rotate, snapping to 0, 90, 180 and 270"),
+            new("Esc while dragging", "Put it back where the gesture started"),
         ]),
 
         new("Selecting", "A press only starts a drag once the pointer has moved a little, so "
@@ -71,6 +72,7 @@ public sealed class ShortcutsViewModel
             new("Click", "Select what is under the pointer"),
             new("Ctrl / Shift + click", "Add to or remove from the selection"),
             new("Alt + click", "Pick the element under the one selected, and keep going"),
+            new("Esc", "Clear the selection, when nothing else is going on"),
             new("Drag on empty stock", "Marquee-select"),
             new("Right-click an element", "Its menu, selecting it first if it was not"),
             new("Right-click empty stock", "Paste, insert and zoom for that spot"),
