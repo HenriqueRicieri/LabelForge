@@ -564,9 +564,19 @@ if (mode == "designer")
     // Smart-guide drag: grab the top box copy at (40,55) and move +157 dots right.
     // Its left edge lands 3 dots short of the vertical guide at 200 (snaps to 200)
     // and its top edge sits 5 dots below the Title's top at 50 (snaps to 50).
+    //
+    // The grab point is taken from the element rather than written down, which is the
+    // whole reason this check went quiet: it used to press at a fixed (600,450), and once
+    // the ellipse arrived at (560,300) with a 200 by 200 footprint that point was inside
+    // the ellipse instead. The drag moved the ellipse, the line printed the box, and the
+    // box had never moved. A grab point derived from what it means to grab cannot drift
+    // that way again.
     var boxCopy = d.Document.Elements[5];
-    Avalonia.Point dragFrom = canvas.TranslatePoint(canvas.DotsToView(600, 450), window)!.Value;
-    Avalonia.Point dragTo = canvas.TranslatePoint(canvas.DotsToView(757, 450), window)!.Value;
+    var boxBounds = new LabelForge.Core.Model.ElementBoundsCalculator().GetBounds(boxCopy);
+    int grabX = boxBounds.X + 60;
+    int grabY = boxBounds.Y + 25;
+    Avalonia.Point dragFrom = canvas.TranslatePoint(canvas.DotsToView(grabX, grabY), window)!.Value;
+    Avalonia.Point dragTo = canvas.TranslatePoint(canvas.DotsToView(grabX + 157, grabY), window)!.Value;
     window.MouseDown(dragFrom, MouseButton.Left);
     window.MouseMove(dragTo);
     window.MouseUp(dragTo, MouseButton.Left);
@@ -1113,27 +1123,36 @@ if (mode == "designer")
     d.Selection.Set(snapped);
     d.NotifyDocumentEdited();
     Pump(700);
+    // Far enough to be a drag and not a click, and far enough that the element ends
+    // somewhere it did not start: +45 dots puts it at 245,165, five short of the lines at
+    // 240 and 160, which is inside the snap threshold. The old version moved 5 dots and
+    // snapped straight back to where it began, so it read as a pass whether the drag had
+    // done anything or not.
     var gridFrom = canvas.TranslatePoint(canvas.DotsToView(240, 150), window)!.Value;
-    var gridTo = canvas.TranslatePoint(canvas.DotsToView(245, 155), window)!.Value;
+    var gridTo = canvas.TranslatePoint(canvas.DotsToView(285, 195), window)!.Value;
     window.MouseDown(gridFrom, MouseButton.Left);
     window.MouseMove(gridTo);
     window.MouseUp(gridTo, MouseButton.Left);
     Pump(700);
     Console.WriteLine(
         $"drag near a line lands on it: {snapped.X},{snapped.Y} "
-        + $"(expected multiples of 40, got {snapped.X % 40}/{snapped.Y % 40} left over)");
+        + $"(expected 240,160: multiples of 40, and moved from 200,120)");
 
     // And a drag that ends well away from any line is left where it was put, because the
     // grid is a hint and not a cage.
-    var freeFrom = canvas.TranslatePoint(canvas.DotsToView(240, 160), window)!.Value;
-    var freeTo = canvas.TranslatePoint(canvas.DotsToView(263, 183), window)!.Value;
+    // Chosen so no edge AND no centre of the 120 by 80 box lands within the snap
+    // threshold of a line. The centre is the one that catches you out: at 263,183 the box
+    // is 17 dots off every line by its edges and 3 dots off one by its middle, so it
+    // snapped anyway and the check would have been describing the wrong thing.
+    var freeFrom = canvas.TranslatePoint(canvas.DotsToView(280, 200), window)!.Value;
+    var freeTo = canvas.TranslatePoint(canvas.DotsToView(290, 220), window)!.Value;
     window.MouseDown(freeFrom, MouseButton.Left);
     window.MouseMove(freeTo);
     window.MouseUp(freeTo, MouseButton.Left);
     Pump(700);
     Console.WriteLine(
         $"drag between lines stays put: {snapped.X},{snapped.Y} "
-        + "(expected not forced onto the grid)");
+        + "(expected 250,180: moved, and not forced onto the grid)");
 
     d.GridPitchMm = 0;
     d.Selection.Clear();
