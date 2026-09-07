@@ -70,7 +70,12 @@ public static class Groups
     /// </summary>
     /// <returns>False when there was nothing to group: fewer than two elements, or one
     /// whole group being grouped with itself.</returns>
-    public static bool Group(LabelDocument document, IEnumerable<Element> selection)
+    /// <summary>
+    /// Whether grouping this selection would do anything: two or more things, and not one
+    /// whole group already. The command asks this rather than working it out again, or the
+    /// menu offers a key that quietly does nothing when it is pressed.
+    /// </summary>
+    public static bool CanGroup(LabelDocument document, IEnumerable<Element> selection)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(selection);
@@ -83,13 +88,22 @@ public static class Groups
 
         // Already exactly one whole group with nothing joining it: grouping again would
         // swap the id for another one and record an undo step for no visible change.
-        if (members[0].GroupId is { } existing &&
-            members.TrueForAll(e => e.GroupId == existing) &&
-            members.Count == Members(document, members[0]).Count)
+        return !(members[0].GroupId is { } existing &&
+                 members.TrueForAll(e => e.GroupId == existing) &&
+                 members.Count == Members(document, members[0]).Count);
+    }
+
+    public static bool Group(LabelDocument document, IEnumerable<Element> selection)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(selection);
+
+        if (!CanGroup(document, selection))
         {
             return false;
         }
 
+        List<Element> members = [.. Expand(document, selection)];
         var id = Guid.NewGuid();
         foreach (Element member in members)
         {

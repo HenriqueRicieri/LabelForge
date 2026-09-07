@@ -1417,7 +1417,14 @@ public sealed class DesignerCanvas : Control
                 // remembered index, and clicking a different stack starts at its top
                 // because nothing selected is in it.
                 int current = selection.Primary is { } chosen ? stack.IndexOf(chosen) : -1;
-                selection.Set(stack[current >= 0 ? (current + 1) % stack.Count : 0]);
+                Element reached = stack[current >= 0 ? (current + 1) % stack.Count : 0];
+
+                // Alt is a bypass for what a click SELECTS, not a reason to leave a group
+                // open behind it: landing outside the opened one closes it, exactly as a
+                // plain click would, or the next ordinary click on that group would still
+                // be picking one member out of it.
+                LeaveGroupUnlessInside(reached);
+                selection.Set(reached);
                 InvalidateVisual();
                 return;
             }

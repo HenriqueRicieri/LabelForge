@@ -2079,9 +2079,10 @@ public partial class DesignerViewModel : ViewModelBase
         ScheduleRender();
     }
 
-    /// <summary>True while there is something that could become a group: two elements, or
-    /// one that already belongs to one and so has an Ungroup to offer.</summary>
-    private bool CanGroup => Selection.Count > 1;
+    /// <summary>True while grouping would actually do something. Not simply "more than one
+    /// selected": one whole group selected is more than one element and grouping it again
+    /// would do nothing, so offering the key there is offering a key that does nothing.</summary>
+    private bool CanGroup => Groups.CanGroup(Document, Selection.Items);
 
     private bool CanUngroup => Selection.Items.Any(e => e.GroupId is not null);
 

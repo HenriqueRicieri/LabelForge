@@ -118,6 +118,25 @@ public sealed class GroupsTests
     }
 
     [Fact]
+    public void CanGroup_SaysWhenGroupingWouldDoNothing()
+    {
+        var first = Box(10, 10, 0);
+        var second = Box(200, 10, 1);
+        var loose = Box(400, 10, 2);
+        LabelDocument document = Document(first, second, loose);
+
+        Assert.False(Groups.CanGroup(document, [first]));
+        Assert.True(Groups.CanGroup(document, [first, second]));
+
+        Groups.Group(document, [first, second]);
+
+        // One whole group is more than one element and still nothing to do, which is what
+        // stops the menu offering a key that presses to no effect.
+        Assert.False(Groups.CanGroup(document, [first, second]));
+        Assert.True(Groups.CanGroup(document, [first, loose]));
+    }
+
+    [Fact]
     public void GroupingAbsorbsAnExistingGroup()
     {
         var first = Box(10, 10, 0);
