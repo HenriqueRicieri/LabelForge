@@ -7,6 +7,8 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LabelForge.App.ViewModels;
 using LabelForge.Core.Io;
 
@@ -40,6 +42,7 @@ public partial class DesignerView : UserControl
         Canvas.DeleteRequested += (_, _) => ViewModel?.DeleteSelectedCommand.Execute(null);
         Canvas.PointerDotsChanged += (x, y) => ViewModel?.ReportPointer(x, y);
         Canvas.PointerLeftLabel += (_, _) => ViewModel?.ReportPointerLeft();
+        Canvas.EditRequested += (_, _) => FocusContentField();
         Canvas.ContextMenuRequested += OnCanvasContextMenu;
         Canvas.PlaceRequested += (x, y) => ViewModel?.PlaceAt(x, y);
         Canvas.CancelRequested += (_, _) => ViewModel?.CancelInsert();
@@ -409,6 +412,34 @@ public partial class DesignerView : UserControl
     /// caret is inside an unterminated marker, and the selector splices the chosen field
     /// into that marker and leaves everything around it alone.
     /// </summary>
+    /// <summary>
+    /// Puts the caret in the field holding the selected element's content, with the text
+    /// selected so typing replaces it. The cheap form of editing in place: the canvas draws
+    /// the renderer's bitmap and must never draw text itself, so the editing happens in the
+    /// panel and the canvas shows the result.
+    ///
+    /// Posted rather than done straight away, because the double-click may be what selected
+    /// the element and the panel's editor for it does not exist until the layout pass that
+    /// follows. Elements with nothing to type (a box, a line) have no such field and this
+    /// does nothing, which is the right amount to do.
+    /// </summary>
+    private void FocusContentField() => Dispatcher.UIThread.Post(
+        () =>
+        {
+            if (PropertiesContent.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault()
+                is not { } box)
+            {
+                return;
+            }
+
+            box.Focus();
+            if (box.GetVisualDescendants().OfType<TextBox>().FirstOrDefault() is { } inner)
+            {
+                inner.SelectAll();
+            }
+        },
+        DispatcherPriority.Background);
+
     private void OnFieldBoxAttached(object? sender, VisualTreeAttachmentEventArgs e)
     {
         if (sender is not AutoCompleteBox box)
@@ -851,6 +882,15 @@ public partial class DesignerView : UserControl
                 if (vm.DuplicateCommand.CanExecute(null))
                 {
                     vm.DuplicateCommand.Execute(null);
+                }
+
+                e.Handled = true;
+                break;
+
+            case Key.A:
+                if (vm.SelectAllCommand.CanExecute(null))
+                {
+                    vm.SelectAllCommand.Execute(null);
                 }
 
                 e.Handled = true;

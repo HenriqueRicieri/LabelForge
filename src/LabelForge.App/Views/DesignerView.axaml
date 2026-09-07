@@ -721,9 +721,9 @@
                         <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="0,8" />
 
                         <!-- Type-specific editor, picked by DataTemplate -->
-                        <ContentControl Content="{Binding SelectionProperties}" />
+                        <ContentControl Name="PropertiesContent" Content="{Binding SelectionProperties}" />
 
-                        <TextBlock Text="Drag to move. Corner handles resize proportionally; edge handles resize one axis (barcodes snap to module steps). The round handle rotates; ZPL printers only support 0/90/180/270. Arrow keys nudge by 1 dot (Shift = 10). Delete removes. Ctrl+Z / Ctrl+Y undo and redo."
+                        <TextBlock Text="Drag to move. Corner handles resize proportionally; edge handles resize one axis (barcodes snap to module steps). The round handle rotates; ZPL printers only support 0/90/180/270. Double-click puts the caret in the text. Tab steps through the stacking order. Arrow keys nudge by 1 dot (Shift = 10). Delete removes. Ctrl+Z / Ctrl+Y undo and redo."
                                    TextWrapping="Wrap" Opacity="0.5" FontSize="11" Margin="0,8,0,0" />
                     </StackPanel>
 

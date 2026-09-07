@@ -1486,6 +1486,77 @@ if (mode == "designer")
     d.NotifyDocumentEdited();
     Pump(400);
 
+    // Selection by keyboard. Three elements with stated z-orders, so front to back is a
+    // fact rather than whatever order they went into the list.
+    d.Document.Elements.Clear();
+    var tabBack = new LabelForge.Core.Model.BoxElement
+    {
+        X = 40, Y = 40, WidthDots = 120, HeightDots = 80, ThicknessDots = 3, ZOrder = 1,
+    };
+    var tabMiddle = new LabelForge.Core.Model.BoxElement
+    {
+        X = 200, Y = 40, WidthDots = 120, HeightDots = 80, ThicknessDots = 3, ZOrder = 2,
+    };
+    var tabFront = new LabelForge.Core.Model.TextElement
+    {
+        X = 360, Y = 40, Text = "front", FontHeightDots = 40, ZOrder = 3,
+    };
+    d.Document.Elements.Add(tabBack);
+    d.Document.Elements.Add(tabMiddle);
+    d.Document.Elements.Add(tabFront);
+    d.Selection.Clear();
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    window.KeyPress(Key.A, RawInputModifiers.Control, PhysicalKey.A, "a");
+    Pump(300);
+    Console.WriteLine($"ctrl+a selects all: {d.Selection.Count} (expected 3)");
+
+    // Tab walks down the z-order from the front and wraps; Shift+Tab comes back up. The
+    // canvas has to hold focus for it, which a click gives it.
+    d.Selection.Clear();
+    canvas.Focus();
+    Pump(200);
+    window.KeyPress(Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, "	");
+    Pump(200);
+    string tabFirst = d.Selection.Primary is { } a ? a.ZOrder.ToString() : "none";
+    window.KeyPress(Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, "	");
+    Pump(200);
+    string tabSecond = d.Selection.Primary is { } b ? b.ZOrder.ToString() : "none";
+    window.KeyPress(Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, "	");
+    Pump(200);
+    string tabThird = d.Selection.Primary is { } c ? c.ZOrder.ToString() : "none";
+    window.KeyPress(Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, "	");
+    Pump(200);
+    string tabWrapped = d.Selection.Primary is { } e2 ? e2.ZOrder.ToString() : "none";
+    Console.WriteLine(
+        $"tab walks the z-order: {tabFirst} {tabSecond} {tabThird} then wraps to {tabWrapped} (expected 3 2 1 then 3)");
+
+    window.KeyPress(Key.Tab, RawInputModifiers.Shift, PhysicalKey.Tab, "	");
+    Pump(200);
+    Console.WriteLine(
+        $"shift+tab goes back up: {(d.Selection.Primary is { } f ? f.ZOrder.ToString() : "none")} "
+        + "(expected 1, wrapping the other way)");
+
+    // Double-click puts the caret in the field holding that element's content, with the
+    // text selected so typing replaces it.
+    var editBounds = new LabelForge.Core.Model.ElementBoundsCalculator().GetBounds(tabFront);
+    var editPoint = canvas.TranslatePoint(
+        canvas.DotsToView(
+            editBounds.X + editBounds.Width / 2, editBounds.Y + editBounds.Height / 2),
+        window)!.Value;
+    window.MouseDown(editPoint, MouseButton.Left);
+    window.MouseUp(editPoint, MouseButton.Left);
+    Pump(120);
+    window.MouseDown(editPoint, MouseButton.Left);
+    window.MouseUp(editPoint, MouseButton.Left);
+    Pump(600);
+    var editFocused = Avalonia.Controls.TopLevel.GetTopLevel(canvas)?.FocusManager?.GetFocusedElement();
+    string editSelected = editFocused is Avalonia.Controls.TextBox tb ? tb.SelectedText : "not a text box";
+    Console.WriteLine(
+        $"double-click edits the content: selected '{editSelected}' (expected 'front'), "
+        + $"selection is the text: {d.Selection.Primary == tabFront}");
+
     // Render caching. Observable without a test hook: a skipped render leaves the very
     // bitmap that is already on screen, so the reference is unchanged.
     d.NewDocumentCommand.Execute(null);

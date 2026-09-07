@@ -70,8 +70,11 @@ public sealed class ShortcutsViewModel
             + "an unsteady click stays a click.",
         [
             new("Click", "Select what is under the pointer"),
+            new("Double-click", "Put the caret in that element's text, ready to replace"),
             new("Ctrl / Shift + click", "Add to or remove from the selection"),
             new("Alt + click", "Pick the element under the one selected, and keep going"),
+            new("Ctrl + A", "Select everything that can be seen"),
+            new("Tab  /  Shift + Tab", "Step down and back up the stacking order"),
             new("Esc", "Clear the selection, when nothing else is going on"),
             new("Drag on empty stock", "Marquee-select"),
             new("Right-click an element", "Its menu, selecting it first if it was not"),

@@ -375,6 +375,11 @@ public sealed class DesignerCanvas : Control
     /// <summary>The pointer has left the label area, or the control.</summary>
     public event EventHandler? PointerLeftLabel;
 
+    /// <summary>A double-click on an element: the caller puts the caret in whatever field
+    /// holds that element's content. The canvas does not edit text itself, because drawing
+    /// it in an Avalonia font is exactly what the WYSIWYG rule forbids.</summary>
+    public event EventHandler? EditRequested;
+
     /// <summary>
     /// A right-click that is not about guides, with the element under the pointer (null
     /// on empty stock) and where the click landed in dots.
@@ -1793,6 +1798,33 @@ public sealed class DesignerCanvas : Control
             .OrderByDescending(el => el.ZOrder)
             .FirstOrDefault(el => _bounds.GetBounds(el).Contains((int)dotX, (int)dotY));
 
+    /// <summary>
+    /// Steps the selection through the elements in z-order and wraps at either end. Tab goes
+    /// deeper, Shift plus Tab comes back up, and with nothing selected Tab starts at the
+    /// front. Hidden elements are left out for the reason Select All leaves them out: a
+    /// selection is something you are about to act on. Locked ones stay in, because a lock
+    /// stops a MOVE and never stopped a click from selecting.
+    /// </summary>
+    /// <returns>False when there was nothing to step to, so the caller can leave Tab alone.</returns>
+    private bool CycleSelection(LabelDocument doc, SelectionSet selection, bool deeper)
+    {
+        List<Element> order =
+            [.. doc.Elements.Where(el => el.IsVisible).OrderByDescending(el => el.ZOrder)];
+        if (order.Count == 0)
+        {
+            return false;
+        }
+
+        int current = selection.Primary is { } primary ? order.IndexOf(primary) : -1;
+        int next = current < 0
+            ? (deeper ? 0 : order.Count - 1)
+            : (current + (deeper ? 1 : -1) + order.Count) % order.Count;
+
+        selection.Set(order[next]);
+        InvalidateVisual();
+        return true;
+    }
+
     /// <summary>Everything under the point, front to back. What Alt-click walks down.</summary>
     private List<Element> ElementsAt(LabelDocument doc, double dotX, double dotY) =>
         [.. doc.Elements
@@ -2109,6 +2141,19 @@ public sealed class DesignerCanvas : Control
 
         var (scale, origin) = GetTransform();
         PointerDotsChanged?.Invoke((p.X - origin.X) / scale, (p.Y - origin.Y) / scale);
+    }
+
+    protected override void OnDoubleTapped(TappedEventArgs e)
+    {
+        base.OnDoubleTapped(e);
+
+        // The first click of the pair already selected whatever is under the pointer, so
+        // there is nothing to hit test here: if that landed on an element, edit it.
+        if (Selection is { Count: 1 })
+        {
+            EditRequested?.Invoke(this, EventArgs.Empty);
+            e.Handled = true;
+        }
     }
 
     protected override void OnPointerExited(PointerEventArgs e)
@@ -2674,6 +2719,18 @@ public sealed class DesignerCanvas : Control
             }
 
             return;
+        }
+
+        if (e.Key == Key.Tab && Document is { } tabDoc && Selection is { } tabSelection)
+        {
+            // Handled only when there was something to step to. On an empty label Tab keeps
+            // its usual meaning and moves focus off the canvas, which is the one way out for
+            // someone working without a pointer.
+            if (CycleSelection(tabDoc, tabSelection, deeper: !e.KeyModifiers.HasFlag(KeyModifiers.Shift)))
+            {
+                e.Handled = true;
+                return;
+            }
         }
 
         if (Selection is not { Count: > 0 } selection || Document is not { } doc)
