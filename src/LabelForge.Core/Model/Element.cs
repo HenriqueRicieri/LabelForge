@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace LabelForge.Core.Model;
 
@@ -42,6 +42,22 @@ public abstract class Element
 
     /// <summary>Human-facing name shown in the layers/objects panel.</summary>
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Which group this element belongs to, or null for none. Flat and one level deep on
+    /// purpose: a container element would have to be threaded through every visitor, the
+    /// bounds calculator, the generator and the importer, for nothing a label needs.
+    ///
+    /// It never reaches the ZPL, because a printer has no notion of one. It is saved with
+    /// the .lfl so a grouping survives a reopen, and it is written ONLY when it is set:
+    /// without that, every element of every label already on disk would gain a null entry
+    /// the next time it was saved, and every undo snapshot would carry it.
+    ///
+    /// The rules live in Editing/Groups. Nothing should read this property directly to work
+    /// out membership, or the answer starts differing between callers.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? GroupId { get; set; }
 
     /// <summary>X of the field origin in dots. Which corner of the drawn field that
     /// origin names is <see cref="Anchor"/>'s business.</summary>
