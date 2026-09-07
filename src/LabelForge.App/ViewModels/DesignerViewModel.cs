@@ -34,6 +34,13 @@ public partial class DesignerViewModel : ViewModelBase
 {
     private const int CoalesceWindowMs = 500;
 
+    /// <summary>How often the properties panel re-reads the element during a gesture.
+    /// Ten times a second: fast enough to read as live, slow enough that dragging does
+    /// not re-evaluate every binding on the panel per frame.</summary>
+    private const int PanelRefreshIntervalMs = 100;
+
+    private long _lastPanelRefresh;
+
     private readonly IZplRenderer _renderer = new BinaryKitsRenderer();
     private readonly TemplateSubstitutor _substitutor = new();
 
@@ -999,8 +1006,18 @@ public partial class DesignerViewModel : ViewModelBase
     /// requests piling up. Waiting a fixed 40 ms only ever made the picture 40 ms older.</summary>
     public void NotifyDocumentPreview()
     {
-        SelectionProperties?.Refresh();
-        ScheduleRender(delayMs: 0);
+        // Refreshing the panel re-reads every bound property of the selected element, and
+        // there is nothing there a person can follow sixty times a second. Ten times is a
+        // live readout. The gesture's own commit refreshes in full on release, so the
+        // number the panel settles on is always the exact one.
+        long now = Environment.TickCount64;
+        if (now - _lastPanelRefresh >= PanelRefreshIntervalMs)
+        {
+            _lastPanelRefresh = now;
+            SelectionProperties?.Refresh();
+        }
+
+        ScheduleRender(delayMs: 0, live: true);
     }
 
     private void OnSelectionChanged()
@@ -2593,7 +2610,10 @@ public partial class DesignerViewModel : ViewModelBase
             DescribePlacement(offLabel), string.Join(" ", run.Warnings), key);
     }
 
-    private async void ScheduleRender(int delayMs = 150)
+    /// <param name="live">A frame of a gesture rather than a finished edit. The picture is
+    /// drawn either way; what a live frame skips is the work that only makes sense once an
+    /// edit is over, so a drag does not spend it sixty times a second.</param>
+    private async void ScheduleRender(int delayMs = 150, bool live = false)
     {
         if (Document.IsContinuous)
         {
@@ -2649,12 +2669,27 @@ public partial class DesignerViewModel : ViewModelBase
 
             GeneratedZpl = zpl;
             CanvasRevision++;
-            SnapshotForRecovery();
             UnderlayMarginDots = marginDots;
+
+            // The placement warning DOES follow a gesture: dragging an element past the
+            // label edge is exactly when someone needs to be told it will not print, and
+            // it was worked out on the background thread with the render anyway.
             PlacementWarning = placementWarning;
             VariableWarning = variableWarning;
-            RefreshVariables();
-            RefreshOutline();
+
+            if (!live)
+            {
+                // None of this belongs in a drag frame. The recovery snapshot is the one
+                // that matters: it serializes the document and writes it into the user's
+                // profile directory, and every landed frame changed the document, so a
+                // drag was writing that file about forty-five times a second. The two
+                // panel refreshes already return early when nothing they show has changed,
+                // which during a move is always, so skipping them saves less; they are
+                // here because "when an edit is finished" is when they are meant to run.
+                SnapshotForRecovery();
+                RefreshVariables();
+                RefreshOutline();
+            }
 
             if (result is not null)
             {
@@ -2671,10 +2706,21 @@ public partial class DesignerViewModel : ViewModelBase
             // what is selected.
             // Kept apart for the diagnosis below: a crowded quiet zone never explains an
             // empty render, so it must not be offered as the reason for one.
-            List<string> barcodeProblems = CollectBarcodeProblems();
-            UpdateValidationWarning(
-                [.. barcodeProblems, .. CollectGs1Problems(), .. CollectQuietZoneProblems()]);
-            UnknownFieldWarning = string.Join(" ", CollectUnknownFieldProblems());
+            // Same rule, with one exception. A render that came back empty has to be
+            // explained whenever it happens, and an unencodable barcode is the likeliest
+            // reason, so those are collected even mid-gesture; the rest waits for the edit
+            // to be finished.
+            bool renderFailed = result is not null && (result.Errors.Count > 0 || !result.HasImage);
+            List<string> barcodeProblems = !live || renderFailed
+                ? CollectBarcodeProblems()
+                : [];
+
+            if (!live)
+            {
+                UpdateValidationWarning(
+                    [.. barcodeProblems, .. CollectGs1Problems(), .. CollectQuietZoneProblems()]);
+                UnknownFieldWarning = string.Join(" ", CollectUnknownFieldProblems());
+            }
 
             // On a failed or empty render, lead with a specific diagnosis when a
             // barcode cannot be encoded, but keep the engine's own message too: the
@@ -2682,7 +2728,7 @@ public partial class DesignerViewModel : ViewModelBase
             var diagnosis = new List<string>(2);
             if (result is not null)
             {
-                if ((result.Errors.Count > 0 || !result.HasImage) && barcodeProblems.Count > 0)
+                if (renderFailed && barcodeProblems.Count > 0)
                 {
                     diagnosis.Add(barcodeProblems[0]);
                 }

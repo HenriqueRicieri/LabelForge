@@ -251,6 +251,46 @@ if (mode == "designer")
     Console.WriteLine(
         $"underlay is dot for dot: {d.Underlay?.PixelSize} px, {d.Underlay?.Size} dip, "
         + $"{d.Underlay?.Dpi} dpi (expected equal sizes at 96, 96)");
+
+    // A drag is a stream of live frames and one committed edit at the end of it. The
+    // recovery snapshot belongs to the edit: it serializes the document and writes it into
+    // the user's profile directory, and every frame of a drag changes the document, so
+    // before this was gated a drag wrote that file about forty-five times a second.
+    {
+        d.NotifyDocumentEdited();
+        Pump(700);
+        string snapshots() => string.Join(
+            ";",
+            Directory.Exists(recoveryDir)
+                ? Directory.GetFiles(recoveryDir)
+                    .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                    .Select(f => $"{Path.GetFileName(f)}@{File.GetLastWriteTimeUtc(f):O}#{new FileInfo(f).Length}")
+                : []);
+
+        string before = snapshots();
+        var dragged = d.Document.Elements[0];
+        int startX = dragged.X;
+        for (int frame = 0; frame < 40; frame++)
+        {
+            dragged.X = startX + frame;
+            d.NotifyDocumentPreview();
+            Dispatcher.UIThread.RunJobs();
+        }
+
+        Pump(700);
+        Console.WriteLine(
+            $"drag writes no recovery snapshot: {snapshots() == before} (expected True), "
+            + $"canvas kept up over 40 frames: {d.CanvasRevision > 0} (expected True)");
+
+        d.NotifyDocumentEdited();
+        Pump(700);
+        Console.WriteLine(
+            $"releasing writes it once: {snapshots() != before} (expected True)");
+
+        dragged.X = startX;
+        d.NotifyDocumentEdited();
+        Pump(700);
+    }
     Console.WriteLine($"export skips parked QR: {!d.GeneratedZpl.Contains("^BQ")} (expected True)");
 
     var reloaded = LabelForge.Core.Io.LabelDocumentJson.Deserialize(d.SerializeDocument());
