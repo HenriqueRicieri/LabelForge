@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -40,6 +42,11 @@ public partial class DesignerViewModel : ViewModelBase
     private const int PanelRefreshIntervalMs = 100;
 
     private long _lastPanelRefresh;
+
+    /// <summary>Where the pointer last was, in dots, or null when it is off the label.</summary>
+    private (double X, double Y)? _pointerDots;
+
+    private readonly ElementBoundsCalculator _readoutBounds = new();
 
     private readonly IZplRenderer _renderer = new BinaryKitsRenderer();
     private readonly TemplateSubstitutor _substitutor = new();
@@ -810,6 +817,12 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial string StatusText { get; set; } = string.Empty;
 
+    /// <summary>Where the pointer is and how big the selection is, the way LABEL MATRIX
+    /// keeps it in the corner of the status bar. Its own property and never
+    /// <see cref="StatusText"/>, which the render's size line overwrites by design.</summary>
+    [ObservableProperty]
+    public partial string CanvasReadout { get; set; } = string.Empty;
+
     /// <summary>Path of the open .lfl file; null until first save.</summary>
     [ObservableProperty]
     public partial string? CurrentFilePath { get; set; }
@@ -1010,6 +1023,8 @@ public partial class DesignerViewModel : ViewModelBase
         // there is nothing there a person can follow sixty times a second. Ten times is a
         // live readout. The gesture's own commit refreshes in full on release, so the
         // number the panel settles on is always the exact one.
+        RefreshReadout();
+
         long now = Environment.TickCount64;
         if (now - _lastPanelRefresh >= PanelRefreshIntervalMs)
         {
@@ -1020,8 +1035,80 @@ public partial class DesignerViewModel : ViewModelBase
         ScheduleRender(delayMs: 0, live: true);
     }
 
+    /// <summary>The canvas says where the pointer is; this turns it into the readout.</summary>
+    public void ReportPointer(double dotX, double dotY)
+    {
+        _pointerDots = (dotX, dotY);
+        RefreshReadout();
+    }
+
+    /// <summary>The pointer is off the label area, so the coordinates go and whatever the
+    /// selection is stays.</summary>
+    public void ReportPointerLeft()
+    {
+        if (_pointerDots is null)
+        {
+            return;
+        }
+
+        _pointerDots = null;
+        RefreshReadout();
+    }
+
+    /// <summary>
+    /// Rebuilds the readout from the pointer and the selection. The numbers are the DRAWN
+    /// bounds, which is what the canvas outlines and what a size readout is asked for, and
+    /// so can differ from the panel's X and Y for a barcode with side digits or a rotated
+    /// field, whose origin is not their top left corner.
+    /// </summary>
+    private void RefreshReadout()
+    {
+        var text = new StringBuilder();
+        if (_pointerDots is { } dots)
+        {
+            double mmX = dots.X / Document.Dpmm;
+            double mmY = dots.Y / Document.Dpmm;
+            text.Append(CultureInfo.InvariantCulture, $"{mmX:0.0}, {mmY:0.0} mm");
+            text.Append(CultureInfo.InvariantCulture,
+                $"  ({(int)Math.Round(dots.X)}, {(int)Math.Round(dots.Y)} dots)");
+        }
+
+        if (Selection.Count > 0)
+        {
+            DotRect? union = null;
+            foreach (Element element in Selection.Items)
+            {
+                DotRect b = _readoutBounds.GetBounds(element);
+                union = union is { } u ? Union(u, b) : b;
+            }
+
+            if (union is { } box)
+            {
+                if (text.Length > 0)
+                {
+                    text.Append("   ");
+                }
+
+                text.Append(CultureInfo.InvariantCulture,
+                    $"selection {box.X}, {box.Y}  {box.Width} x {box.Height} dots");
+            }
+        }
+
+        CanvasReadout = text.ToString();
+
+        static DotRect Union(DotRect a, DotRect b)
+        {
+            int x = Math.Min(a.X, b.X);
+            int y = Math.Min(a.Y, b.Y);
+            return new DotRect(
+                x, y, Math.Max(a.X + a.Width, b.X + b.Width) - x,
+                Math.Max(a.Y + a.Height, b.Y + b.Height) - y);
+        }
+    }
+
     private void OnSelectionChanged()
     {
+        RefreshReadout();
         HasSelection = Selection.Count > 0;
         SelectionCount = Selection.Count;
         IsSingleSelection = Selection.Count == 1;
@@ -1327,6 +1414,7 @@ public partial class DesignerViewModel : ViewModelBase
     public void NotifyDocumentEdited()
     {
         SelectionProperties?.Refresh();
+        RefreshReadout();
         // Key on the set of moved elements so a continuous drag or a run of nudges of
         // the same selection coalesces, but editing a different selection does not.
         string key = "canvas:" + string.Join(",", Selection.Items.Select(e => e.Id));
@@ -1708,6 +1796,7 @@ public partial class DesignerViewModel : ViewModelBase
         if (Aligner.Align(Selection.Items.ToList(), edge, Document.WidthDots, Document.HeightDots))
         {
             SelectionProperties?.Refresh();
+            RefreshReadout();
             RecordUndo();
             ScheduleRender();
         }
@@ -1718,6 +1807,7 @@ public partial class DesignerViewModel : ViewModelBase
         if (Aligner.Distribute(Selection.Items.ToList(), horizontal))
         {
             SelectionProperties?.Refresh();
+            RefreshReadout();
             RecordUndo();
             ScheduleRender();
         }

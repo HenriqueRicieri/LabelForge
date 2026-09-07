@@ -153,6 +153,11 @@ public sealed class DesignerCanvas : Control
     // Snap feedback while dragging elements: pink, distinct from every other overlay.
     private static readonly Pen SnapPen = new(new SolidColorBrush(Color.FromRgb(0xEC, 0x48, 0x99)), 1);
 
+    /// <summary>The element under the pointer. The selection blue at part strength, so it
+    /// reads as "this is what a click would take" without competing with the selection.</summary>
+    private static readonly Pen HoverPen =
+        new(new SolidColorBrush(Color.FromArgb(0x99, 0x25, 0x63, 0xEB)), 1);
+
     private readonly ElementBoundsCalculator _bounds = new();
 
     // A press that has not become a drag yet. Below the threshold a press and a release
@@ -236,6 +241,10 @@ public sealed class DesignerCanvas : Control
 
     // Last pointer position over the canvas area, mirrored as markers in the rulers.
     private Point? _pointerPosition;
+
+    /// <summary>What the pointer is over, worked out in <see cref="UpdateHoverCursor"/>
+    /// because that already runs on every move.</summary>
+    private Element? _hover;
 
     // Guides. Holding the left button on a ruler shows a transient guide that follows
     // the pointer and vanishes on release; permanent guides (inserted from the ruler
@@ -358,6 +367,13 @@ public sealed class DesignerCanvas : Control
 
     /// <summary>Raised when the user presses Delete with a selection.</summary>
     public event EventHandler? DeleteRequested;
+
+    /// <summary>Where the pointer is, in dots, on every move over the label area. Negative
+    /// values are the pasteboard, which is a real place to be.</summary>
+    public event Action<double, double>? PointerDotsChanged;
+
+    /// <summary>The pointer has left the label area, or the control.</summary>
+    public event EventHandler? PointerLeftLabel;
 
     /// <summary>
     /// A right-click that is not about guides, with the element under the pointer (null
@@ -749,6 +765,22 @@ public sealed class DesignerCanvas : Control
                     Math.Max(zone.Width * scale, 4),
                     Math.Max(zone.Height * scale, 4)));
             }
+        }
+
+        // What a click would take. Suppressed while a gesture is running, when the answer
+        // is whatever is being dragged rather than whatever happens to be under the
+        // pointer, and on anything already selected, which has an outline of its own.
+        if (_hover is { } hovered &&
+            !_dragging && !_resizing && !_rotating && !_marquee &&
+            doc.Elements.Contains(hovered) &&
+            Selection?.Contains(hovered) != true)
+        {
+            DotRect h = _bounds.GetBounds(hovered);
+            context.DrawRectangle(null, HoverPen, new Rect(
+                origin.X + h.X * scale,
+                origin.Y + h.Y * scale,
+                Math.Max(h.Width * scale, 4),
+                Math.Max(h.Height * scale, 4)));
         }
 
         if (Selection is { Count: > 0 } selection)
@@ -1822,6 +1854,7 @@ public sealed class DesignerCanvas : Control
         base.OnPointerMoved(e);
         Point p = e.GetPosition(this);
         _pointerPosition = p;
+        ReportPointer(p);
 
         if (_panning)
         {
@@ -2063,17 +2096,52 @@ public sealed class DesignerCanvas : Control
         InvalidateVisual();
     }
 
+    /// <summary>Tells whoever is listening where the pointer is. Raised before any of the
+    /// early returns in the move handler, so it keeps up during a pan or a guide drag as
+    /// well as during a gesture.</summary>
+    private void ReportPointer(Point p)
+    {
+        if (p.X < RulerSize || p.Y < RulerSize)
+        {
+            PointerLeftLabel?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        var (scale, origin) = GetTransform();
+        PointerDotsChanged?.Invoke((p.X - origin.X) / scale, (p.Y - origin.Y) / scale);
+    }
+
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
         _pointerPosition = null;
+        _hover = null;
+        PointerLeftLabel?.Invoke(this, EventArgs.Empty);
         InvalidateVisual();
     }
 
     private void UpdateHoverCursor(Point p)
     {
+        // Cleared before any of the early returns below, or the last element hovered stays
+        // outlined under a placement cursor or while the pointer sits on a handle.
+        Element? wasHover = _hover;
+        _hover = null;
+
+        if (Document is { } hoverDoc && p.X >= RulerSize && p.Y >= RulerSize)
+        {
+            var (hoverScale, hoverOrigin) = GetTransform();
+            _hover = ElementAt(
+                hoverDoc, (p.X - hoverOrigin.X) / hoverScale, (p.Y - hoverOrigin.Y) / hoverScale);
+        }
+
+        if (!ReferenceEquals(wasHover, _hover))
+        {
+            InvalidateVisual();
+        }
+
         if (IsPlacing)
         {
+            _hover = null;
             Cursor = new Cursor(StandardCursorType.Cross);
             return;
         }

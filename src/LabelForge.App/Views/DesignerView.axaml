@@ -904,6 +904,19 @@
             <ScrollBar Name="CanvasHScroll" Grid.Row="1" Orientation="Horizontal"
                        AllowAutoHide="False" Visibility="Visible" />
 
+            <!-- Pointer and selection coordinates, floating over the opposite corner
+                 from the zoom control. Not in the toolbar above: that one is already
+                 full, and numbers that change width on every pointer move would shuffle
+                 whatever sat beside them. -->
+            <Border Grid.Row="0" Grid.Column="0" IsHitTestVisible="False"
+                    HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="12,0,0,12"
+                    IsVisible="{Binding CanvasReadout, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                    Background="{DynamicResource AppPanelBackground}"
+                    BorderBrush="{DynamicResource AppSeparator}" BorderThickness="1"
+                    CornerRadius="4" Padding="8,3">
+                <TextBlock Text="{Binding CanvasReadout}" FontSize="12" Opacity="0.75" />
+            </Border>
+
             <!-- Floating zoom control over the canvas corner -->
             <Border Grid.Row="0" Grid.Column="0"
                     HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,12,12"

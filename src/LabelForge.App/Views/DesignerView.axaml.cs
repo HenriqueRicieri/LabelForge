@@ -38,6 +38,8 @@ public partial class DesignerView : UserControl
         Canvas.DocumentEdited += (_, _) => ViewModel?.NotifyDocumentEdited();
         Canvas.LiveEdited += (_, _) => ViewModel?.NotifyDocumentPreview();
         Canvas.DeleteRequested += (_, _) => ViewModel?.DeleteSelectedCommand.Execute(null);
+        Canvas.PointerDotsChanged += (x, y) => ViewModel?.ReportPointer(x, y);
+        Canvas.PointerLeftLabel += (_, _) => ViewModel?.ReportPointerLeft();
         Canvas.ContextMenuRequested += OnCanvasContextMenu;
         Canvas.PlaceRequested += (x, y) => ViewModel?.PlaceAt(x, y);
         Canvas.CancelRequested += (_, _) => ViewModel?.CancelInsert();

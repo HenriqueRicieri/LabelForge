@@ -1432,6 +1432,60 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(400);
 
+    // The readout: where the pointer is, and how big the selection is. The view is put
+    // back first, because the auto-pan drag above left it scrolled.
+    canvas.ResetView();
+    Pump(300);
+    var readoutBox = new LabelForge.Core.Model.BoxElement
+    {
+        X = 200, Y = 100, WidthDots = 300, HeightDots = 150, ThicknessDots = 3,
+    };
+    d.Document.Elements.Add(readoutBox);
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    window.MouseMove(canvas.TranslatePoint(canvas.DotsToView(160, 80), window)!.Value);
+    Pump(300);
+    string readout = d.CanvasReadout;
+    Console.WriteLine(
+        $"readout follows the pointer: '{readout}' "
+        + $"(expected the dots to read 160, 80): {readout.Contains("160, 80 dots")}");
+
+    d.Selection.Set(readoutBox);
+    Pump(300);
+    string withSelection = d.CanvasReadout;
+    Console.WriteLine(
+        $"and the selection: '{withSelection}' (expected 200, 100 and 300 x 150): "
+        + $"{withSelection.Contains("200, 100") && withSelection.Contains("300 x 150")}");
+
+    // The hover outline goes on the element under the pointer while it is NOT selected,
+    // which is the state the screenshot has to show. Text rather than the box above: a
+    // box's own border sits exactly where its hover outline goes, so the picture would
+    // prove nothing.
+    var hoverText = new LabelForge.Core.Model.TextElement
+    {
+        X = 220, Y = 320, Text = "hover me", FontHeightDots = 50,
+    };
+    d.Document.Elements.Add(hoverText);
+    d.Selection.Clear();
+    d.NotifyDocumentEdited();
+    Pump(700);
+    window.MouseMove(canvas.TranslatePoint(canvas.DotsToView(280, 345), window)!.Value);
+    Pump(400);
+    Capture("designer-hover.png");
+    d.Document.Elements.Remove(hoverText);
+
+    // Over a ruler there is no position to report and nothing is selected, so the readout
+    // has nothing to say.
+    window.MouseMove(canvas.TranslatePoint(new Avalonia.Point(4, 4), window)!.Value);
+    Pump(300);
+    Console.WriteLine(
+        $"readout clears off the label: '{d.CanvasReadout}' (expected empty)");
+
+    d.Document.Elements.Remove(readoutBox);
+    d.NotifyDocumentEdited();
+    Pump(400);
+
     // Render caching. Observable without a test hook: a skipped render leaves the very
     // bitmap that is already on screen, so the reference is unchanged.
     d.NewDocumentCommand.Execute(null);
