@@ -154,6 +154,15 @@ public sealed class DesignerCanvas : Control
 
     private readonly ElementBoundsCalculator _bounds = new();
 
+    // A press that has not become a drag yet. Below the threshold a press and a release
+    // is a click, and a click is where the modifiers decide the selection; past it the
+    // press was a grab and the same modifiers mean something else entirely (H11). Holding
+    // the two apart is the whole reason this state exists.
+    private bool _pressArmed;
+    private Point _pressPoint;
+    private Element? _pressHit;
+    private Element? _pressPendingToggle;
+
     // Group drag.
     private bool _dragging;
     private Point _dragStartDots;
@@ -231,6 +240,12 @@ public sealed class DesignerCanvas : Control
     /// <summary>Screen distance within which a guide can be grabbed or snapped to.</summary>
     private const double GuideGrabPx = 5;
     private const double SnapPx = 6;
+
+    /// <summary>How far the pointer travels before a press counts as a drag, in SCREEN
+    /// pixels rather than dots. In dots it would be 32 pixels of slack at 800 per cent
+    /// zoom and less than one at 25, so a click would be impossible at one end and
+    /// unavoidable at the other. Four is what a hand holds still to.</summary>
+    private const double DragThresholdPx = 4;
 
     public DesignerCanvas()
     {
@@ -1284,16 +1299,53 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
-        if (additive)
+        // Nothing moves and nothing is deselected on the press itself. The pointer has to
+        // travel first (see PromoteToDrag), and until it does this is still a click.
+        //
+        // What the modifiers do here is the Illustrator and Figma rule, and it exists so
+        // that Shift and Ctrl can mean one thing on a click and another on a drag (H11).
+        // Adding to a selection is safe to do straight away, because a drag that follows
+        // moves the whole selection and the user asked for this element to be in it.
+        // REMOVING is not, because a press on something already selected is the ordinary
+        // way to start dragging the group, so it waits for a release that never moved.
+        _pressArmed = true;
+        _pressPoint = p;
+        _pressHit = hit;
+        _pressPendingToggle = null;
+
+        if (!additive)
+        {
+            if (!selection.Contains(hit))
+            {
+                selection.Set(hit);
+            }
+        }
+        else if (selection.Contains(hit))
+        {
+            _pressPendingToggle = hit;
+        }
+        else if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
             selection.Toggle(hit);
-            return;
+        }
+        else
+        {
+            // Ctrl on something not selected. Held through a drag it duplicates (H11), so
+            // it must not change the selection until the release says it was a click.
+            _pressPendingToggle = hit;
         }
 
-        if (!selection.Contains(hit))
-        {
-            selection.Set(hit);
-        }
+        e.Pointer.Capture(this);
+        InvalidateVisual();
+    }
+
+    /// <summary>The press turned out to be a grab: set up the drag it was always going to
+    /// be. Separated from the press so everything here happens once the pointer has
+    /// travelled, on the state the selection is in by then.</summary>
+    private void PromoteToDrag(LabelDocument doc, SelectionSet selection, double dotX, double dotY)
+    {
+        _pressArmed = false;
+        _pressPendingToggle = null;
 
         // Drag the whole (unlocked part of the) selection together.
         _dragItems.Clear();
@@ -1302,30 +1354,29 @@ public sealed class DesignerCanvas : Control
             _dragItems.Add((element, element.X, element.Y));
         }
 
-        if (_dragItems.Count > 0)
+        if (_dragItems.Count == 0)
         {
-            _dragging = true;
-            _dragStartDots = new Point(dotX, dotY);
-            _dragDx = 0;
-            _dragDy = 0;
-
-            // Union of the dragged bounds, the box that snaps against guides.
-            int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
-            foreach ((Element element, _, _) in _dragItems)
-            {
-                DotRect b = _bounds.GetBounds(element);
-                minX = Math.Min(minX, b.X);
-                minY = Math.Min(minY, b.Y);
-                maxX = Math.Max(maxX, b.X + b.Width);
-                maxY = Math.Max(maxY, b.Y + b.Height);
-            }
-
-            _dragStartBounds = new DotRect(minX, minY, maxX - minX, maxY - minY);
-            BuildSnapTargets(doc, _dragItems.Select(i => i.Element).ToHashSet());
-            e.Pointer.Capture(this);
+            return;
         }
 
-        InvalidateVisual();
+        _dragging = true;
+        _dragStartDots = new Point(dotX, dotY);
+        _dragDx = 0;
+        _dragDy = 0;
+
+        // Union of the dragged bounds, the box that snaps against guides.
+        int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
+        foreach ((Element element, _, _) in _dragItems)
+        {
+            DotRect b = _bounds.GetBounds(element);
+            minX = Math.Min(minX, b.X);
+            minY = Math.Min(minY, b.Y);
+            maxX = Math.Max(maxX, b.X + b.Width);
+            maxY = Math.Max(maxY, b.Y + b.Height);
+        }
+
+        _dragStartBounds = new DotRect(minX, minY, maxX - minX, maxY - minY);
+        BuildSnapTargets(doc, _dragItems.Select(i => i.Element).ToHashSet());
     }
 
     /// <summary>Collects the snap targets for a starting gesture: guides, label edges
@@ -1516,6 +1567,40 @@ public sealed class DesignerCanvas : Control
             _marqueeCurrent = p;
             InvalidateVisual();
             return;
+        }
+
+        // A press waiting to find out what it is. Four screen pixels of travel and it was
+        // a grab; anything less and the release will treat it as a click.
+        if (_pressArmed)
+        {
+            double travel = Math.Max(
+                Math.Abs(p.X - _pressPoint.X), Math.Abs(p.Y - _pressPoint.Y));
+            if (travel < DragThresholdPx)
+            {
+                InvalidateVisual();
+                return;
+            }
+
+            if (Document is not { } pressDoc || Selection is not { } pressSelection)
+            {
+                _pressArmed = false;
+                return;
+            }
+
+            (double pressScale, Point pressOrigin) = GetTransform();
+            PromoteToDrag(
+                pressDoc,
+                pressSelection,
+                (_pressPoint.X - pressOrigin.X) / pressScale,
+                (_pressPoint.Y - pressOrigin.Y) / pressScale);
+
+            if (!_dragging)
+            {
+                // Everything under the pointer is locked, so there is nothing to move and
+                // nothing to record. The press is over.
+                InvalidateVisual();
+                return;
+            }
         }
 
         if (!_dragging && !_resizing && !_rotating)
@@ -1982,6 +2067,26 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
+        // A press that never travelled far enough to become a drag. This is the click,
+        // and it is where a modifier that was held gets to change the selection: taking
+        // an element out of a multiple selection, or adding one with Ctrl.
+        if (_pressArmed)
+        {
+            _pressArmed = false;
+            Element? toggle = _pressPendingToggle;
+            _pressPendingToggle = null;
+            _pressHit = null;
+            e.Pointer.Capture(null);
+
+            if (toggle is not null)
+            {
+                Selection?.Toggle(toggle);
+            }
+
+            InvalidateVisual();
+            return;
+        }
+
         if (!_dragging && !_resizing)
         {
             return;
@@ -2010,6 +2115,7 @@ public sealed class DesignerCanvas : Control
         _dragDy = 0;
         _snapX = null;
         _snapY = null;
+        _pressHit = null;
         InvalidateVisual();
     }
 

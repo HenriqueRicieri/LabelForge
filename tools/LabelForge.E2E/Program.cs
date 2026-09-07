@@ -1154,6 +1154,74 @@ if (mode == "designer")
         $"drag between lines stays put: {snapped.X},{snapped.Y} "
         + "(expected 250,180: moved, and not forced onto the grid)");
 
+    // A press is a click until the pointer travels. Below the threshold it must move
+    // nothing and record nothing: an unsteady click at a low zoom used to nudge an element
+    // by a few dots and bury the real edit under an undo step for the accident.
+    var pressTarget = d.Document.Elements[0];
+    pressTarget.X = 200;
+    pressTarget.Y = 120;
+    d.Selection.Set(pressTarget);
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    var tinyFrom = canvas.TranslatePoint(canvas.DotsToView(240, 150), window)!.Value;
+    var tinyTo = new Avalonia.Point(tinyFrom.X + 2, tinyFrom.Y + 2);
+    window.MouseDown(tinyFrom, MouseButton.Left);
+    window.MouseMove(tinyTo);
+    window.MouseUp(tinyTo, MouseButton.Left);
+    Pump(700);
+    Console.WriteLine(
+        $"a 2 px press moves nothing: {d.Document.Elements[0].X},{d.Document.Elements[0].Y} "
+        + "(expected 200,120)");
+
+    // Undo has to land on the edit before the press, which is only true if the press
+    // recorded nothing of its own.
+    d.UndoCommand.Execute(null);
+    Pump(700);
+    Console.WriteLine(
+        $"and records no undo step: {d.Document.Elements[0].X},{d.Document.Elements[0].Y} "
+        + "(expected 250,180, where it sat before the move that IS a step)");
+    d.RedoCommand.Execute(null);
+    Pump(700);
+
+    // Ctrl decides the selection on the RELEASE now, because the same key means duplicate
+    // once a drag begins. Pressing it on something already selected and letting go without
+    // moving takes that element out; crossing the threshold instead leaves the selection
+    // alone, because the press was a grab.
+    var second = new LabelForge.Core.Model.BoxElement
+    {
+        X = 480, Y = 120, WidthDots = 120, HeightDots = 80, ThicknessDots = 3,
+    };
+    d.Document.Elements.Add(second);
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    void SelectBoth()
+    {
+        d.Selection.SetMany(d.Document.Elements);
+        Pump(200);
+    }
+
+    var ctrlOn = canvas.TranslatePoint(canvas.DotsToView(520, 150), window)!.Value;
+    SelectBoth();
+    window.MouseDown(ctrlOn, MouseButton.Left, RawInputModifiers.Control);
+    window.MouseUp(ctrlOn, MouseButton.Left, RawInputModifiers.Control);
+    Pump(400);
+    Console.WriteLine(
+        $"ctrl click in place removes it: {d.Selection.Count} selected (expected 1)");
+
+    SelectBoth();
+    int secondX = d.Document.Elements[1].X;
+    window.MouseDown(ctrlOn, MouseButton.Left, RawInputModifiers.Control);
+    window.MouseMove(new Avalonia.Point(ctrlOn.X + 30, ctrlOn.Y), RawInputModifiers.Control);
+    window.MouseUp(new Avalonia.Point(ctrlOn.X + 30, ctrlOn.Y), MouseButton.Left, RawInputModifiers.Control);
+    Pump(700);
+    Console.WriteLine(
+        $"ctrl drag keeps the selection: {d.Selection.Count} selected (expected 2), "
+        + $"and moved it: {d.Document.Elements[1].X != secondX} (expected True)");
+
+    d.Document.Elements.Remove(second);
+    d.NotifyDocumentEdited();
     d.GridPitchMm = 0;
     d.Selection.Clear();
     Pump(400);

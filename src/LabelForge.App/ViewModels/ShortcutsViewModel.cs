@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace LabelForge.App.ViewModels;
 
@@ -58,7 +58,8 @@ public sealed class ShortcutsViewModel
             new("Drag the round handle", "Rotate, snapping to 0, 90, 180 and 270"),
         ]),
 
-        new("Selecting", string.Empty,
+        new("Selecting", "A press only starts a drag once the pointer has moved a little, so "
+            + "an unsteady click stays a click.",
         [
             new("Click", "Select what is under the pointer"),
             new("Ctrl / Shift + click", "Add to or remove from the selection"),
