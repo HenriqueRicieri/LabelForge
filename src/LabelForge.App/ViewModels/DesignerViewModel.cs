@@ -111,6 +111,8 @@ public partial class DesignerViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(DuplicateCommand))]
     [NotifyCanExecuteChangedFor(nameof(BringToFrontCommand))]
     [NotifyCanExecuteChangedFor(nameof(SendToBackCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BringForwardCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SendBackwardCommand))]
     [NotifyCanExecuteChangedFor(nameof(AlignLeftCommand))]
     [NotifyCanExecuteChangedFor(nameof(AlignCenterHorizontalCommand))]
     [NotifyCanExecuteChangedFor(nameof(AlignRightCommand))]
@@ -1997,6 +1999,70 @@ public partial class DesignerViewModel : ViewModelBase
             element.ZOrder = nextZ++;
         }
 
+        RecordUndo();
+        ScheduleRender();
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void BringForward() => Reorder(forward: true);
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void SendBackward() => Reorder(forward: false);
+
+    /// <summary>
+    /// Moves the selection one step through the stacking order by SWAPPING z-orders with the
+    /// neighbour it is passing, so the set of values in the document is the same set
+    /// afterwards, just dealt out differently. Assigning fresh numbers would work on one
+    /// label and drift on the next.
+    ///
+    /// Stepping starts from the end the selection is heading towards, and a selected element
+    /// never swaps with another selected one, so several elements picked at once move as a
+    /// block and keep their order within it.
+    ///
+    /// Two elements sharing a z-order cannot pass each other this way, since swapping equal
+    /// values changes nothing. That ambiguity is older than this command (which of two tied
+    /// elements is on top is already undefined) and is left alone rather than renumbering the
+    /// whole document behind the user's back.
+    /// </summary>
+    private void Reorder(bool forward)
+    {
+        if (Selection.Count == 0)
+        {
+            return;
+        }
+
+        List<Element> order = [.. Document.Elements.OrderBy(e => e.ZOrder)];
+        IEnumerable<int> steps = forward
+            ? Enumerable.Range(0, order.Count).Reverse()
+            : Enumerable.Range(0, order.Count);
+
+        bool moved = false;
+        foreach (int i in steps)
+        {
+            if (!Selection.Contains(order[i]))
+            {
+                continue;
+            }
+
+            int j = forward ? i + 1 : i - 1;
+            if (j < 0 || j >= order.Count ||
+                Selection.Contains(order[j]) ||
+                order[i].ZOrder == order[j].ZOrder)
+            {
+                continue;
+            }
+
+            (order[i].ZOrder, order[j].ZOrder) = (order[j].ZOrder, order[i].ZOrder);
+            (order[i], order[j]) = (order[j], order[i]);
+            moved = true;
+        }
+
+        if (!moved)
+        {
+            return;
+        }
+
+        RefreshOutline();
         RecordUndo();
         ScheduleRender();
     }

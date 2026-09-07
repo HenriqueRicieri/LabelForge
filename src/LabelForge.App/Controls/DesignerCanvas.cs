@@ -2745,6 +2745,14 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
+        // Ctrl with an arrow is not a nudge: it is the z-order step, which the window
+        // handles beside the rest of the Ctrl shortcuts. Handling it here would swallow it
+        // before it ever got there, since the canvas is what has focus.
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            return;
+        }
+
         int step = e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 10 : 1;
         (int dx, int dy) = e.Key switch
         {

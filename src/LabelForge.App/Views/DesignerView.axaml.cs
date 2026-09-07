@@ -84,6 +84,8 @@ public partial class DesignerView : UserControl
         Add(menu, "Delete", vm.DeleteSelectedCommand);
         menu.Items.Add(new Separator());
         Add(menu, "Bring to Front", vm.BringToFrontCommand);
+        Add(menu, "Bring Forward", vm.BringForwardCommand);
+        Add(menu, "Send Backward", vm.SendBackwardCommand);
         Add(menu, "Send to Back", vm.SendToBackCommand);
         menu.Items.Add(new Separator());
 
@@ -839,8 +841,55 @@ public partial class DesignerView : UserControl
             return;
         }
 
+        // The brackets are the convention for stepping through the stacking order, and they
+        // are the one binding that cannot be written down as a key. Windows names these keys
+        // after a US keyboard: on the ABNT2 layout this app is written for, the key it calls
+        // OEM_6 types "[" while on a US layout the same name types "]". Binding the key would
+        // therefore swap the two commands depending on whose keyboard it is. The CHARACTER the
+        // key produced is the part that means the same thing everywhere, so that is what is
+        // matched. Ctrl+Shift+Up and Down are bound beside them for the layouts and platforms
+        // where a key held with Ctrl reports no character at all.
+        switch (e.KeySymbol)
+        {
+            case "[" or "{":
+                if (vm.SendBackwardCommand.CanExecute(null))
+                {
+                    vm.SendBackwardCommand.Execute(null);
+                }
+
+                e.Handled = true;
+                return;
+
+            case "]" or "}":
+                if (vm.BringForwardCommand.CanExecute(null))
+                {
+                    vm.BringForwardCommand.Execute(null);
+                }
+
+                e.Handled = true;
+                return;
+        }
+
         switch (e.Key)
         {
+            case Key.Up when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                if (vm.BringForwardCommand.CanExecute(null))
+                {
+                    vm.BringForwardCommand.Execute(null);
+                }
+
+                e.Handled = true;
+                break;
+
+            case Key.Down when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                if (vm.SendBackwardCommand.CanExecute(null))
+                {
+                    vm.SendBackwardCommand.Execute(null);
+                }
+
+                e.Handled = true;
+                break;
+
             case Key.N:
                 if (vm.NewDocumentCommand.CanExecute(null))
                 {

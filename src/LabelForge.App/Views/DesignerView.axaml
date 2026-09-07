@@ -322,6 +322,10 @@
                         <MenuItem Header="D_uplicate" Command="{Binding DuplicateCommand}" InputGesture="Ctrl+D" />
                         <Separator />
                         <MenuItem Header="Bring to _Front" Command="{Binding BringToFrontCommand}" />
+                        <MenuItem Header="Bring F_orward" Command="{Binding BringForwardCommand}"
+                                  InputGesture="Ctrl+Shift+Up" />
+                        <MenuItem Header="Send Back_ward" Command="{Binding SendBackwardCommand}"
+                                  InputGesture="Ctrl+Shift+Down" />
                         <MenuItem Header="Send to _Back" Command="{Binding SendToBackCommand}" />
                         <Separator />
                         <MenuItem Header="A_lign">

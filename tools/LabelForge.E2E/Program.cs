@@ -1557,6 +1557,43 @@ if (mode == "designer")
         $"double-click edits the content: selected '{editSelected}' (expected 'front'), "
         + $"selection is the text: {d.Selection.Primary == tabFront}");
 
+    // One step through the stacking order. The z-orders in the document have to be the same
+    // SET afterwards, only dealt out differently: the command swaps with the neighbour it
+    // passes rather than assigning fresh numbers.
+    string zBefore = string.Join(
+        ",", d.Document.Elements.Select(el => el.ZOrder).OrderBy(z => z));
+    d.Selection.Set(tabBack);
+    canvas.Focus();
+    Pump(300);
+    window.KeyPress(
+        Key.Up, RawInputModifiers.Control | RawInputModifiers.Shift, PhysicalKey.ArrowUp, null);
+    Pump(700);
+    string zAfter = string.Join(
+        ",", d.Document.Elements.Select(el => el.ZOrder).OrderBy(z => z));
+    Console.WriteLine(
+        $"ctrl+shift+up brings it forward: back is now {tabBack.ZOrder} (expected 2), "
+        + $"middle {tabMiddle.ZOrder} (expected 1), z-orders still {zAfter} (expected {zBefore})");
+
+    // And the brackets, matched on the CHARACTER the key produced rather than on the key,
+    // because Windows names these keys after a US keyboard and this one is ABNT2: there, the
+    // key called OEM_6 types "[". Binding the key would swap the two commands by layout.
+    window.KeyPress(Key.OemCloseBrackets, RawInputModifiers.Control, PhysicalKey.BracketRight, "[");
+    Pump(700);
+    Console.WriteLine(
+        $"ctrl+[ sends it back down: back is {tabBack.ZOrder} (expected 1 again), "
+        + $"middle {tabMiddle.ZOrder} (expected 2 again)");
+
+    // Nothing to pass: the front element stays where it is and records no undo step.
+    d.Selection.Set(tabFront);
+    Pump(200);
+    int undosBefore = d.Document.Elements.Count;
+    window.KeyPress(Key.OemPipe, RawInputModifiers.Control, PhysicalKey.Backslash, "]");
+    Pump(700);
+    Console.WriteLine(
+        $"and stops at the front: {tabFront.ZOrder} (expected 3), "
+        + $"z-orders {string.Join(",", d.Document.Elements.Select(el => el.ZOrder).OrderBy(z => z))} "
+        + $"(expected {zBefore})");
+
     // Render caching. Observable without a test hook: a skipped render leaves the very
     // bitmap that is already on screen, so the reference is unchanged.
     d.NewDocumentCommand.Execute(null);
