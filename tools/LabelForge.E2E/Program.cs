@@ -1389,9 +1389,14 @@ if (mode == "designer")
     int xAfterPan = upper.X;
     window.MouseUp(panTo, MouseButton.Left);
     Pump(700);
+    // Printed as verdicts rather than distances, and the distances only when one fails.
+    // How far the view gets depends on how many timer ticks the pump delivered, which
+    // differs from run to run: a line that changes every time is a line nobody reads.
+    double originAfterPan = canvas.DotsToView(0, 0).X;
+    bool panned = originAfterPan < originBeforePan - 1;
     Console.WriteLine(
-        $"drag at the edge pans the view: label origin on screen {originBeforePan:0} -> {canvas.DotsToView(0, 0).X:0} "
-        + "(expected to have moved left)");
+        $"drag at the edge pans the view: {panned} (expected True)"
+        + (panned ? "" : $" [label origin on screen {originBeforePan:0} -> {originAfterPan:0}]"));
     // What the hand is holding, which started 60 dots into the box and stays there for the
     // whole drag: where THAT ends up is how far the drag reached. It is the quantity to
     // check rather than the box's left edge, because the pointer never leaves the canvas,
@@ -1399,9 +1404,11 @@ if (mode == "designer")
     // left edge would need a longer pan than the harness can drive, since the timer that
     // continues the scroll gets a handful of ticks out of the pump instead of thirty.
     int heldDot = xAfterPan + 60;
+    bool reached = heldDot > edgeDotsBefore;
     Console.WriteLine(
-        $"and the element keeps following: x 600 -> {xAfterPan}, the held point at {heldDot} is past "
-        + $"the {edgeDotsBefore:0} dots the viewport ended at: {heldDot > edgeDotsBefore} (expected True)");
+        $"and the element keeps following: the held point is past the {edgeDotsBefore:0} dots the "
+        + $"viewport ended at: {reached} (expected True)"
+        + (reached ? "" : $" [held {heldDot}, element x {xAfterPan}]"));
 
     // And it stops: nothing keeps scrolling once the button is up.
     double originAtRest = canvas.DotsToView(0, 0).X;
