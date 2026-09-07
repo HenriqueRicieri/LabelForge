@@ -1265,6 +1265,32 @@ if (mode == "designer")
         $"one undo takes the copy back out: {d.Document.Elements.Count} elements "
         + $"(expected {beforeDuplicate})");
 
+    // Ctrl-drag on a LOCKED element. A copy of something that cannot be dragged would sit
+    // in the document with nothing moving it, so nothing is copied at all.
+    var immovable = new LabelForge.Core.Model.BoxElement
+    {
+        X = 700, Y = 60, WidthDots = 120, HeightDots = 80, ThicknessDots = 3,
+        ZOrder = 200, IsLocked = true,
+    };
+    d.Document.Elements.Add(immovable);
+    d.Selection.Clear();
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    int beforeLockedDrag = d.Document.Elements.Count;
+    var lockedFrom = canvas.TranslatePoint(canvas.DotsToView(760, 100), window)!.Value;
+    window.MouseDown(lockedFrom, MouseButton.Left, RawInputModifiers.Control);
+    window.MouseMove(new Avalonia.Point(lockedFrom.X + 40, lockedFrom.Y), RawInputModifiers.Control);
+    window.MouseUp(
+        new Avalonia.Point(lockedFrom.X + 40, lockedFrom.Y), MouseButton.Left, RawInputModifiers.Control);
+    Pump(700);
+    Console.WriteLine(
+        $"ctrl drag on a locked element copies nothing: {d.Document.Elements.Count} elements "
+        + $"(expected {beforeLockedDrag}), still at {immovable.X} (expected 700)");
+    d.Document.Elements.Remove(immovable);
+    d.NotifyDocumentEdited();
+    Pump(700);
+
     // Alt-click walks down the stack instead of picking the top one again. Two boxes are
     // parked on the same spot so there is a stack to walk.
     var lower = new LabelForge.Core.Model.BoxElement
@@ -1348,11 +1374,15 @@ if (mode == "designer")
     Pump(700);
 
     double originBeforePan = canvas.DotsToView(0, 0).X;
+    // Where the viewport ended before the pan, in dots. That is what the element has to
+    // get past for the drag to have reached somewhere the view was not already showing.
+    double dotsPerPixel = 100.0 / (canvas.DotsToView(100, 0).X - originBeforePan);
+    double edgeDotsBefore = (canvas.Bounds.Width - originBeforePan) * dotsPerPixel;
     var panFrom = canvas.TranslatePoint(canvas.DotsToView(660, 340), window)!.Value;
     // The edge is the CANVAS's edge, and the harness clicks in window coordinates, so it
     // has to be translated like every other point here.
     var panTo = canvas.TranslatePoint(
-        new Avalonia.Point(canvas.Bounds.Width - 4, canvas.DotsToView(660, 340).Y), window)!.Value;
+        new Avalonia.Point(canvas.Bounds.Width - 1, canvas.DotsToView(660, 340).Y), window)!.Value;
     window.MouseDown(panFrom, MouseButton.Left);
     window.MouseMove(panTo);
     Pump(500);
@@ -1362,9 +1392,16 @@ if (mode == "designer")
     Console.WriteLine(
         $"drag at the edge pans the view: label origin on screen {originBeforePan:0} -> {canvas.DotsToView(0, 0).X:0} "
         + "(expected to have moved left)");
+    // What the hand is holding, which started 60 dots into the box and stays there for the
+    // whole drag: where THAT ends up is how far the drag reached. It is the quantity to
+    // check rather than the box's left edge, because the pointer never leaves the canvas,
+    // so a held point past the old edge is only possible if the view moved under it. The
+    // left edge would need a longer pan than the harness can drive, since the timer that
+    // continues the scroll gets a handful of ticks out of the pump instead of thirty.
+    int heldDot = xAfterPan + 60;
     Console.WriteLine(
-        $"and the element keeps following: x 600 -> {xAfterPan} "
-        + "(expected past where the viewport ended)");
+        $"and the element keeps following: x 600 -> {xAfterPan}, the held point at {heldDot} is past "
+        + $"the {edgeDotsBefore:0} dots the viewport ended at: {heldDot > edgeDotsBefore} (expected True)");
 
     // And it stops: nothing keeps scrolling once the button is up.
     double originAtRest = canvas.DotsToView(0, 0).X;

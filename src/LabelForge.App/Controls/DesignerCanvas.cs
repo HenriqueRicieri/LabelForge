@@ -1430,18 +1430,29 @@ public sealed class DesignerCanvas : Control
         _axisLockX = false;
         _axisLockY = false;
 
-        // Ctrl held across the threshold copies instead of moving. What gets copied is the
-        // whole selection when the pressed element was part of it, and that element alone
-        // otherwise, which is what pressing on something outside the selection meant.
-        // The copies become the selection, so the drag below moves them, the originals are
-        // left behind, and the one undo step recorded on release covers both.
-        if (duplicate && _pressHit is { } pressed)
-        {
-            IEnumerable<Element> source = selection.Contains(pressed)
-                ? selection.Items.Where(el => !el.IsLocked)
-                : [pressed];
+        // What the drag has to move: the whole selection, or the pressed element alone when
+        // a Ctrl-drag began on something outside it, which is what pressing there meant.
+        // Locked elements sit out, and when that leaves nothing there is no drag at all.
+        //
+        // Settled BEFORE the copies below, because a copy made for a drag that cannot
+        // happen stays in the document with nothing to move it and no undo step to take it
+        // back out. Ctrl-dragging a locked element did exactly that.
+        bool pressedAlone =
+            duplicate && _pressHit is { } pressed && !selection.Contains(pressed);
+        IEnumerable<Element> candidates = pressedAlone ? [_pressHit!] : selection.Items;
+        List<Element> movable = [.. candidates.Where(el => !el.IsLocked)];
 
-            List<Element> clones = ElementDuplicator.Clone(doc, source);
+        if (movable.Count == 0)
+        {
+            return;
+        }
+
+        // Ctrl held across the threshold copies instead of moving. The copies become the
+        // selection, so the drag below moves them, the originals are left behind, and the
+        // one undo step recorded on release covers both.
+        if (duplicate)
+        {
+            List<Element> clones = ElementDuplicator.Clone(doc, movable);
             if (clones.Count > 0)
             {
                 foreach (Element clone in clones)
@@ -1893,7 +1904,11 @@ public sealed class DesignerCanvas : Control
             if (!_dragging)
             {
                 // Everything under the pointer is locked, so there is nothing to move and
-                // nothing to record. The press is over.
+                // nothing to record. The press is over, and it has to be ended here: the
+                // release returns early on a gesture that never started, so anything left
+                // set would still be set at the next press.
+                e.Pointer.Capture(null);
+                EndGestureState();
                 InvalidateVisual();
                 return;
             }
