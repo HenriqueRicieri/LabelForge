@@ -9,6 +9,25 @@ using LabelForge.App.Controls;
 using LabelForge.App.ViewModels;
 using LabelForge.App.Views;
 
+// The end-to-end harness. It drives the real windows through Avalonia's headless platform
+// and prints one line per check, each carrying the value it found beside the value expected,
+// so a run reads as a transcript rather than a pass count.
+//
+// How it is meant to be used:
+//   - exit code 0 means every check held; a line whose two halves disagree fails the run
+//   - a run is diffed against the previous one, and only the lines the change was meant to
+//     touch may differ (the crash-recovery line carries a timestamp and always does)
+//   - a check written for a bug is run against the code BEFORE the fix first, because a
+//     check that cannot fail is not a check
+//
+// Three things that have caught people out in here:
+//   - undo deserializes a whole new document, so an Element held across an undo is a
+//     detached object; re-fetch from Document.Elements after every undo
+//   - a click and a drag close together are a double-click, exactly as in the real editor,
+//     so two gestures meant to be separate need a Pump() between them
+//   - numbers print through InvariantCulture: this is built on a pt-BR machine, and a
+//     decimal comma would make runs from two machines differ for no reason
+
 AppBuilder.Configure<LabelForge.App.App>()
     .UseSkia()
     .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
