@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Avalonia.Media.Imaging;
 using LabelForge.Core.Editing;
 using LabelForge.Core.Model;
@@ -181,6 +182,14 @@ public sealed class DesignerCanvas : Control
     private string? _gestureBefore;
     private readonly List<Element> _gestureAdded = [];
 
+    // Dragging to somewhere off screen. While a gesture is running and the pointer is at
+    // the edge of the canvas, the view scrolls that way and the gesture is replayed with
+    // the position the pointer still has, so the element keeps following a hand that has
+    // run out of room.
+    private DispatcherTimer? _autoPan;
+    private Point _autoPanPointer;
+    private KeyModifiers _autoPanModifiers;
+
 
     // Group drag.
     private bool _dragging;
@@ -215,7 +224,7 @@ public sealed class DesignerCanvas : Control
 
     // Marquee selection.
     private bool _marquee;
-    private Point _marqueeStart;
+    private Point _marqueeStartDots;
     private Point _marqueeCurrent;
 
     // Explicit view transform once the user zooms or pans; null means auto-fit.
@@ -269,6 +278,17 @@ public sealed class DesignerCanvas : Control
     /// <summary>How far one axis has to lead the other before a shifted drag commits to
     /// it. Without a margin the choice flips back and forth near the diagonal.</summary>
     private const double AxisLockLeadPx = 3;
+
+    /// <summary>How close to the edge of the canvas the pointer has to be for the view to
+    /// start following it.</summary>
+    private const double AutoPanZonePx = 24;
+
+    /// <summary>The most one tick moves the view. Reached when the pointer is at the very
+    /// edge or past it; nearer the inside of the zone it is proportionally slower, so the
+    /// scroll starts gently instead of jumping the moment the zone is entered. Twelve
+    /// pixels every 16 ms is about 750 a second at full tilt, which is a screen width in
+    /// rather over a second.</summary>
+    private const double AutoPanMaxStepPx = 12;
 
     public DesignerCanvas()
     {
@@ -1049,11 +1069,21 @@ public sealed class DesignerCanvas : Control
         return _cornerCut;
     }
 
-    private Rect MarqueeRect() => new(
-        Math.Min(_marqueeStart.X, _marqueeCurrent.X),
-        Math.Min(_marqueeStart.Y, _marqueeCurrent.Y),
-        Math.Abs(_marqueeCurrent.X - _marqueeStart.X),
-        Math.Abs(_marqueeCurrent.Y - _marqueeStart.Y));
+    /// <summary>The band on screen. The anchor is kept in dots and converted here, so the
+    /// view panning under a marquee (which is what auto-pan does) moves the band with the
+    /// label rather than leaving its corner pinned to a screen position the label has since
+    /// slid away from.</summary>
+    private Rect MarqueeRect()
+    {
+        var (scale, origin) = GetTransform();
+        double startX = _marqueeStartDots.X * scale + origin.X;
+        double startY = _marqueeStartDots.Y * scale + origin.Y;
+        return new Rect(
+            Math.Min(startX, _marqueeCurrent.X),
+            Math.Min(startY, _marqueeCurrent.Y),
+            Math.Abs(_marqueeCurrent.X - startX),
+            Math.Abs(_marqueeCurrent.Y - startY));
+    }
 
     /// <summary>The selection rectangle in screen space, only for a single unlocked selection.</summary>
     private Rect? SelectionScreenRect()
@@ -1340,7 +1370,7 @@ public sealed class DesignerCanvas : Control
             }
 
             _marquee = true;
-            _marqueeStart = p;
+            _marqueeStartDots = new Point(dotX, dotY);
             _marqueeCurrent = p;
             e.Pointer.Capture(this);
             InvalidateVisual();
@@ -1502,10 +1532,122 @@ public sealed class DesignerCanvas : Control
         return true;
     }
 
+    /// <summary>
+    /// Starts, keeps or stops the view following the pointer, depending on how close it is
+    /// to the edge of the canvas. Called on every pointer move during a gesture, so a hand
+    /// that comes back inside stops the scroll without anything else having to notice.
+    /// </summary>
+    private void UpdateAutoPan(Point p, KeyModifiers modifiers)
+    {
+        _autoPanPointer = p;
+        _autoPanModifiers = modifiers;
+
+        if (AutoPanStep(p) is (0, 0))
+        {
+            StopAutoPan();
+            return;
+        }
+
+        if (_autoPan is not null)
+        {
+            return;
+        }
+
+        // The view has to be an explicit one before it can be moved: while it is still
+        // auto-fitting, panning it would be overwritten on the next layout pass.
+        EnsureExplicitTransform();
+        _autoPan = new DispatcherTimer(
+            TimeSpan.FromMilliseconds(16), DispatcherPriority.Input, (_, _) => AutoPanTick());
+        _autoPan.Start();
+
+        // Scroll once now rather than waiting for the first tick. It makes reaching the
+        // edge feel like it did something immediately, and it is the part a headless test
+        // can see: the dispatcher timer does not advance under the harness's pump, so
+        // without this the whole feature would be unverifiable there.
+        AutoPanTick();
+    }
+
+    private void StopAutoPan()
+    {
+        _autoPan?.Stop();
+        _autoPan = null;
+    }
+
+    private void AutoPanTick()
+    {
+        if (!_dragging && !_resizing && !_marquee)
+        {
+            // Rotation is deliberately not in this list: it turns an element about its own
+            // centre and never needs to reach anywhere the view is not already showing.
+            StopAutoPan();
+            return;
+        }
+
+        (double dx, double dy) = AutoPanStep(_autoPanPointer);
+        if (dx == 0 && dy == 0)
+        {
+            StopAutoPan();
+            return;
+        }
+
+        _viewOrigin = new Point(_viewOrigin.X + dx, _viewOrigin.Y + dy);
+        ViewChanged?.Invoke(this, EventArgs.Empty);
+
+        // The pointer has not moved; the label under it has. Replaying the gesture with the
+        // same screen position is what turns that into the element following along.
+        if (_marquee)
+        {
+            InvalidateVisual();
+            return;
+        }
+
+        ApplyGesture(_autoPanPointer, _autoPanModifiers);
+    }
+
+    /// <summary>
+    /// How far the view should move this tick, in screen pixels, for a pointer at this
+    /// position. Zero on an axis the pointer is comfortably inside.
+    ///
+    /// The sign is the direction the CONTENT moves, which is the opposite of the direction
+    /// the pointer is reaching: a pointer at the left edge is asking to see what is further
+    /// left, so the content slides right.
+    /// </summary>
+    private (double Dx, double Dy) AutoPanStep(Point p)
+    {
+        double left = RulerSize;
+        double top = RulerSize;
+        double right = Bounds.Width;
+        double bottom = Bounds.Height;
+        if (right - left < AutoPanZonePx * 2 || bottom - top < AutoPanZonePx * 2)
+        {
+            return (0, 0);
+        }
+
+        return (Step(p.X, left, right), Step(p.Y, top, bottom));
+
+        static double Step(double value, double near, double far)
+        {
+            if (value < near + AutoPanZonePx)
+            {
+                double depth = Math.Min(near + AutoPanZonePx - value, AutoPanZonePx);
+                return depth / AutoPanZonePx * AutoPanMaxStepPx;
+            }
+
+            if (value > far - AutoPanZonePx)
+            {
+                double depth = Math.Min(value - (far - AutoPanZonePx), AutoPanZonePx);
+                return -(depth / AutoPanZonePx * AutoPanMaxStepPx);
+            }
+
+            return 0;
+        }
+    }
+
     /// <summary>Everything a gesture leaves behind, cleared in one place so a cancel and a
     /// release cannot forget different halves of it.</summary>
     private void EndGestureState()
     {
+        StopAutoPan();
         _dragging = false;
         _resizing = false;
         _rotating = false;
@@ -1717,6 +1859,7 @@ public sealed class DesignerCanvas : Control
         if (_marquee)
         {
             _marqueeCurrent = p;
+            UpdateAutoPan(p, e.KeyModifiers);
             InvalidateVisual();
             return;
         }
@@ -1765,6 +1908,18 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
+        ApplyGesture(p, e.KeyModifiers);
+        UpdateAutoPan(p, e.KeyModifiers);
+    }
+
+    /// <summary>
+    /// One frame of a move, resize or rotation, from a pointer position and the modifiers
+    /// held with it. Separate from the pointer handler because auto-pan replays it on a
+    /// timer with the last position the pointer had: the pointer is not moving any more,
+    /// the view is, and the element has to keep following.
+    /// </summary>
+    private void ApplyGesture(Point p, KeyModifiers modifiers)
+    {
         if (Document is not { } doc)
         {
             return;
@@ -1804,11 +1959,11 @@ public sealed class DesignerCanvas : Control
             ComputeGestureRect(
                 dotX,
                 dotY,
-                aboutCenter: e.KeyModifiers.HasFlag(KeyModifiers.Control),
-                freeCorner: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+                aboutCenter: modifiers.HasFlag(KeyModifiers.Control),
+                freeCorner: modifiers.HasFlag(KeyModifiers.Shift));
             _snapX = null;
             _snapY = null;
-            if (!e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+            if (!modifiers.HasFlag(KeyModifiers.Alt))
             {
                 SnapResizeGesture(scale);
             }
@@ -1827,7 +1982,7 @@ public sealed class DesignerCanvas : Control
             // near the diagonal the two are within a pixel of each other and a per-frame
             // choice flickers between them. The lock only changes when the other axis wins
             // by a clear margin, and it is released the moment Shift is.
-            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            if (modifiers.HasFlag(KeyModifiers.Shift))
             {
                 int lead = Math.Max(
                     (int)Math.Round(AxisLockLeadPx / scale), 1);
@@ -1862,7 +2017,7 @@ public sealed class DesignerCanvas : Control
             // then clamp to the pasteboard.
             _snapX = null;
             _snapY = null;
-            if (!e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+            if (!modifiers.HasFlag(KeyModifiers.Alt))
             {
                 int threshold = Math.Max((int)Math.Round(SnapPx / scale), 1);
                 (int shiftX, _snapX) = GuideSnapper.Snap(
@@ -2311,6 +2466,7 @@ public sealed class DesignerCanvas : Control
         if (_marquee)
         {
             _marquee = false;
+            StopAutoPan();
             e.Pointer.Capture(null);
             CommitMarquee();
             InvalidateVisual();

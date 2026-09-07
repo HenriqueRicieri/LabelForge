@@ -1338,6 +1338,40 @@ if (mode == "designer")
         $"escape takes a duplicate back out: {beforeEscapeDuplicate} -> {duringDuplicate} "
         + $"-> {d.Document.Elements.Count} (expected up by one, then back down)");
 
+    // Dragging to the edge scrolls the view and keeps the element following. Both have to
+    // move: the view alone means the element was left behind, and the element alone means
+    // it stopped at the edge of what was on screen.
+    d.Selection.Set(upper);
+    upper.X = 600;
+    upper.Y = 300;
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    double originBeforePan = canvas.DotsToView(0, 0).X;
+    var panFrom = canvas.TranslatePoint(canvas.DotsToView(660, 340), window)!.Value;
+    // The edge is the CANVAS's edge, and the harness clicks in window coordinates, so it
+    // has to be translated like every other point here.
+    var panTo = canvas.TranslatePoint(
+        new Avalonia.Point(canvas.Bounds.Width - 4, canvas.DotsToView(660, 340).Y), window)!.Value;
+    window.MouseDown(panFrom, MouseButton.Left);
+    window.MouseMove(panTo);
+    Pump(500);
+    int xAfterPan = upper.X;
+    window.MouseUp(panTo, MouseButton.Left);
+    Pump(700);
+    Console.WriteLine(
+        $"drag at the edge pans the view: label origin on screen {originBeforePan:0} -> {canvas.DotsToView(0, 0).X:0} "
+        + "(expected to have moved left)");
+    Console.WriteLine(
+        $"and the element keeps following: x 600 -> {xAfterPan} "
+        + "(expected past where the viewport ended)");
+
+    // And it stops: nothing keeps scrolling once the button is up.
+    double originAtRest = canvas.DotsToView(0, 0).X;
+    Pump(500);
+    Console.WriteLine(
+        $"the pan stops on release: {Math.Abs(canvas.DotsToView(0, 0).X - originAtRest) < 0.5} (expected True)");
+
     // With no gesture running, Escape clears the selection the way it does everywhere.
     d.Selection.Set(upper);
     Pump(200);
