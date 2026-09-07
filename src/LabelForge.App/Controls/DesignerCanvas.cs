@@ -292,6 +292,11 @@ public sealed class DesignerCanvas : Control
     /// start following it.</summary>
     private const double AutoPanZonePx = 24;
 
+    /// <summary>Below this on screen, a selection is smaller than the handles that would sit
+    /// on it, so it would disappear under them. The outline stays and zooming in brings the
+    /// handles back, which is the way out of it.</summary>
+    private const double HandlesMinPx = 24;
+
     /// <summary>The most one tick moves the view. Reached when the pointer is at the very
     /// edge or past it; nearer the inside of the zone it is proportionally slower, so the
     /// scroll starts gently instead of jumping the moment the zone is entered. Twelve
@@ -859,15 +864,25 @@ public sealed class DesignerCanvas : Control
                 if (selection.Count == 1 && !_dragging && !_resizing && !_rotating &&
                     !element.IsLocked)
                 {
-                    foreach ((_, Point center) in HandleCenters(rect))
+                    if (HandlesFit(rect))
                     {
-                        DrawHandle(context, center);
+                        foreach ((_, Point center) in HandleCenters(rect))
+                        {
+                            DrawHandle(context, center);
+                        }
                     }
 
-                    // Rotation handle: a circle tethered above the selection.
-                    Point rot = RotationHandleCenter(rect);
-                    context.DrawLine(SelectionPen, new Point(rect.Center.X, rect.Top), rot);
-                    context.DrawEllipse(Brushes.White, SelectionPen, rot, HandleSize / 2 + 1, HandleSize / 2 + 1);
+                    // Rotation handle: a circle tethered above the selection. Only on the
+                    // fields ZPL will actually turn, which is FieldRotation's answer and not
+                    // this control's to re-derive: a box drawn at 90 degrees is byte for byte
+                    // the box drawn at 0, so a handle offering it would be a lie.
+                    if (FieldRotation.Applies(element))
+                    {
+                        Point rot = RotationHandleCenter(rect);
+                        context.DrawLine(SelectionPen, new Point(rect.Center.X, rect.Top), rot);
+                        context.DrawEllipse(
+                            Brushes.White, SelectionPen, rot, HandleSize / 2 + 1, HandleSize / 2 + 1);
+                    }
                 }
             }
         }
@@ -1142,6 +1157,12 @@ public sealed class DesignerCanvas : Control
     }
 
     /// <summary>Corner handles resize proportionally; edge-midpoint handles resize one axis.</summary>
+    /// <summary>Whether a selection has room for its handles. Both sides have to be under the
+    /// threshold before they go: a long thin line is not hidden by handles sitting along it,
+    /// and losing them would leave no way to resize it.</summary>
+    private static bool HandlesFit(Rect r) =>
+        r.Width >= HandlesMinPx || r.Height >= HandlesMinPx;
+
     private static IEnumerable<(ResizeHandle Handle, Point Center)> HandleCenters(Rect r)
     {
         yield return (ResizeHandle.TopLeft, r.TopLeft);
@@ -1308,7 +1329,8 @@ public sealed class DesignerCanvas : Control
         // small element would just re-select it.
         if (SelectionScreenRect() is { } selRect && selection.Primary is { } primary)
         {
-            if (GrabRect(RotationHandleCenter(selRect)).Contains(p))
+            if (FieldRotation.Applies(primary) &&
+                GrabRect(RotationHandleCenter(selRect)).Contains(p))
             {
                 DotRect b = _bounds.GetBounds(primary);
                 _rotating = true;
@@ -1328,7 +1350,7 @@ public sealed class DesignerCanvas : Control
 
             foreach ((ResizeHandle kind, Point center) in HandleCenters(selRect))
             {
-                if (!GrabRect(center).Contains(p))
+                if (!HandlesFit(selRect) || !GrabRect(center).Contains(p))
                 {
                     continue;
                 }
@@ -2193,18 +2215,23 @@ public sealed class DesignerCanvas : Control
 
         if (SelectionScreenRect() is { } selRect)
         {
-            if (GrabRect(RotationHandleCenter(selRect)).Contains(p))
+            if (Selection?.Primary is { } handlePrimary &&
+                FieldRotation.Applies(handlePrimary) &&
+                GrabRect(RotationHandleCenter(selRect)).Contains(p))
             {
                 Cursor = new Cursor(StandardCursorType.Hand);
                 return;
             }
 
-            foreach ((ResizeHandle kind, Point center) in HandleCenters(selRect))
+            if (HandlesFit(selRect))
             {
-                if (GrabRect(center).Contains(p))
+                foreach ((ResizeHandle kind, Point center) in HandleCenters(selRect))
                 {
-                    Cursor = new Cursor(HandleCursor(kind));
-                    return;
+                    if (GrabRect(center).Contains(p))
+                    {
+                        Cursor = new Cursor(HandleCursor(kind));
+                        return;
+                    }
                 }
             }
         }

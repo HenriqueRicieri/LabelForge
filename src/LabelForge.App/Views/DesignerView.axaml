@@ -324,6 +324,8 @@
                                   InputGesture="Ctrl+Shift+V" />
                         <MenuItem Header="D_uplicate" Command="{Binding DuplicateCommand}" InputGesture="Ctrl+D" />
                         <Separator />
+                        <MenuItem Header="_Rotate 90" Command="{Binding Rotate90Command}"
+                                  InputGesture="Ctrl+R" />
                         <MenuItem Header="Bring to _Front" Command="{Binding BringToFrontCommand}" />
                         <MenuItem Header="Bring F_orward" Command="{Binding BringForwardCommand}"
                                   InputGesture="Ctrl+Shift+Up" />

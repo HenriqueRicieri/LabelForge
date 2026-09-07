@@ -1635,6 +1635,89 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(200);
 
+    // Handles that tell the truth. A box carries no orientation in its ZPL, so the rotation
+    // handle is not drawn for one and must not be grabbable either: pressing where it would
+    // be has to start a MARQUEE, which is what that empty spot means without it.
+    var turnable = d.Document.Elements.OfType<LabelForge.Core.Model.TextElement>().First();
+    var unturnable = d.Document.Elements.OfType<LabelForge.Core.Model.BoxElement>().First();
+    d.Selection.Set(unturnable);
+    Pump(400);
+    var boxRect = new LabelForge.Core.Model.ElementBoundsCalculator().GetBounds(unturnable);
+    var boxTop = canvas.DotsToView(boxRect.X + boxRect.Width / 2, boxRect.Y);
+    var rotGrab = canvas.TranslatePoint(new Avalonia.Point(boxTop.X, boxTop.Y - 26), window)!.Value;
+    var boxOrientationBefore = unturnable.Orientation;
+    window.MouseDown(rotGrab, MouseButton.Left);
+    window.MouseMove(new Avalonia.Point(rotGrab.X + 60, rotGrab.Y + 60));
+    window.MouseUp(new Avalonia.Point(rotGrab.X + 60, rotGrab.Y + 60), MouseButton.Left);
+    Pump(700);
+    Console.WriteLine(
+        $"no rotation handle on a box: orientation {unturnable.Orientation} "
+        + $"(expected {boxOrientationBefore}, unchanged)");
+
+    // The same grab on a field that DOES turn, so the line above is a difference between the
+    // two elements rather than a drag the harness aimed wrong.
+    d.Selection.Set(turnable);
+    Pump(400);
+    var textRect = new LabelForge.Core.Model.ElementBoundsCalculator().GetBounds(turnable);
+    var textTop = canvas.DotsToView(textRect.X + textRect.Width / 2, textRect.Y);
+    var textRotGrab = canvas.TranslatePoint(new Avalonia.Point(textTop.X, textTop.Y - 26), window)!.Value;
+    window.MouseDown(textRotGrab, MouseButton.Left);
+    window.MouseMove(new Avalonia.Point(textRotGrab.X + 80, textRotGrab.Y + 80));
+    window.MouseUp(new Avalonia.Point(textRotGrab.X + 80, textRotGrab.Y + 80), MouseButton.Left);
+    Pump(700);
+    Console.WriteLine(
+        $"but the same grab turns a text field: {turnable.Orientation} (expected not Normal)");
+    d.UndoCommand.Execute(null);
+    Pump(700);
+
+    // Undo rebuilds the document by deserializing a snapshot, so every element reference
+    // taken before it now points at a detached copy that no longer belongs to any document.
+    // Anything after an undo has to ask the document again.
+    turnable = d.Document.Elements.OfType<LabelForge.Core.Model.TextElement>().First();
+    unturnable = d.Document.Elements.OfType<LabelForge.Core.Model.BoxElement>().First();
+    Console.WriteLine(
+        $"and undo puts it back: {turnable.Orientation} (expected Normal)");
+
+    // An element smaller than its own handles does not get them, so a press on its corner
+    // is a press on the ELEMENT and moves it instead of resizing it.
+    var tiny = new LabelForge.Core.Model.BoxElement
+    {
+        X = 600, Y = 400, WidthDots = 10, HeightDots = 10, ThicknessDots = 1, ZOrder = 50,
+    };
+    d.Document.Elements.Add(tiny);
+    d.Selection.Set(tiny);
+    d.NotifyDocumentEdited();
+    Pump(700);
+    var tinyCorner = canvas.TranslatePoint(canvas.DotsToView(601, 401), window)!.Value;
+    window.MouseDown(tinyCorner, MouseButton.Left);
+    window.MouseMove(new Avalonia.Point(tinyCorner.X + 40, tinyCorner.Y + 40));
+    window.MouseUp(new Avalonia.Point(tinyCorner.X + 40, tinyCorner.Y + 40), MouseButton.Left);
+    Pump(700);
+    Console.WriteLine(
+        $"a tiny element has no handles to catch: {tiny.WidthDots}x{tiny.HeightDots} dots "
+        + $"(expected 10x10, unresized), moved to {tiny.X},{tiny.Y} (expected past 600,400)");
+    d.Document.Elements.Remove(tiny);
+    d.NotifyDocumentEdited();
+    Pump(400);
+
+    // Ctrl+R turns what can be turned and leaves the rest alone, so a mixed selection is
+    // not an all-or-nothing choice.
+    d.Selection.SetMany([turnable, unturnable]);
+    canvas.Focus();
+    Pump(300);
+    var textBefore = turnable.Orientation;
+    window.KeyPress(Key.R, RawInputModifiers.Control, PhysicalKey.R, "r");
+    Pump(700);
+    var expectedTurn = (LabelForge.Core.Model.Orientation)(((int)textBefore + 1) % 4);
+    Console.WriteLine(
+        $"ctrl+r turns the text: {textBefore} -> {turnable.Orientation} (expected {expectedTurn}), "
+        + $"and leaves the box at {unturnable.Orientation} (expected {boxOrientationBefore})");
+    d.UndoCommand.Execute(null);
+    Pump(700);
+
+    d.Selection.Clear();
+    Pump(200);
+
     // Render caching. Observable without a test hook: a skipped render leaves the very
     // bitmap that is already on screen, so the reference is unchanged.
     d.NewDocumentCommand.Execute(null);

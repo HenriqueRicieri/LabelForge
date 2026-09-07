@@ -84,6 +84,7 @@ public partial class DesignerView : UserControl
         Add(menu, "Duplicate", vm.DuplicateCommand);
         Add(menu, "Delete", vm.DeleteSelectedCommand);
         menu.Items.Add(new Separator());
+        Add(menu, "Rotate 90", vm.Rotate90Command);
         Add(menu, "Bring to Front", vm.BringToFrontCommand);
         Add(menu, "Bring Forward", vm.BringForwardCommand);
         Add(menu, "Send Backward", vm.SendBackwardCommand);
@@ -960,6 +961,18 @@ public partial class DesignerView : UserControl
                 if (vm.SelectAllCommand.CanExecute(null))
                 {
                     vm.SelectAllCommand.Execute(null);
+                }
+
+                e.Handled = true;
+                break;
+
+            // Ctrl + R is the ruler toggle in most tools, which is why the plan left this
+            // key open. Here the rulers are permanent and have no command at all, so the key
+            // is free and it is the one R suggests.
+            case Key.R:
+                if (vm.Rotate90Command.CanExecute(null))
+                {
+                    vm.Rotate90Command.Execute(null);
                 }
 
                 e.Handled = true;

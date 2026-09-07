@@ -1113,6 +1113,10 @@ public partial class DesignerViewModel : ViewModelBase
     private void OnSelectionChanged()
     {
         RefreshReadout();
+
+        // Whether a rotation is possible depends on WHAT is selected, not on how much, so
+        // it cannot ride on HasSelection changing.
+        Rotate90Command.NotifyCanExecuteChanged();
         HasSelection = Selection.Count > 0;
         SelectionCount = Selection.Count;
         IsSingleSelection = Selection.Count == 1;
@@ -2054,6 +2058,36 @@ public partial class DesignerViewModel : ViewModelBase
             element.ZOrder = nextZ++;
         }
 
+        RecordUndo();
+        ScheduleRender();
+    }
+
+    /// <summary>True while the selection holds anything ZPL will actually turn. Not
+    /// <see cref="HasSelection"/>: a box is a selection and cannot be rotated.</summary>
+    private bool CanRotate => Selection.Items.Any(FieldRotation.Applies);
+
+    /// <summary>
+    /// A quarter turn clockwise, for the elements rotation reaches. The graphic primitives
+    /// are skipped rather than refused, so a mixed selection turns what it can instead of
+    /// doing nothing: `^GB` and the rest carry no orientation at all, and setting one on them
+    /// would change the document without changing a single printed dot.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanRotate))]
+    private void Rotate90()
+    {
+        List<Element> turning = [.. Selection.Items.Where(FieldRotation.Applies)];
+        if (turning.Count == 0)
+        {
+            return;
+        }
+
+        foreach (Element element in turning)
+        {
+            element.Orientation = (Orientation)(((int)element.Orientation + 1) % 4);
+        }
+
+        SelectionProperties?.Refresh();
+        RefreshReadout();
         RecordUndo();
         ScheduleRender();
     }

@@ -67,6 +67,7 @@ public sealed class ShortcutsViewModel
             new("Ctrl + drag a handle", "Resize from the middle, both sides at once"),
             new("Shift + drag a corner", "Resize the two sides independently"),
             new("Drag the round handle", "Rotate, snapping to 0, 90, 180 and 270"),
+            new("Ctrl + R", "A quarter turn, for the fields ZPL will actually turn"),
             new("Esc while dragging", "Put it back where the gesture started"),
         ]),
 
