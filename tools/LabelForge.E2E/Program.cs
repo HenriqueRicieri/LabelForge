@@ -13,20 +13,25 @@ using LabelForge.App.Views;
 // and prints one line per check, each carrying the value it found beside the value expected,
 // so a run reads as a transcript rather than a pass count.
 //
-// How it is meant to be used:
-//   - exit code 0 means every check held; a line whose two halves disagree fails the run
-//   - a run is diffed against the previous one, and only the lines the change was meant to
-//     touch may differ (the crash-recovery line carries a timestamp and always does)
-//   - a check written for a bug is run against the code BEFORE the fix first, because a
-//     check that cannot fail is not a check
+// How it is meant to be read:
+//   - nothing in here grades itself. There is no assertion and no failing exit code: exit 0
+//     means the run reached the end without throwing, which is worth knowing and is not the
+//     same as the checks holding
+//   - so the lines are the result. A run is diffed against the previous one and only the
+//     lines the change was meant to touch may differ (the crash-recovery line carries a
+//     timestamp and always does), and a line whose two halves disagree is a failure a person
+//     has to notice
+//   - a check written for a bug is run against the code BEFORE the fix first, and the line it
+//     prints then has to visibly disagree with its own "expected". A check that cannot fail
+//     is not a check
 //
 // Three things that have caught people out in here:
 //   - undo deserializes a whole new document, so an Element held across an undo is a
 //     detached object; re-fetch from Document.Elements after every undo
 //   - a click and a drag close together are a double-click, exactly as in the real editor,
 //     so two gestures meant to be separate need a Pump() between them
-//   - numbers print through InvariantCulture: this is built on a pt-BR machine, and a
-//     decimal comma would make runs from two machines differ for no reason
+//   - decimals go out through a formatter that pins InvariantCulture: this is built on a
+//     pt-BR machine, and a decimal comma would make two machines' runs differ for no reason
 
 AppBuilder.Configure<LabelForge.App.App>()
     .UseSkia()
@@ -2016,6 +2021,20 @@ if (mode == "designer")
     Console.WriteLine(
         $"ctrl+= and ctrl+- zoom: {Zoom(zoomBefore)} -> {Zoom(zoomedIn)} -> {Zoom(canvas.GetZoom())} "
         + "(expected up then back)");
+
+    // The same two keys with NO character, which is the case the fallback binding exists for
+    // and the one a headless run can produce on demand. The check above sends "=" and "-", so
+    // it never reaches that binding.
+    canvas.SetZoom(1);
+    Pump(300);
+    window.KeyPress(Key.OemPlus, RawInputModifiers.Control, PhysicalKey.Equal, null);
+    Pump(400);
+    double mute = canvas.GetZoom();
+    window.KeyPress(Key.OemMinus, RawInputModifiers.Control, PhysicalKey.Minus, null);
+    Pump(400);
+    Console.WriteLine(
+        $"and with no character at all: 1.00 -> {Zoom(mute)} -> {Zoom(canvas.GetZoom())} "
+        + "(expected up then back, on the key binding rather than the character)");
 
     canvas.ZoomBy(2);
     Pump(300);
