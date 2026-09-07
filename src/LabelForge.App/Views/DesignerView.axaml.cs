@@ -887,6 +887,22 @@ public partial class DesignerView : UserControl
 
         switch (e.Key)
         {
+            // The zoom keys' fallback, for the same case the brackets have Ctrl+Shift+Up and
+            // Down for. Unlike the brackets these two ARE safe to bind by key: minus and
+            // equals sit on the same keys under both the US layout Windows names them after
+            // and the ABNT2 one this app is written for, so the name and the character agree.
+            // Never reached while the character comes through, and the only thing standing
+            // between the shortcuts window and a key that does nothing when it does not.
+            case Key.OemPlus or Key.Add:
+                Canvas.ZoomBy(1.25);
+                e.Handled = true;
+                break;
+
+            case Key.OemMinus or Key.Subtract:
+                Canvas.ZoomBy(1 / 1.25);
+                e.Handled = true;
+                break;
+
             case Key.Up when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
                 if (vm.BringForwardCommand.CanExecute(null))
                 {
