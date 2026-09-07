@@ -93,6 +93,31 @@ public sealed class AlignerUnitTests
     }
 
     [Fact]
+    public void AligningToTheLabel_IgnoresTheOtherUnits()
+    {
+        var a = Box(300, 100);
+        var b = Box(500, 100);
+
+        // Without the flag these two would line up with each other at 300. With it, both go
+        // to the label's edge, which is Photoshop's align-to-canvas.
+        Assert.True(Aligner.AlignUnits([[a], [b]], AlignEdge.Left, 800, 1200, toLabel: true));
+        Assert.Equal(0, a.X);
+        Assert.Equal(0, b.X);
+    }
+
+    [Fact]
+    public void CenterOnLabel_DoesBothAxesEvenWhenOneHasNothingToDo()
+    {
+        // Already centred across, so the horizontal pass moves nothing. The vertical pass
+        // still has to run, which a short-circuiting expression would have skipped.
+        var box = Box(350, 100, w: 100, h: 50);
+
+        Assert.True(Aligner.CenterOnLabel([[box]], 800, 1200));
+        Assert.Equal(350, box.X);
+        Assert.Equal(575, box.Y);
+    }
+
+    [Fact]
     public void TwoUnitsAreNotEnoughToDistribute()
     {
         var a = Box(0, 100);

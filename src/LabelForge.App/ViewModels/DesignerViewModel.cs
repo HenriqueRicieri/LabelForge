@@ -17,6 +17,7 @@ using LabelForge.Core.Editing;
 using LabelForge.Core.Io;
 using LabelForge.Core.Model;
 using LabelForge.Core.Rendering;
+using LabelForge.Core.Settings;
 using LabelForge.Core.Templating;
 using LabelForge.Core.Zpl;
 
@@ -57,6 +58,13 @@ public partial class DesignerViewModel : ViewModelBase
     private readonly Core.Media.UserMediaStore _userMediaStore;
     private readonly Core.Fields.FieldCatalogStore _fieldCatalogStore;
     private readonly RecoveryStore _recovery;
+    private readonly UserSettingsStore _settingsStore;
+    private UserSettings _settings = new();
+
+    /// <summary>Backing the toggle directly: it is read in the constructor before the
+    /// generated property exists, and setting it there would try to persist what was just
+    /// loaded.</summary>
+    private bool _alignToLabel;
     private string? _lastSnapshot;
 
     /// <summary>What the last drawn underlay was rendered from: the preview ZPL and the
@@ -883,16 +891,20 @@ public partial class DesignerViewModel : ViewModelBase
     public DesignerViewModel(
         Core.Media.UserMediaStore? userMediaStore = null,
         Core.Fields.FieldCatalogStore? fieldCatalogStore = null,
-        RecoveryStore? recoveryStore = null)
+        RecoveryStore? recoveryStore = null,
+        UserSettingsStore? userSettingsStore = null)
     {
         _renderQueue = new RenderQueue<RenderRequest, RenderPass>(Render);
         _userMediaStore = userMediaStore ?? new Core.Media.UserMediaStore();
         _fieldCatalogStore = fieldCatalogStore ?? new Core.Fields.FieldCatalogStore();
         _recovery = recoveryStore ?? new RecoveryStore();
+        _settingsStore = userSettingsStore ?? new UserSettingsStore();
         Selection.Changed += (_, _) => OnSelectionChanged();
 
         ApplyUserMedia(_userMediaStore.Load());
         ApplyFieldCatalogs(_fieldCatalogStore.Load());
+        _settings = _settingsStore.Load();
+        _alignToLabel = _settings.AlignToLabel;
 
         // Property setters record undo states; construction must not, or the
         // history would start with a spurious extra document before the baseline.
@@ -1822,9 +1834,96 @@ public partial class DesignerViewModel : ViewModelBase
         return units;
     }
 
+    /// <summary>
+    /// Line things up against the LABEL rather than against each other, which is
+    /// Photoshop's align-to-canvas. A preference rather than a pair of commands, because
+    /// it is a way of working rather than a choice made per click, and it is kept per
+    /// machine: a label opened elsewhere must behave the way that person set up.
+    /// </summary>
+    public bool AlignToLabel
+    {
+        get => _alignToLabel;
+        set
+        {
+            if (_alignToLabel == value)
+            {
+                return;
+            }
+
+            _alignToLabel = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(AlignTargetName));
+            _settings = _settings with { AlignToLabel = value };
+            if (_settingsStore.Save(_settings) is { } error)
+            {
+                Notify($"Could not save the setting: {error}");
+            }
+        }
+    }
+
+    /// <summary>What the menu item reads, so the answer is visible without opening it.</summary>
+    public string AlignTargetName => AlignToLabel ? "to label" : "to selection";
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void CenterOnLabel()
+    {
+        if (!Aligner.CenterOnLabel(SelectedUnits(), Document.WidthDots, Document.HeightDots))
+        {
+            return;
+        }
+
+        SelectionProperties?.Refresh();
+        RefreshReadout();
+        RecordUndo();
+        ScheduleRender();
+    }
+
+    [RelayCommand(CanExecute = nameof(HasMultiSelection))]
+    private void MatchWidth() => ApplyMatch(width: true, height: false);
+
+    [RelayCommand(CanExecute = nameof(HasMultiSelection))]
+    private void MatchHeight() => ApplyMatch(width: false, height: true);
+
+    [RelayCommand(CanExecute = nameof(HasMultiSelection))]
+    private void MatchSize() => ApplyMatch(width: true, height: true);
+
+    /// <summary>
+    /// Sizes the selection to the LAST element picked, which is the convention everywhere
+    /// and the only one a person can control: whatever you clicked most recently is the one
+    /// you meant. Anything whose size comes in steps lands on the nearest one, and the
+    /// status line says how many did, rather than the panel showing a number the canvas is
+    /// not drawing.
+    /// </summary>
+    private void ApplyMatch(bool width, bool height)
+    {
+        if (Selection.Primary is not { } reference)
+        {
+            return;
+        }
+
+        SizeMatch result = SizeMatcher.Match(Selection.Items.ToList(), reference, width, height);
+        if (result.Resized == 0 && result.Quantized == 0)
+        {
+            return;
+        }
+
+        SelectionProperties?.Refresh();
+        RefreshReadout();
+        RecordUndo();
+        ScheduleRender();
+
+        if (result.Quantized > 0)
+        {
+            Notify(result.Quantized == 1
+                ? "One element only sizes in steps, so it landed on the nearest one"
+                : $"{result.Quantized} elements only size in steps, so they landed on the nearest");
+        }
+    }
+
     private void ApplyAlign(AlignEdge edge)
     {
-        if (Aligner.AlignUnits(SelectedUnits(), edge, Document.WidthDots, Document.HeightDots))
+        if (Aligner.AlignUnits(
+                SelectedUnits(), edge, Document.WidthDots, Document.HeightDots, AlignToLabel))
         {
             SelectionProperties?.Refresh();
             RefreshReadout();

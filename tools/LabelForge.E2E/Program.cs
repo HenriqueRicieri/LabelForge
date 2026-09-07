@@ -25,8 +25,10 @@ if (args.Contains("dark"))
 string presetsPath = Path.Combine(AppContext.BaseDirectory, "e2e-user-media.json");
 string catalogsPath = Path.Combine(AppContext.BaseDirectory, "e2e-field-catalogs.json");
 string recoveryDir = Path.Combine(AppContext.BaseDirectory, "e2e-recovery");
+string settingsPath = Path.Combine(AppContext.BaseDirectory, "e2e-user-settings.json");
 File.Delete(presetsPath);
 File.Delete(catalogsPath);
+File.Delete(settingsPath);
 if (Directory.Exists(recoveryDir))
 {
     Directory.Delete(recoveryDir, recursive: true);
@@ -41,7 +43,8 @@ var vm = new MainViewModel(
     new LabelForge.Core.Media.UserMediaStore(presetsPath),
     new LabelForge.Core.Fields.FieldCatalogStore(catalogsPath),
     new LabelForge.Core.Io.RecoveryStore(recoveryDir, "e2e"),
-    () => new LabelForge.Core.Rendering.BinaryKitsRenderer());
+    () => new LabelForge.Core.Rendering.BinaryKitsRenderer(),
+    new LabelForge.Core.Settings.UserSettingsStore(settingsPath));
 var window = new MainWindow { DataContext = vm };
 window.Show();
 
@@ -1862,6 +1865,54 @@ if (mode == "designer")
 
     d.Selection.Clear();
     Pump(200);
+
+    // Aligning to the LABEL rather than to the rest of the selection, and a size that can
+    // be copied from one element to the others.
+    d.Document.Elements.Clear();
+    var aLeft = new LabelForge.Core.Model.BoxElement
+    {
+        X = 300, Y = 100, WidthDots = 100, HeightDots = 50, ThicknessDots = 3,
+    };
+    var aRight = new LabelForge.Core.Model.BoxElement
+    {
+        X = 500, Y = 200, WidthDots = 240, HeightDots = 120, ThicknessDots = 3,
+    };
+    d.Document.Elements.Add(aLeft);
+    d.Document.Elements.Add(aRight);
+    d.Selection.SetMany([aLeft, aRight]);
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    d.AlignLeftCommand.Execute(null);
+    Pump(500);
+    Console.WriteLine(
+        $"align to selection: {aLeft.X},{aRight.X} (expected both at 300, the leftmost)");
+
+    d.AlignToLabel = true;
+    d.AlignLeftCommand.Execute(null);
+    Pump(500);
+    Console.WriteLine(
+        $"align to label: {aLeft.X},{aRight.X} (expected both at 0), "
+        + $"and the setting stuck: {File.Exists(settingsPath)} (expected True)");
+
+    d.CenterOnLabelCommand.Execute(null);
+    Pump(500);
+    Console.WriteLine(
+        $"center on label: first at {aLeft.X},{aLeft.Y} on an "
+        + $"{d.Document.WidthDots} x {d.Document.HeightDots} dot label (expected both axes centred)");
+
+    // Same size copies from the LAST element picked, which is the one a person controls.
+    d.Selection.SetMany([aLeft, aRight]);
+    Pump(300);
+    d.MatchSizeCommand.Execute(null);
+    Pump(500);
+    Console.WriteLine(
+        $"same size takes the last picked: {aLeft.WidthDots}x{aLeft.HeightDots} "
+        + $"(expected {aRight.WidthDots}x{aRight.HeightDots})");
+
+    d.AlignToLabel = false;
+    d.Selection.Clear();
+    Pump(300);
 
     // Render caching. Observable without a test hook: a skipped render leaves the very
     // bitmap that is already on screen, so the reference is unchanged.

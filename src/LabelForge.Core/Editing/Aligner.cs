@@ -30,10 +30,31 @@ public static class Aligner
 {
     /// <summary>Returns true when at least one element moved.</summary>
     public static bool Align(
-        IReadOnlyList<Element> elements, AlignEdge edge, int labelWidthDots, int labelHeightDots)
+        IReadOnlyList<Element> elements,
+        AlignEdge edge,
+        int labelWidthDots,
+        int labelHeightDots,
+        bool toLabel = false)
     {
         ArgumentNullException.ThrowIfNull(elements);
-        return AlignUnits(Alone(elements), edge, labelWidthDots, labelHeightDots);
+        return AlignUnits(Alone(elements), edge, labelWidthDots, labelHeightDots, toLabel);
+    }
+
+    /// <summary>Puts the selection in the middle of the label on both axes at once, which
+    /// is two commands people always run together.</summary>
+    public static bool CenterOnLabel(
+        IReadOnlyList<IReadOnlyList<Element>> units, int labelWidthDots, int labelHeightDots)
+    {
+        ArgumentNullException.ThrowIfNull(units);
+
+        // Both axes run, whatever either answers: written as two statements rather than one
+        // short-circuiting expression, which would skip the second axis whenever the first
+        // one had nothing to do.
+        bool horizontal = AlignUnits(
+            units, AlignEdge.CenterHorizontal, labelWidthDots, labelHeightDots, toLabel: true);
+        bool vertical = AlignUnits(
+            units, AlignEdge.Middle, labelWidthDots, labelHeightDots, toLabel: true);
+        return horizontal || vertical;
     }
 
     /// <summary>Equalizes the gaps between three or more elements along one axis; the
@@ -52,11 +73,16 @@ public static class Aligner
     /// A unit holding any locked element sits the whole move out, because a group moves as
     /// one thing and half of one moving is not that.
     /// </summary>
+    /// <param name="toLabel">Line up against the label rather than within the selection,
+    /// which is Photoshop's align-to-canvas. Without it several units line up with each
+    /// other and only a lone one has the label to go by, which is what this has always
+    /// done and is the commoner ask.</param>
     public static bool AlignUnits(
         IReadOnlyList<IReadOnlyList<Element>> units,
         AlignEdge edge,
         int labelWidthDots,
-        int labelHeightDots)
+        int labelHeightDots,
+        bool toLabel = false)
     {
         ArgumentNullException.ThrowIfNull(units);
 
@@ -71,7 +97,7 @@ public static class Aligner
         List<DotRect> boxes = [.. items.Select(u => Box(u, bounds))];
 
         int lo, hi;
-        if (items.Count == 1)
+        if (items.Count == 1 || toLabel)
         {
             lo = 0;
             hi = horizontal ? labelWidthDots : labelHeightDots;

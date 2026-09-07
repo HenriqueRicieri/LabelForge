@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LabelForge.Core.Io;
 
@@ -27,9 +27,11 @@ public partial class MainViewModel : ViewModelBase
         LabelForge.Core.Media.UserMediaStore? userMediaStore = null,
         LabelForge.Core.Fields.FieldCatalogStore? fieldCatalogStore = null,
         LabelForge.Core.Io.RecoveryStore? recoveryStore = null,
-        Func<LabelForge.Core.Rendering.IZplRenderer>? comparisonRenderer = null)
+        Func<LabelForge.Core.Rendering.IZplRenderer>? comparisonRenderer = null,
+        LabelForge.Core.Settings.UserSettingsStore? userSettingsStore = null)
     {
-        Designer = new DesignerViewModel(userMediaStore, fieldCatalogStore, recoveryStore);
+        Designer = new DesignerViewModel(
+            userMediaStore, fieldCatalogStore, recoveryStore, userSettingsStore);
         Viewer = new ViewerViewModel(comparisonRenderer);
     }
 

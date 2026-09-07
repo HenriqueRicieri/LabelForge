@@ -324,6 +324,14 @@
                                   InputGesture="Ctrl+Shift+V" />
                         <MenuItem Header="D_uplicate" Command="{Binding DuplicateCommand}" InputGesture="Ctrl+D" />
                         <Separator />
+                        <MenuItem Header="Align to _label"
+                                  ToggleType="CheckBox" IsChecked="{Binding AlignToLabel}"
+                                  ToolTip.Tip="Line things up with the label rather than with each other" />
+                        <MenuItem Header="Center on La_bel" Command="{Binding CenterOnLabelCommand}" />
+                        <MenuItem Header="Same _Width" Command="{Binding MatchWidthCommand}" />
+                        <MenuItem Header="Same _Height" Command="{Binding MatchHeightCommand}" />
+                        <MenuItem Header="Same Si_ze" Command="{Binding MatchSizeCommand}" />
+                        <Separator />
                         <MenuItem Header="_Group" Command="{Binding GroupSelectionCommand}"
                                   InputGesture="Ctrl+G" />
                         <MenuItem Header="Un_group" Command="{Binding UngroupSelectionCommand}"
@@ -868,27 +876,27 @@
                 <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="2,5" />
 
                 <Button Classes="tool" Command="{Binding AlignLeftCommand}"
-                        ToolTip.Tip="Align left (single element: to the label)">
+                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align left ({0})'}">
                     <PathIcon Data="M2,2 L3.6,2 L3.6,14 L2,14 Z M5.2,3.6 L14,3.6 L14,6.4 L5.2,6.4 Z M5.2,9.6 L10.5,9.6 L10.5,12.4 L5.2,12.4 Z" />
                 </Button>
                 <Button Classes="tool" Command="{Binding AlignCenterHorizontalCommand}"
-                        ToolTip.Tip="Align horizontal centers (single element: center on label)">
+                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align horizontal centers ({0})'}">
                     <PathIcon Data="F1 M7.2,2 L8.8,2 L8.8,14 L7.2,14 Z M3,3.6 L13,3.6 L13,6.4 L3,6.4 Z M5,9.6 L11,9.6 L11,12.4 L5,12.4 Z" />
                 </Button>
                 <Button Classes="tool" Command="{Binding AlignRightCommand}"
-                        ToolTip.Tip="Align right (single element: to the label)">
+                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align right ({0})'}">
                     <PathIcon Data="M12.4,2 L14,2 L14,14 L12.4,14 Z M2,3.6 L10.8,3.6 L10.8,6.4 L2,6.4 Z M5.5,9.6 L10.8,9.6 L10.8,12.4 L5.5,12.4 Z" />
                 </Button>
                 <Button Classes="tool" Command="{Binding AlignTopCommand}"
-                        ToolTip.Tip="Align top (single element: to the label)">
+                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align top ({0})'}">
                     <PathIcon Data="M2,2 L14,2 L14,3.6 L2,3.6 Z M3.6,5.2 L6.4,5.2 L6.4,14 L3.6,14 Z M9.6,5.2 L12.4,5.2 L12.4,10.5 L9.6,10.5 Z" />
                 </Button>
                 <Button Classes="tool" Command="{Binding AlignMiddleCommand}"
-                        ToolTip.Tip="Align vertical centers (single element: center on label)">
+                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align vertical centers ({0})'}">
                     <PathIcon Data="F1 M2,7.2 L14,7.2 L14,8.8 L2,8.8 Z M3.6,3 L6.4,3 L6.4,13 L3.6,13 Z M9.6,5 L12.4,5 L12.4,11 L9.6,11 Z" />
                 </Button>
                 <Button Classes="tool" Command="{Binding AlignBottomCommand}"
-                        ToolTip.Tip="Align bottom (single element: to the label)">
+                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align bottom ({0})'}">
                     <PathIcon Data="M2,12.4 L14,12.4 L14,14 L2,14 Z M3.6,2 L6.4,2 L6.4,10.8 L3.6,10.8 Z M9.6,5.5 L12.4,5.5 L12.4,10.8 L9.6,10.8 Z" />
                 </Button>
 
