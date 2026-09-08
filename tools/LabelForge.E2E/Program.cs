@@ -420,18 +420,27 @@ if (mode == "designer")
 
     if (d.SelectionProperties is DiagonalPropertiesViewModel diagonal)
     {
-        diagonal.LeansRight = false;
+        // The lean is a rotation now rather than a tick box, so the panel offers it in the
+        // same slot every other field's rotation sits in, with the diagonal's own two words
+        // for its two stops. A quarter turn takes the box with it: "/" across 200 by 140,
+        // turned, is "\" across 140 by 200, and flipping only the letter would leave the
+        // line crossing a box it no longer fits.
+        diagonal.SelectedOrientation = diagonal.Orientations[1];
         Pump(500);
-        Console.WriteLine(
-            $"diagonal leans left: {d.GeneratedZpl.Contains("^GD200,140,3,B,L")} (expected True)");
+        Check(
+            "the panel turns a diagonal, box and all",
+            d.GeneratedZpl.Contains("^GD140,200,3,B,L"), true,
+            "^GD140,200,3,B,L: leaning the other way, in a box on its side");
 
         // A one-dot diagonal prints and the preview cannot draw it, so the panel says so
         // instead of the thickness being quietly clamped to what the canvas can show.
         diagonal.Thickness = 1;
         Pump(500);
-        Console.WriteLine(
-            $"one-dot diagonal warns: {diagonal.HasThicknessNote} (expected True), "
-            + $"kept at 1={d.GeneratedZpl.Contains("^GD200,140,1,B,L")} (expected True)");
+        Check("one-dot diagonal warns", diagonal.HasThicknessNote, true);
+        Check(
+            "and is kept at 1 rather than clamped to what the canvas can draw",
+            d.GeneratedZpl.Contains("^GD140,200,1,B,L"), true,
+            "^GD140,200,1,B,L, in the box the turn above left it in");
         diagonal.Thickness = 3;
         Pump(300);
     }
@@ -1775,6 +1784,136 @@ if (mode == "designer")
     d.Selection.Clear();
     Pump(200);
 
+    // A line turns, and it turns through the same handle everything else turns through. It
+    // used to be a checkbox, which meant the canvas offered no handle for something the
+    // printer draws either way round: `^GB` with its sides swapped IS the vertical line, so
+    // the quarter turn was always expressible and only the UI said otherwise.
+    //
+    // The turn is read off IsVertical rather than Orientation, because Orientation is the
+    // property the generator never looks at for a line, and writing it was the bug the
+    // read/write pair in FieldRotation exists to prevent.
+    var turningLine = new LabelForge.Core.Model.LineElement
+    {
+        X = 200, Y = 500, LengthDots = 300, ThicknessDots = 6, ZOrder = 60,
+    };
+    d.Document.Elements.Add(turningLine);
+    d.Selection.Set(turningLine);
+    d.NotifyDocumentEdited();
+    Pump(700);
+
+    var lineRect = new LabelForge.Core.Model.ElementBoundsCalculator().GetBounds(turningLine);
+    var lineTop = canvas.DotsToView(lineRect.X + lineRect.Width / 2, lineRect.Y);
+    var lineRotGrab = canvas.TranslatePoint(new Avalonia.Point(lineTop.X, lineTop.Y - 26), window)!.Value;
+    window.MouseDown(lineRotGrab, MouseButton.Left);
+    window.MouseMove(new Avalonia.Point(lineRotGrab.X + 90, lineRotGrab.Y + 90));
+    window.MouseUp(new Avalonia.Point(lineRotGrab.X + 90, lineRotGrab.Y + 90), MouseButton.Left);
+    Pump(700);
+    Check("dragging a line's rotation handle stands it up", turningLine.IsVertical, true);
+    Check(
+        "and it says so where the generator reads it, not where it does not",
+        $"{turningLine.IsVertical},{turningLine.Orientation}", "True,Normal",
+        "IsVertical carries the turn; Orientation is untouched because ^GB ignores it");
+
+    // One undo puts it back, which is also how the turn is shown to be ONE step rather than
+    // the drag having recorded several. Fetched from the document rather than through the
+    // reference above, because an undo deserializes a whole new document; and reported as
+    // missing rather than assumed present, or a run where the drag turned nothing would undo
+    // the ADD instead and this line would read a stale object as a pass.
+    d.UndoCommand.Execute(null);
+    Pump(700);
+    var afterUndo = d.Document.Elements
+        .OfType<LabelForge.Core.Model.LineElement>().FirstOrDefault(l => l.LengthDots == 300);
+    Check(
+        "and one undo lays it back down",
+        afterUndo is null ? "the line is gone, so the undo took the add" : $"{afterUndo.IsVertical}",
+        "False");
+
+    RemoveScratch(60);
+
+    // Ctrl + R reaches it too, which is the other half of the checkbox going away. Its own
+    // line rather than the one above, so neither check can be read as a pass on the other's
+    // leftovers.
+    var keyedLine = new LabelForge.Core.Model.LineElement
+    {
+        X = 200, Y = 500, LengthDots = 260, ThicknessDots = 6, ZOrder = 63,
+    };
+    d.Document.Elements.Add(keyedLine);
+    d.Selection.Set(keyedLine);
+    d.NotifyDocumentEdited();
+    canvas.Focus();
+    Pump(700);
+    window.KeyPress(Key.R, RawInputModifiers.Control, PhysicalKey.R, "r");
+    Pump(700);
+    Check("ctrl+r turns a line as well", keyedLine.IsVertical, true);
+    RemoveScratch(63);
+
+    // A diagonal turns by trading its lean AND its sides in one move, or the line would be
+    // left crossing a box it no longer fits.
+    var turningDiagonal = new LabelForge.Core.Model.DiagonalLineElement
+    {
+        X = 200, Y = 500, WidthDots = 240, HeightDots = 80, ThicknessDots = 4, ZOrder = 61,
+    };
+    d.Document.Elements.Add(turningDiagonal);
+    d.Selection.Set(turningDiagonal);
+    d.NotifyDocumentEdited();
+    canvas.Focus();
+    Pump(700);
+    window.KeyPress(Key.R, RawInputModifiers.Control, PhysicalKey.R, "r");
+    Pump(700);
+    Check(
+        "ctrl+r turns a diagonal, lean and box together",
+        $"{turningDiagonal.LeansRight},{turningDiagonal.WidthDots}x{turningDiagonal.HeightDots}",
+        "False,80x240", "a quarter turn of / is \\ in a box on its side");
+    RemoveScratch(61);
+
+    // The checkbox is gone from the panel, checked in the rendered panel rather than on the
+    // view model: a binding to a property that no longer exists fails quietly, so a check
+    // that only asked the view model would pass with the box still sitting there.
+    var checkboxLine = new LabelForge.Core.Model.LineElement
+    {
+        X = 200, Y = 500, LengthDots = 300, ThicknessDots = 6, ZOrder = 62,
+    };
+    d.Document.Elements.Add(checkboxLine);
+    d.Selection.Set(checkboxLine);
+    d.NotifyDocumentEdited();
+    Pump(700);
+    Check(
+        "the line editor has no tick box for its turn", TurnTickBoxes(), "none",
+        "Vertical is a rotation now, in the slot every other field's rotation sits in");
+
+    RemoveScratch(62);
+    var checkboxDiagonal = new LabelForge.Core.Model.DiagonalLineElement
+    {
+        X = 200, Y = 500, WidthDots = 200, HeightDots = 90, ThicknessDots = 4, ZOrder = 62,
+    };
+    d.Document.Elements.Add(checkboxDiagonal);
+    d.Selection.Set(checkboxDiagonal);
+    d.NotifyDocumentEdited();
+    Pump(700);
+    Check(
+        "and neither does the diagonal editor", TurnTickBoxes(), "none",
+        "its lean went the same way, for the same reason");
+
+    RemoveScratch(62);
+    d.Selection.Clear();
+    Pump(200);
+
+    // And the two questions stay apart. A box is still not turnable, and the bounds
+    // calculator still asks the OTHER one, so nothing started swapping sides that does not
+    // swap them in the ink.
+    Check(
+        "what can be turned, and what carries an orientation letter",
+        string.Join(
+            ",",
+            LabelForge.Core.Model.FieldRotation.CanRotate(new LabelForge.Core.Model.LineElement()),
+            LabelForge.Core.Model.FieldRotation.Applies(new LabelForge.Core.Model.LineElement()),
+            LabelForge.Core.Model.FieldRotation.CanRotate(new LabelForge.Core.Model.BoxElement())),
+        "True,False,False",
+        "a line turns but says so elsewhere; a box does neither");
+
+    d.Selection.Clear();
+    Pump(200);
+
     // Groups. Three elements, two of them about to become one thing.
     d.Document.Elements.Clear();
     var gLeft = new LabelForge.Core.Model.BoxElement
@@ -2709,6 +2848,39 @@ if (mode == "designer")
     Console.WriteLine($"catalog removed: {d.FieldCatalogs.Count} left (expected 0)");
     d.Selection.Clear();
     Pump(200);
+
+    /// <summary>
+    /// The tick boxes that used to carry a turn, if the panel is still showing any. Read off
+    /// the rendered window rather than the view model, because a binding to a property that
+    /// no longer exists fails quietly: a check that asked the view model would pass with the
+    /// box still sitting there.
+    /// </summary>
+    string TurnTickBoxes()
+    {
+        string[] left = [.. window.GetVisualDescendants().OfType<CheckBox>()
+            .Select(c => c.Content as string ?? string.Empty)
+            .Where(t => t is "Vertical" or "Leans right (/)")];
+        return left.Length == 0 ? "none" : string.Join(" / ", left);
+    }
+
+    /// <summary>
+    /// Takes a scratch element back out by the z-order it was given, without going through
+    /// undo. The checks around it must not lean on undo for cleanup: a run where nothing
+    /// turned records no step, so the undo would take the ADD instead and the next check
+    /// would read whatever was underneath as though it were its own result. By z-order and
+    /// not by type, because the label already carries lines and boxes of its own.
+    /// </summary>
+    void RemoveScratch(int zOrder)
+    {
+        foreach (var stale in d.Document.Elements.Where(el => el.ZOrder == zOrder).ToList())
+        {
+            d.Document.Elements.Remove(stale);
+        }
+
+        d.Selection.Clear();
+        d.NotifyDocumentEdited();
+        Pump(400);
+    }
 
     bool UndoLeavesNothing()
     {

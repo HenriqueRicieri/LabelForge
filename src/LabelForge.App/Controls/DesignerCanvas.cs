@@ -226,14 +226,17 @@ public sealed class DesignerCanvas : Control
     private double _gestureW;
     private double _gestureH;
 
-    // Rotation (single selection only). The outline rotates continuously with the
-    // pointer, with magnetic snapping at the four orientations ZPL supports.
+    // Rotation (single selection only). The outline rotates continuously with the pointer,
+    // with magnetic snapping at the orientations the element can actually be in: four where
+    // ZPL carries the letter, two for a line or a diagonal, which say their turn in another
+    // property and read the same at 0 and 180.
     private bool _rotating;
     private Point _rotateCenterDots;
     private double _rotateStartPointerDeg;
     private int _rotateStartDeg;
     private double _rotateVisualDeg;
     private DotRect _rotateStartBounds;
+    private int _rotateStops = 4;
     private Orientation _rotateGestureStart;
 
     // Marquee selection.
@@ -916,11 +919,13 @@ public sealed class DesignerCanvas : Control
                         }
                     }
 
-                    // Rotation handle: a circle tethered above the selection. Only on the
-                    // fields ZPL will actually turn, which is FieldRotation's answer and not
+                    // Rotation handle: a circle tethered above the selection. Only where a
+                    // quarter turn means something, which is FieldRotation's answer and not
                     // this control's to re-derive: a box drawn at 90 degrees is byte for byte
-                    // the box drawn at 0, so a handle offering it would be a lie.
-                    if (FieldRotation.Applies(element))
+                    // the box drawn at 0, so a handle offering it would be a lie. A line and
+                    // a diagonal DO turn, they just say so in another property, which is why
+                    // this asks CanRotate and not Applies.
+                    if (FieldRotation.CanRotate(element))
                     {
                         Point rot = RotationHandleCenter(rect);
                         context.DrawLine(SelectionPen, new Point(rect.Center.X, rect.Top), rot);
@@ -1374,17 +1379,18 @@ public sealed class DesignerCanvas : Control
         // small element would just re-select it.
         if (SelectionScreenRect() is { } selRect && selection.Primary is { } primary)
         {
-            if (FieldRotation.Applies(primary) &&
+            if (FieldRotation.CanRotate(primary) &&
                 GrabRect(RotationHandleCenter(selRect)).Contains(p))
             {
                 DotRect b = _bounds.GetBounds(primary);
                 _rotating = true;
                 _rotateCenterDots = new Point(b.X + b.Width / 2.0, b.Y + b.Height / 2.0);
                 _rotateStartPointerDeg = PointerAngleDeg(dotX, dotY);
-                _rotateStartDeg = OrientationDegrees(primary.Orientation);
+                _rotateStartDeg = OrientationDegrees(FieldRotation.Get(primary));
                 _rotateVisualDeg = _rotateStartDeg;
                 _rotateStartBounds = b;
-                _rotateGestureStart = primary.Orientation;
+                _rotateStops = FieldRotation.Stops(primary);
+                _rotateGestureStart = FieldRotation.Get(primary);
                 _gestureBefore = ElementSnapshot.Capture([primary]);
                 _gestureAdded.Clear();
                 Cursor = new Cursor(StandardCursorType.Hand);
@@ -2163,19 +2169,29 @@ public sealed class DesignerCanvas : Control
         {
             if (Selection?.Primary is { } primary)
             {
+                // Legal orientations are always 90 degrees apart. How many are DISTINCT is
+                // not: a field carrying an orientation letter has four, while a line and a
+                // diagonal have two, because a bar turned 180 degrees is the same bar. So the
+                // angle is folded into the range the element can actually occupy before
+                // anything else happens to it, or the outline would come to rest at 270
+                // degrees of a line that has no such state and the readout would name it.
+                double span = _rotateStops == 2 ? 180 : 360;
                 double delta = PointerAngleDeg(dotX, dotY) - _rotateStartPointerDeg;
-                double raw = ((_rotateStartDeg + delta) % 360 + 360) % 360;
+                double raw = ((_rotateStartDeg + delta) % span + span) % span;
 
-                // Magnetic snap: within 10 degrees of a legal orientation the outline
-                // locks onto it; elsewhere it follows the pointer freely.
-                double nearest = Math.Round(raw / 90.0) * 90 % 360;
+                // Magnetic snap: within 10 degrees of a legal orientation the outline locks
+                // onto it; elsewhere it follows the pointer freely.
+                double nearest = Math.Round(raw / 90.0) * 90 % span;
                 double distance = raw - Math.Round(raw / 90.0) * 90;
                 _rotateVisualDeg = Math.Abs(distance) <= 10 ? nearest : raw;
 
-                Orientation snapped = DegreesToOrientation(raw);
-                if (primary.Orientation != snapped)
+                // Through FieldRotation, never onto Element.Orientation: for a line that
+                // property is one the generator does not read, so writing it would turn
+                // nothing while making the document look edited.
+                Orientation snapped = DegreesToOrientation(nearest);
+                if (FieldRotation.Get(primary) != snapped)
                 {
-                    primary.Orientation = snapped;
+                    FieldRotation.Set(primary, snapped);
                     LiveEdited?.Invoke(this, EventArgs.Empty);
                 }
             }
@@ -2394,7 +2410,7 @@ public sealed class DesignerCanvas : Control
         if (SelectionScreenRect() is { } selRect)
         {
             if (Selection?.Primary is { } handlePrimary &&
-                FieldRotation.Applies(handlePrimary) &&
+                FieldRotation.CanRotate(handlePrimary) &&
                 GrabRect(RotationHandleCenter(selRect)).Contains(p))
             {
                 Cursor = new Cursor(StandardCursorType.Hand);
@@ -2709,6 +2725,12 @@ public sealed class DesignerCanvas : Control
 
         // The gesture targets the on-screen (rotated) footprint; the resizer
         // reasons in the element's intrinsic axes, so swap for 90/270.
+        //
+        // Element.Orientation and NOT FieldRotation.Get, which is the opposite of the rule on
+        // the rotation path and deliberate: a vertical line reads as 90 there, but its drawn
+        // footprint already counts its length down the page and ElementResizer already picks
+        // the height for it, so swapping here as well would turn it twice and a drag would
+        // stretch the thickness.
         (int w, int h) = primary.Orientation is Orientation.Rotated90 or Orientation.Rotated270
             ? (_candidateHeight, _candidateWidth)
             : (_candidateWidth, _candidateHeight);
@@ -2811,7 +2833,7 @@ public sealed class DesignerCanvas : Control
             Cursor = Cursor.Default;
             e.Pointer.Capture(null);
             bool turned = Selection?.Primary is { } rotated
-                && rotated.Orientation != _rotateGestureStart;
+                && FieldRotation.Get(rotated) != _rotateGestureStart;
             EndGestureState();
             if (turned)
             {

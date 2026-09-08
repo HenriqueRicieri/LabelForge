@@ -2286,20 +2286,22 @@ public partial class DesignerViewModel : ViewModelBase
         ScheduleRender();
     }
 
-    /// <summary>True while the selection holds anything ZPL will actually turn. Not
-    /// <see cref="HasSelection"/>: a box is a selection and cannot be rotated.</summary>
-    private bool CanRotate => Selection.Items.Any(FieldRotation.Applies);
+    /// <summary>True while the selection holds anything a quarter turn means something for.
+    /// Not <see cref="HasSelection"/>: a box is a selection and cannot be rotated.</summary>
+    private bool CanRotate => Selection.Items.Any(FieldRotation.CanRotate);
 
     /// <summary>
-    /// A quarter turn clockwise, for the elements rotation reaches. The graphic primitives
-    /// are skipped rather than refused, so a mixed selection turns what it can instead of
-    /// doing nothing: `^GB` and the rest carry no orientation at all, and setting one on them
-    /// would change the document without changing a single printed dot.
+    /// A quarter turn clockwise, for everything the turn reaches. A box, an ellipse and an
+    /// image are skipped rather than refused, so a mixed selection turns what it can instead
+    /// of doing nothing: their commands carry no orientation at all and no way to express one
+    /// by trading sides, so turning them would change the document without changing a printed
+    /// dot. A line and a diagonal are not in that group, whatever `Applies` says: a vertical
+    /// line is `^GB` with its sides swapped, and `FieldRotation` is where that lives.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanRotate))]
     private void Rotate90()
     {
-        List<Element> turning = [.. Selection.Items.Where(FieldRotation.Applies)];
+        List<Element> turning = [.. Selection.Items.Where(FieldRotation.CanRotate)];
         if (turning.Count == 0)
         {
             return;
@@ -2307,7 +2309,7 @@ public partial class DesignerViewModel : ViewModelBase
 
         foreach (Element element in turning)
         {
-            element.Orientation = (Orientation)(((int)element.Orientation + 1) % 4);
+            FieldRotation.Rotate90(element);
         }
 
         SelectionProperties?.Refresh();

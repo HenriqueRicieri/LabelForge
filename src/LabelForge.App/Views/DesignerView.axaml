@@ -223,7 +223,6 @@
                 <TextBlock Classes="propLabel" Text="Thickness (dots)" />
                 <NumericUpDown Value="{Binding Thickness}" Minimum="1" Maximum="200"
                                Increment="1" FormatString="0" />
-                <CheckBox Content="Vertical" IsChecked="{Binding IsVertical}" Margin="0,4,0,0" />
                 <CheckBox Content="White (erase)" IsChecked="{Binding IsWhite}"
                           ToolTip.Tip="Draws in white, which clears whatever was drawn under it. Over blank stock it prints nothing." />
             </StackPanel>
@@ -290,8 +289,6 @@
                                Increment="1" FormatString="0" />
                 <TextBlock Text="{Binding ThicknessNote}" IsVisible="{Binding HasThicknessNote}"
                            Foreground="#D97706" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />
-                <CheckBox Content="Leans right (/)" IsChecked="{Binding LeansRight}" Margin="0,4,0,0"
-                          ToolTip.Tip="On: bottom-left up to top-right. Off: top-left down to bottom-right." />
                 <CheckBox Content="White (erase)" IsChecked="{Binding IsWhite}"
                           ToolTip.Tip="Draws in white, which clears whatever was drawn under it. Over blank stock it prints nothing." />
             </StackPanel>

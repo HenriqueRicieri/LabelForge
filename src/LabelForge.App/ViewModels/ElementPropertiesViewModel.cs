@@ -117,7 +117,10 @@ public abstract class ElementPropertiesViewModel : ObservableObject
 
     public abstract string TypeName { get; }
 
-    public IReadOnlyList<OrientationOption> Orientations => OrientationOption.All;
+    /// <summary>The turns this element has. Four for the fields that carry an orientation
+    /// letter, and the two-stop types name theirs in their own words, because "90 degrees"
+    /// is not what anybody calls a vertical line.</summary>
+    public virtual IReadOnlyList<OrientationOption> Orientations => OrientationOption.All;
 
     /// <summary>When set, X and Y display and accept millimeters (converted through
     /// the document density); the model always stays in dots.</summary>
@@ -177,15 +180,26 @@ public abstract class ElementPropertiesViewModel : ObservableObject
     protected int ToDots(decimal value) =>
         UseMm ? Units.MmToDots((double)value, _document.Dpmm) : (int)value;
 
-    /// <summary>Whether to offer a rotation at all. ZPL's graphic primitives take no
-    /// orientation argument, so the control would be one that cannot do anything; see
+    /// <summary>Whether to offer a rotation at all. A box, an ellipse and an image state a
+    /// width and a height and draw them, so the control would be one that cannot do
+    /// anything; a line and a diagonal do turn, in another property. See
     /// <see cref="FieldRotation"/>.</summary>
-    public bool CanRotate => FieldRotation.Applies(Element);
+    public bool CanRotate => FieldRotation.CanRotate(Element);
 
+    /// <summary>
+    /// The turn, read and written through <see cref="FieldRotation"/> rather than off
+    /// <see cref="Element.Orientation"/>: for a line and a diagonal that property is one the
+    /// generator never reads, so setting it here would leave the panel showing a rotation the
+    /// label does not have. The numeric half of every transform belongs on the panel, which
+    /// is why this is here at all rather than the handle being the only way to turn a line.
+    /// </summary>
     public OrientationOption SelectedOrientation
     {
-        get => Orientations.First(o => o.Value == Element.Orientation);
-        set => Edit(Element.Orientation, value?.Value ?? Orientation.Normal, v => Element.Orientation = v);
+        get => Orientations.First(o => o.Value == FieldRotation.Get(Element));
+        set => Edit(
+            FieldRotation.Get(Element),
+            value?.Value ?? Orientation.Normal,
+            v => FieldRotation.Set(Element, v));
     }
 
     public IReadOnlyList<AnchorOption> Anchors { get; } =
@@ -818,11 +832,14 @@ public sealed class LinePropertiesViewModel : ElementPropertiesViewModel
         set => Edit(_line.ThicknessDots, Math.Max((int)value, 1), v => _line.ThicknessDots = v);
     }
 
-    public bool IsVertical
-    {
-        get => _line.IsVertical;
-        set => Edit(_line.IsVertical, value, v => _line.IsVertical = v);
-    }
+    /// <summary>A bar has no direction, so it has two turns rather than four, and they are
+    /// called what a person calls them. The property behind them is still `IsVertical`, set
+    /// through <see cref="FieldRotation"/> like the handle and Ctrl + R set it.</summary>
+    public override IReadOnlyList<OrientationOption> Orientations { get; } =
+    [
+        new("Horizontal", Orientation.Normal),
+        new("Vertical", Orientation.Rotated90),
+    ];
 
     /// <summary>Draws the bar in white, which on monochrome stock erases what is under
     /// it. Invisible over blank stock, because that is exactly what it prints.</summary>
@@ -995,12 +1012,15 @@ public sealed class DiagonalPropertiesViewModel : ElementPropertiesViewModel
         }
     }
 
-    /// <summary>True for ^GD's "R": bottom-left up to top-right.</summary>
-    public bool LeansRight
-    {
-        get => _diagonal.LeansRight;
-        set => Edit(_diagonal.LeansRight, value, v => _diagonal.LeansRight = v);
-    }
+    /// <summary>The same two turns a line has, in the diagonal's own words. "/" is ^GD's "R"
+    /// and the zero here, running bottom-left up to top-right; the quarter turn is "\" in a
+    /// box on its side, which <see cref="FieldRotation"/> does in one move so the line cannot
+    /// end up crossing a box it no longer fits.</summary>
+    public override IReadOnlyList<OrientationOption> Orientations { get; } =
+    [
+        new("Leans right (/)", Orientation.Normal),
+        new("Leans left (\\)", Orientation.Rotated90),
+    ];
 
     /// <inheritdoc cref="LinePropertiesViewModel.IsWhite"/>
     public bool IsWhite
