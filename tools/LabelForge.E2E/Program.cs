@@ -2816,6 +2816,33 @@ if (mode == "designer")
     }
 
     // Crash recovery: the snapshot follows the edits, a real save clears it because the
+    {
+        var shapes = window.GetVisualDescendants().OfType<SplitButton>().Single(b => b.Name == "ShapesButton");
+        var shapeFlyout = (MenuFlyout)shapes.Flyout!;
+        shapeFlyout.ShowAt(shapes);
+        Pump(500);
+        Check("Shapes offers the three planned entries", shapeFlyout.Items.Count, 3);
+        foreach (var entry in shapeFlyout.Items.Cast<MenuItem>())
+        {
+            Check($"Shapes binds {entry.Header}", entry.Command is not null, true);
+            entry.Command?.Execute(null);
+            string expectedShape = entry.Header?.ToString() == "Diagonal line" ? "Diagonal" : entry.Header!.ToString()!;
+            Check($"Shapes arms {entry.Header}", d.ArmedTool, expectedShape);
+        }
+
+        d.AddEllipseCommand.Execute(null);
+        d.CancelInsert();
+        shapes.Command!.Execute(null);
+        Check("Shapes main face remembers Ellipse", d.ArmedTool, "Ellipse");
+        Check("Shapes highlights an armed shape", d.IsShapeArmed, true);
+        Check("no separate diagonal toolbar button",
+            window.GetVisualDescendants().OfType<Button>().Any(b => ReferenceEquals(b.Command, d.AddDiagonalCommand)), false);
+        Capture("designer-toolbar-shapes.png");
+        shapeFlyout.Hide();
+        d.CancelInsert();
+    }
+
+    // Crash recovery: the snapshot follows the edits, a real save clears it because the
     // work is safe elsewhere, and a snapshot left by a dead session is offered on start.
     d.NewDocumentCommand.Execute(null);
     Pump(200);

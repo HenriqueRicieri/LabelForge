@@ -1479,6 +1479,13 @@ public partial class DesignerViewModel : ViewModelBase
 
     partial void OnArmedToolChanged(string? value)
     {
+        if (value is "Box" or "Ellipse" or "Diagonal")
+        {
+            _lastShape = value;
+            OnPropertyChanged(nameof(ShapeIcon));
+        }
+
+        OnPropertyChanged(nameof(IsShapeArmed));
         OnPropertyChanged(nameof(IsTextArmed));
         OnPropertyChanged(nameof(IsBoxArmed));
         OnPropertyChanged(nameof(IsLineArmed));
@@ -1510,6 +1517,28 @@ public partial class DesignerViewModel : ViewModelBase
     public bool IsPdf417Armed => ArmedTool == "Pdf417";
 
     public bool IsImageArmed => ArmedTool == "Image";
+
+    private string _lastShape = "Box";
+
+    public bool IsShapeArmed => ArmedTool is "Box" or "Ellipse" or "Diagonal";
+
+    public Avalonia.Media.Geometry ShapeIcon => Avalonia.Media.Geometry.Parse(_lastShape switch
+    {
+        "Ellipse" => "F1 M8,2.6 C11.9,2.6 14.4,4.9 14.4,8 C14.4,11.1 11.9,13.4 8,13.4 C4.1,13.4 1.6,11.1 1.6,8 C1.6,4.9 4.1,2.6 8,2.6 Z M8,4.4 C5.1,4.4 3.4,5.9 3.4,8 C3.4,10.1 5.1,11.6 8,11.6 C10.9,11.6 12.6,10.1 12.6,8 C12.6,5.9 10.9,4.4 8,4.4 Z",
+        "Diagonal" => "M2,2.6 L3.4,2.6 L3.4,13.4 L2,13.4 Z M2,12 L14,12 L14,13.4 L2,13.4 Z M2.9,11.1 L12.6,2.4 L13.6,3.5 L3.9,12.2 Z",
+        _ => "M2,3 L14,3 L14,13 L2,13 Z M3.8,4.8 L12.2,4.8 L12.2,11.2 L3.8,11.2 Z",
+    });
+
+    [RelayCommand]
+    private void AddShape()
+    {
+        switch (_lastShape)
+        {
+            case "Ellipse": AddEllipse(); break;
+            case "Diagonal": AddDiagonal(); break;
+            default: AddBox(); break;
+        }
+    }
 
     private Func<Element>? _pendingFactory;
     private Element? _drawingElement;
