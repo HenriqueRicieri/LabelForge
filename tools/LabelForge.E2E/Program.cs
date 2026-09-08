@@ -2698,6 +2698,123 @@ if (mode == "designer")
         $"mirror undone on its own: {!d.PrintMirror} still reversed={d.PrintReverseAll} "
         + "(expected True True)");
 
+    // H29 uses real pointer placement; PlaceAt alone cannot exercise the press threshold.
+    {
+        void BlankDraw()
+        {
+            d.NewDocumentCommand.Execute(null);
+            canvas.ResetView();
+            canvas.Focus();
+            Pump(700);
+        }
+
+        Avalonia.Point DrawPoint(int x, int y) => canvas.TranslatePoint(canvas.DotsToView(x, y), window)!.Value;
+        void DrawBox(int x, int y, int endX, int endY, RawInputModifiers modifiers = RawInputModifiers.Alt)
+        {
+            d.AddBoxCommand.Execute(null);
+            Pump(300);
+            window.MouseDown(DrawPoint(x, y), MouseButton.Left, modifiers);
+            window.MouseMove(DrawPoint(endX, endY), modifiers);
+            window.MouseUp(DrawPoint(endX, endY), MouseButton.Left, modifiers);
+            Pump(700);
+        }
+
+        string RecoveryStamp() => string.Join(";", Directory.Exists(recoveryDir)
+            ? Directory.GetFiles(recoveryDir).OrderBy(f => f)
+                .Select(f => $"{f}:{File.GetLastWriteTimeUtc(f):O}:{new FileInfo(f).Length}") : []);
+
+        BlankDraw();
+        string beforeDrawRecovery = RecoveryStamp();
+        d.AddBoxCommand.Execute(null);
+        Pump(300);
+        window.MouseDown(DrawPoint(100, 100), MouseButton.Left, RawInputModifiers.Alt);
+        Check("draw waits for pointer travel", d.Document.Elements.Count, 0);
+        window.MouseMove(DrawPoint(400, 300), RawInputModifiers.Alt);
+        Pump(700);
+        Check("draw previews without saving recovery", RecoveryStamp() == beforeDrawRecovery, true);
+        Check("unfinished draw records no undo", d.CanUndo, false);
+        Capture("designer-draw-preview.png");
+        window.MouseUp(DrawPoint(400, 300), MouseButton.Left, RawInputModifiers.Alt);
+        Pump(700);
+        var drawnBox = d.Document.Elements.OfType<LabelForge.Core.Model.BoxElement>().Single();
+        Check("box drawn between corners", $"{drawnBox.X},{drawnBox.Y},{drawnBox.WidthDots},{drawnBox.HeightDots}", "100,100,300,200");
+        Check("draw release saves recovery", RecoveryStamp() != beforeDrawRecovery, true);
+        d.UndoCommand.Execute(null);
+        Pump(700);
+        Check("one undo removes the drawn box", d.Document.Elements.Count, 0);
+
+        BlankDraw();
+        d.AddBoxCommand.Execute(null);
+        Pump(300);
+        var clickDraw = DrawPoint(100, 100);
+        window.MouseDown(clickDraw, MouseButton.Left);
+        window.MouseMove(new Avalonia.Point(clickDraw.X + 2, clickDraw.Y));
+        window.MouseUp(new Avalonia.Point(clickDraw.X + 2, clickDraw.Y), MouseButton.Left);
+        Pump(700);
+        drawnBox = d.Document.Elements.OfType<LabelForge.Core.Model.BoxElement>().Single();
+        Check("small draw press places the default at the press", $"{drawnBox.X},{drawnBox.Y},{drawnBox.WidthDots},{drawnBox.HeightDots}", "100,100,240,140");
+
+        BlankDraw();
+        DrawBox(400, 300, 100, 100);
+        drawnBox = d.Document.Elements.OfType<LabelForge.Core.Model.BoxElement>().Single();
+        Check("drawing up-left normalizes the box", $"{drawnBox.X},{drawnBox.Y},{drawnBox.WidthDots},{drawnBox.HeightDots}", "100,100,300,200");
+        BlankDraw();
+        DrawBox(100, 100, 300, 200, RawInputModifiers.Alt | RawInputModifiers.Shift);
+        drawnBox = d.Document.Elements.OfType<LabelForge.Core.Model.BoxElement>().Single();
+        Check("Shift draws a square", $"{drawnBox.WidthDots},{drawnBox.HeightDots}", "200,200");
+
+        foreach (var delta in new[] { (300, 20), (20, 300), (-150, 20) })
+        {
+            BlankDraw();
+            d.AddLineCommand.Execute(null);
+            Pump(300);
+            window.MouseDown(DrawPoint(200, 100), MouseButton.Left, RawInputModifiers.Alt);
+            window.MouseMove(DrawPoint(200 + delta.Item1, 100 + delta.Item2), RawInputModifiers.Alt);
+            window.MouseUp(DrawPoint(200 + delta.Item1, 100 + delta.Item2), MouseButton.Left, RawInputModifiers.Alt);
+            Pump(700);
+            var line = d.Document.Elements.OfType<LabelForge.Core.Model.LineElement>().Single();
+            string wanted = delta == (300, 20) ? "200,100,300,False" : delta == (20, 300) ? "200,100,300,True" : "50,100,150,False";
+            Check($"line draw {delta}", $"{line.X},{line.Y},{line.LengthDots},{line.IsVertical}", wanted);
+        }
+
+        foreach (int endY in new[] { 300, 100 })
+        {
+            BlankDraw();
+            d.AddDiagonalCommand.Execute(null);
+            Pump(300);
+            window.MouseDown(DrawPoint(100, 200), MouseButton.Left, RawInputModifiers.Alt);
+            window.MouseMove(DrawPoint(300, endY), RawInputModifiers.Alt);
+            window.MouseUp(DrawPoint(300, endY), MouseButton.Left, RawInputModifiers.Alt);
+            Pump(700);
+            var diagonalDraw = d.Document.Elements.OfType<LabelForge.Core.Model.DiagonalLineElement>().Single();
+            Check($"diagonal drawn towards y={endY}", diagonalDraw.LeansRight, endY == 100);
+        }
+
+        BlankDraw();
+        d.AddBarcodeCommand.Execute(null);
+        Pump(300);
+        window.MouseDown(DrawPoint(100, 100), MouseButton.Left, RawInputModifiers.Alt);
+        window.MouseMove(DrawPoint(400, 300), RawInputModifiers.Alt);
+        window.MouseUp(DrawPoint(400, 300), MouseButton.Left, RawInputModifiers.Alt);
+        Pump(700);
+        var drawnBarcode = d.Document.Elements.OfType<LabelForge.Core.Model.BarcodeElement>().Single();
+        Check("drawn barcode uses whole modules", drawnBarcode.ModuleWidthDots, 3);
+        Check("drawn barcode height includes interpretation",
+            drawnBarcode.HeightDots + LabelForge.Core.Model.BarcodeInterpretation.HeightDots(drawnBarcode), 200);
+
+        BlankDraw();
+        beforeDrawRecovery = RecoveryStamp();
+        d.AddBoxCommand.Execute(null);
+        Pump(300);
+        window.MouseDown(DrawPoint(100, 100), MouseButton.Left);
+        window.MouseMove(DrawPoint(300, 300), RawInputModifiers.Alt);
+        window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        window.MouseUp(DrawPoint(300, 300), MouseButton.Left);
+        Pump(700);
+        Check("Escape discards the drawing and disarms", $"{d.Document.Elements.Count},{d.CanUndo},{d.IsPlacing}", "0,False,False");
+        Check("cancelled draw leaves recovery unchanged", RecoveryStamp() == beforeDrawRecovery, true);
+    }
+
     // Crash recovery: the snapshot follows the edits, a real save clears it because the
     // work is safe elsewhere, and a snapshot left by a dead session is offered on start.
     d.NewDocumentCommand.Execute(null);
@@ -2917,6 +3034,7 @@ if (mode == "designer")
         d.NotifyDocumentEdited();
         Pump(400);
     }
+
 
     bool UndoLeavesNothing()
     {

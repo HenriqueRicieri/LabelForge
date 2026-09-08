@@ -71,6 +71,12 @@ public sealed class ShortcutsViewModel
             new("Esc while dragging", "Put it back where the gesture started"),
         ]),
 
+        new("Drawing", "Drawing starts free; Shift constrains a new shape. Resizing an existing corner keeps its proportions until Shift is held.",
+        [
+            new("Armed tool: click or drag", "Click for the default size; drag from one corner to draw; Esc cancels"),
+            new("Shift / Alt while drawing", "Shift makes shapes square or keeps an image's aspect; Alt disables snapping; Ctrl has no effect"),
+        ]),
+
         new("Selecting", "A press only starts a drag once the pointer has moved a little, so "
             + "an unsteady click stays a click.",
         [

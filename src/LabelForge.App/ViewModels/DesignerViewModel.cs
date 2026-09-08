@@ -1512,6 +1512,7 @@ public partial class DesignerViewModel : ViewModelBase
     public bool IsImageArmed => ArmedTool == "Image";
 
     private Func<Element>? _pendingFactory;
+    private Element? _drawingElement;
 
     [RelayCommand]
     private void AddText() => ArmInsert("Text",
@@ -1750,21 +1751,62 @@ public partial class DesignerViewModel : ViewModelBase
         _pendingFactory = factory;
         IsPlacing = true;
         ArmedTool = tool;
-        StatusText = "Click the canvas to place the new element (Esc cancels)";
+        StatusText = "Click to place it, or drag to draw it at the size you want (Esc cancels)";
     }
 
     /// <summary>Called by the canvas with the clicked position in dots.</summary>
     public void PlaceAt(int x, int y)
     {
-        if (_pendingFactory is null)
+        if (AddPendingAt(Math.Clamp(x, 0, Math.Max(Document.WidthDots - 1, 0)),
+            Math.Clamp(y, 0, Math.Max(Document.HeightDots - 1, 0))) is null)
         {
-            IsPlacing = false;
             return;
         }
 
+        RecordUndo();
+        ScheduleRender();
+    }
+
+    public Element? BeginDrawAt(int x, int y) => _drawingElement = AddPendingAt(x, y);
+
+    public void CommitDraw()
+    {
+        if (_drawingElement is null)
+        {
+            return;
+        }
+
+        _drawingElement = null;
+        SelectionProperties?.Refresh();
+        RefreshReadout();
+        RecordUndo();
+        ScheduleRender();
+    }
+
+    public void CancelDraw()
+    {
+        if (_drawingElement is { } element)
+        {
+            Document.Elements.Remove(element);
+            _drawingElement = null;
+            Selection.Clear();
+            NotifyDocumentPreview();
+        }
+
+        CancelInsert();
+    }
+
+    private Element? AddPendingAt(int x, int y)
+    {
+        if (_pendingFactory is null)
+        {
+            IsPlacing = false;
+            return null;
+        }
+
         Element element = _pendingFactory();
-        element.X = Math.Clamp(x, 0, Math.Max(Document.WidthDots - 1, 0));
-        element.Y = Math.Clamp(y, 0, Math.Max(Document.HeightDots - 1, 0));
+        element.X = x;
+        element.Y = y;
         element.ZOrder = Document.Elements.Count == 0
             ? 0
             : Document.Elements.Max(e => e.ZOrder) + 1;
@@ -1775,8 +1817,7 @@ public partial class DesignerViewModel : ViewModelBase
         IsPlacing = false;
         ArmedTool = null;
         StatusText = string.Empty;
-        RecordUndo();
-        ScheduleRender();
+        return element;
     }
 
     public void CancelInsert()

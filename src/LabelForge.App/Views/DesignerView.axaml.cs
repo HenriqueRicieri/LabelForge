@@ -46,6 +46,9 @@ public partial class DesignerView : UserControl
         Canvas.EditRequested += (_, _) => FocusContentField();
         Canvas.ContextMenuRequested += OnCanvasContextMenu;
         Canvas.PlaceRequested += (x, y) => ViewModel?.PlaceAt(x, y);
+        Canvas.BeginDrawRequested += (x, y) => ViewModel?.BeginDrawAt(x, y);
+        Canvas.DrawCommitted += (_, _) => ViewModel?.CommitDraw();
+        Canvas.DrawCancelled += (_, _) => ViewModel?.CancelDraw();
         Canvas.CancelRequested += (_, _) => ViewModel?.CancelInsert();
 
         Canvas.ViewChanged += (_, _) => SyncScrollBars();

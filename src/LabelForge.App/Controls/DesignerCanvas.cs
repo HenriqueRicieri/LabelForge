@@ -231,6 +231,10 @@ public sealed class DesignerCanvas : Control
     // ZPL carries the letter, two for a line or a diagonal, which say their turn in another
     // property and read the same at 0 and 180.
     private bool _rotating;
+    private bool _drawArmed;
+    private bool _drawing;
+    private Point _drawPressPoint;
+    private Point _drawAnchorDots;
     private Point _rotateCenterDots;
     private double _rotateStartPointerDeg;
     private int _rotateStartDeg;
@@ -406,6 +410,9 @@ public sealed class DesignerCanvas : Control
 
     /// <summary>Raised when the user clicks the canvas while an insert is armed (dot coordinates).</summary>
     public event Action<int, int>? PlaceRequested;
+    public event Func<int, int, Element?>? BeginDrawRequested;
+    public event EventHandler? DrawCommitted;
+    public event EventHandler? DrawCancelled;
 
     /// <summary>Raised when the user presses Escape (cancels an armed insert).</summary>
     public event EventHandler? CancelRequested;
@@ -1381,7 +1388,10 @@ public sealed class DesignerCanvas : Control
         // Armed insert: this click places the new element.
         if (IsPlacing)
         {
-            PlaceRequested?.Invoke((int)Math.Round(dotX), (int)Math.Round(dotY));
+            _drawArmed = true;
+            _drawPressPoint = p;
+            _drawAnchorDots = new Point(Math.Round(dotX), Math.Round(dotY));
+            e.Pointer.Capture(this);
             e.Handled = true;
             return;
         }
@@ -1642,6 +1652,14 @@ public sealed class DesignerCanvas : Control
     /// <returns>False when there was no gesture to cancel.</returns>
     private bool CancelGesture()
     {
+        if (_drawArmed || _drawing)
+        {
+            EndGestureState();
+            DrawCancelled?.Invoke(this, EventArgs.Empty);
+            InvalidateVisual();
+            return true;
+        }
+
         if (!_dragging && !_resizing && !_rotating && !_pressArmed)
         {
             return false;
@@ -1796,6 +1814,8 @@ public sealed class DesignerCanvas : Control
         _dragging = false;
         _resizing = false;
         _rotating = false;
+        _drawArmed = false;
+        _drawing = false;
         _pressArmed = false;
         _pressHit = null;
         _pressPendingToggle = null;
@@ -2146,6 +2166,28 @@ public sealed class DesignerCanvas : Control
             }
         }
 
+        if (_drawArmed)
+        {
+            if (Math.Pow(p.X - _drawPressPoint.X, 2) + Math.Pow(p.Y - _drawPressPoint.Y, 2)
+                < DragThresholdPx * DragThresholdPx)
+            {
+                return;
+            }
+
+            _drawArmed = false;
+            Element? element = BeginDrawRequested?.Invoke((int)_drawAnchorDots.X, (int)_drawAnchorDots.Y);
+            if (element is null)
+            {
+                EndGestureState();
+                e.Pointer.Capture(null);
+                return;
+            }
+
+            _drawing = true;
+            _resizing = true;
+            BuildSnapTargets(Document!, [element]);
+        }
+
         if (!_dragging && !_resizing && !_rotating)
         {
             UpdateHoverCursor(p);
@@ -2175,6 +2217,14 @@ public sealed class DesignerCanvas : Control
         var (scale, origin) = GetTransform();
         double dotX = (p.X - origin.X) / scale;
         double dotY = (p.Y - origin.Y) / scale;
+
+        if (_drawing && Selection?.Primary is { } drawn)
+        {
+            ApplyDrawFrame(drawn, dotX, dotY, scale, modifiers);
+            LiveEdited?.Invoke(this, EventArgs.Empty);
+            InvalidateVisual();
+            return;
+        }
 
         if (_rotating)
         {
@@ -2702,6 +2752,39 @@ public sealed class DesignerCanvas : Control
         primary.Y = top ? anchorBottom - bounds.Height - offY : _resizeStartY;
     }
 
+    private void ApplyDrawFrame(Element element, double x, double y, double scale, KeyModifiers modifiers)
+    {
+        bool constrain = modifiers.HasFlag(KeyModifiers.Shift);
+        DrawTarget target = DrawGesture.Calculate(element, _drawAnchorDots.X, _drawAnchorDots.Y, x, y, constrain);
+        _snapX = null;
+        _snapY = null;
+        if (!modifiers.HasFlag(KeyModifiers.Alt))
+        {
+            bool keepAspect = constrain && element is BoxElement or EllipseElement or DiagonalLineElement or ImageElement;
+            target = DrawGesture.Snap(target, (int)_drawAnchorDots.X, (int)_drawAnchorDots.Y,
+                _snapTargetsX, _snapTargetsY, Math.Max((int)Math.Round(SnapPx / scale), 1),
+                keepAspect, out _snapX, out _snapY);
+        }
+
+        if (target.Rotation is { } rotation)
+        {
+            FieldRotation.Set(element, rotation);
+        }
+
+        ElementResizer.Resize(element, target.Width, target.Height);
+        DotRect bounds = _bounds.GetBounds(element);
+        int left = target.Left ? (int)_drawAnchorDots.X - bounds.Width : (int)_drawAnchorDots.X;
+        int top = target.Top ? (int)_drawAnchorDots.Y - bounds.Height : (int)_drawAnchorDots.Y;
+        element.X += left - bounds.X;
+        element.Y += top - bounds.Y;
+        _gestureX = left;
+        _gestureY = top;
+        _gestureW = bounds.Width;
+        _gestureH = bounds.Height;
+        _candidateWidth = bounds.Width;
+        _candidateHeight = bounds.Height;
+    }
+
     private double PointerAngleDeg(double dotX, double dotY) =>
         Math.Atan2(dotY - _rotateCenterDots.Y, dotX - _rotateCenterDots.X) * 180.0 / Math.PI;
 
@@ -2773,6 +2856,31 @@ public sealed class DesignerCanvas : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+
+        if (_drawArmed || _drawing)
+        {
+            bool commit = _drawing;
+            if (commit)
+            {
+                ApplyGesture(e.GetPosition(this), e.KeyModifiers);
+            }
+
+            Point anchor = _drawAnchorDots;
+            EndGestureState();
+            e.Pointer.Capture(null);
+            if (commit)
+            {
+                DrawCommitted?.Invoke(this, EventArgs.Empty);
+            }
+            else
+            {
+                PlaceRequested?.Invoke((int)anchor.X, (int)anchor.Y);
+            }
+
+            e.Handled = true;
+            InvalidateVisual();
+            return;
+        }
 
         if (_panning)
         {
