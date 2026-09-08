@@ -226,15 +226,14 @@ public sealed class DesignerCanvas : Control
     private double _gestureW;
     private double _gestureH;
 
-    // Rotation (single selection only). The outline rotates continuously with the pointer,
-    // with magnetic snapping at the orientations the element can actually be in: four where
-    // ZPL carries the letter, two for a line or a diagonal, which say their turn in another
-    // property and read the same at 0 and 180.
-    private bool _rotating;
     private bool _drawArmed;
     private bool _drawing;
     private Point _drawPressPoint;
     private Point _drawAnchorDots;
+
+    // Rotation uses four stops for oriented fields and two for lines and diagonals.
+    // Two-stop outlines show the snapped bounds; other outlines follow the pointer.
+    private bool _rotating;
     private Point _rotateCenterDots;
     private double _rotateStartPointerDeg;
     private int _rotateStartDeg;
@@ -879,7 +878,7 @@ public sealed class DesignerCanvas : Control
                     continue;
                 }
 
-                // During a rotation the outline rotates continuously with the pointer.
+                // Lines show their snapped bounds; other outlines follow the pointer.
                 if (singleGesture && _rotating && element == selection.Primary)
                 {
                     if (_rotateStops == 2)
@@ -1385,7 +1384,7 @@ public sealed class DesignerCanvas : Control
             return;
         }
 
-        // Armed insert: this click places the new element.
+        // Armed insert: wait for a click release or enough travel to begin drawing.
         if (IsPlacing)
         {
             _drawArmed = true;
@@ -2761,7 +2760,7 @@ public sealed class DesignerCanvas : Control
         if (!modifiers.HasFlag(KeyModifiers.Alt))
         {
             bool keepAspect = constrain && element is BoxElement or EllipseElement or DiagonalLineElement or ImageElement;
-            target = DrawGesture.Snap(target, (int)_drawAnchorDots.X, (int)_drawAnchorDots.Y,
+            target = DrawGesture.Snap(element, target, (int)_drawAnchorDots.X, (int)_drawAnchorDots.Y,
                 _snapTargetsX, _snapTargetsY, Math.Max((int)Math.Round(SnapPx / scale), 1),
                 keepAspect, out _snapX, out _snapY);
         }

@@ -7,14 +7,16 @@ public readonly record struct DrawTarget(int X, int Y, int Width, int Height, bo
 
 public static class DrawGesture
 {
-    public static DrawTarget Snap(DrawTarget target, int anchorX, int anchorY,
+    public static DrawTarget Snap(Element element, DrawTarget target, int anchorX, int anchorY,
         IReadOnlyList<int> targetsX, IReadOnlyList<int> targetsY, int threshold,
         bool keepAspect, out int? snapX, out int? snapY)
     {
         int edgeX = target.Left ? target.X : target.X + target.Width;
         int edgeY = target.Top ? target.Y : target.Y + target.Height;
-        (int shiftX, int? targetX) = GuideSnapper.Snap(edgeX, edgeX, targetsX, threshold);
-        (int shiftY, int? targetY) = GuideSnapper.Snap(edgeY, edgeY, targetsY, threshold);
+        (int shiftX, int? targetX) = GuideSnapper.Snap(edgeX, edgeX,
+            element is LineElement && target.Rotation == Orientation.Rotated90 ? [] : targetsX, threshold);
+        (int shiftY, int? targetY) = GuideSnapper.Snap(edgeY, edgeY,
+            element is LineElement && target.Rotation == Orientation.Normal ? [] : targetsY, threshold);
         snapX = targetX;
         snapY = targetY;
         int width = Math.Max(target.Width + (target.Left ? -shiftX : shiftX), 1);

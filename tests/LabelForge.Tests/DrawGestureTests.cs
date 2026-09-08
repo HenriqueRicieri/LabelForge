@@ -41,10 +41,10 @@ public sealed class DrawGestureTests
     public void Snapping_PreservesAnchorAndOptionalAspect()
     {
         DrawTarget target = DrawGesture.Calculate(new BoxElement(), 100, 100, 297, 248, false);
-        DrawTarget snapped = DrawGesture.Snap(target, 100, 100, [300], [250], 6, false, out _, out _);
+        DrawTarget snapped = DrawGesture.Snap(new BoxElement(), target, 100, 100, [300], [250], 6, false, out _, out _);
         Assert.Equal((100, 100, 200, 150), (snapped.X, snapped.Y, snapped.Width, snapped.Height));
         target = DrawGesture.Calculate(new BoxElement(), 400, 400, 103, 252, true);
-        snapped = DrawGesture.Snap(target, 400, 400, [100], [], 6, true, out _, out _);
+        snapped = DrawGesture.Snap(new BoxElement(), target, 400, 400, [100], [], 6, true, out _, out _);
         Assert.Equal((100, 100, 300, 300), (snapped.X, snapped.Y, snapped.Width, snapped.Height));
     }
 
@@ -60,5 +60,18 @@ public sealed class DrawGestureTests
         var image = new ImageElement { SourcePixelWidth = 400, SourcePixelHeight = 200 };
         DrawTarget picture = DrawGesture.Calculate(image, 100, 100, 200, 200, true);
         Assert.Equal((200, 100), (picture.Width, picture.Height));
+    }
+
+    [Theory]
+    [InlineData(297, 120, 200, 3, 300, null)]
+    [InlineData(120, 297, 3, 200, null, 300)]
+    public void Line_SnapsOnlyItsLength(int x, int y, int width, int height, int? expectedX, int? expectedY)
+    {
+        var line = new LineElement { ThicknessDots = 3 };
+        DrawTarget target = DrawGesture.Calculate(line, 100, 100, x, y, false);
+        DrawTarget snapped = DrawGesture.Snap(line, target, 100, 100, [105, 300], [105, 300], 6,
+            false, out int? snapX, out int? snapY);
+        Assert.Equal((width, height), (snapped.Width, snapped.Height));
+        Assert.Equal((expectedX, expectedY), (snapX, snapY));
     }
 }
