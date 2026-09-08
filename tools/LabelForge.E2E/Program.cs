@@ -14,13 +14,17 @@ using LabelForge.App.Views;
 // so a run reads as a transcript rather than a pass count.
 //
 // How it is meant to be read:
-//   - nothing in here grades itself. There is no assertion and no failing exit code: exit 0
-//     means the run reached the end without throwing, which is worth knowing and is not the
-//     same as the checks holding
-//   - so the lines are the result. A run is diffed against the previous one and only the
+//   - a check written through Check() or CheckVerdict() grades itself. It prints the same
+//     line as any other, compares the two halves as well, and the run exits 1 if any of them
+//     disagreed, with the summary at the end naming each one
+//   - every other line is transcript only, and there are still far more of those. Migration
+//     is incremental: a new check uses the helpers from its first line, an old free-text line
+//     moves to them when the check beside it is touched. So exit 0 means no GRADED check
+//     disagreed, not that every line held
+//   - which is why the diff stays. A run is diffed against the previous one and only the
 //     lines the change was meant to touch may differ (the crash-recovery line carries a
-//     timestamp and always does), and a line whose two halves disagree is a failure a person
-//     has to notice
+//     timestamp and always does). The grade catches what was already wrong when the last run
+//     was taken; the diff catches what changed on purpose
 //   - a check written for a bug is run against the code BEFORE the fix first, and the line it
 //     prints then has to visibly disagree with its own "expected". A check that cannot fail
 //     is not a check
@@ -71,6 +75,11 @@ var vm = new MainViewModel(
     new LabelForge.Core.Settings.UserSettingsStore(settingsPath));
 var window = new MainWindow { DataContext = vm };
 window.Show();
+
+// The grade. Declared before either mode's block, because the helpers that raise it close
+// over these two and a captured local has to be assigned at every place it is called from.
+int graded = 0;
+var disagreed = new List<string>();
 
 var tabs = window.FindControl<TabControl>("MainTabs")!;
 string mode = args.Length > 0 ? args[0] : "designer";
@@ -608,7 +617,7 @@ if (mode == "designer")
     window.MouseMove(dragTo);
     window.MouseUp(dragTo, MouseButton.Left);
     Pump(200);
-    Console.WriteLine($"snap drag: box at {boxCopy.X},{boxCopy.Y} (expected 200,50: guide X, Title top Y)");
+    Check("snap drag, box at", $"{boxCopy.X},{boxCopy.Y}", "200,50", "guide X, Title top Y");
 
     // Alignment commands: with two elements, align-left pulls the Title (X=200) to
     // the Barcode's left edge (X=50); distribution stays disabled below three.
@@ -1161,9 +1170,9 @@ if (mode == "designer")
     window.MouseMove(gridTo);
     window.MouseUp(gridTo, MouseButton.Left);
     Pump(700);
-    Console.WriteLine(
-        $"drag near a line lands on it: {snapped.X},{snapped.Y} "
-        + $"(expected 240,160: multiples of 40, and moved from 200,120)");
+    Check(
+        "drag near a line lands on it", $"{snapped.X},{snapped.Y}", "240,160",
+        "multiples of 40, and moved from 200,120");
 
     // And a drag that ends well away from any line is left where it was put, because the
     // grid is a hint and not a cage.
@@ -1177,9 +1186,9 @@ if (mode == "designer")
     window.MouseMove(freeTo);
     window.MouseUp(freeTo, MouseButton.Left);
     Pump(700);
-    Console.WriteLine(
-        $"drag between lines stays put: {snapped.X},{snapped.Y} "
-        + "(expected 250,180: moved, and not forced onto the grid)");
+    Check(
+        "drag between lines stays put", $"{snapped.X},{snapped.Y}", "250,180",
+        "moved, and not forced onto the grid");
 
     // A press is a click until the pointer travels. Below the threshold it must move
     // nothing and record nothing: an unsteady click at a low zoom used to nudge an element
@@ -1197,17 +1206,18 @@ if (mode == "designer")
     window.MouseMove(tinyTo);
     window.MouseUp(tinyTo, MouseButton.Left);
     Pump(700);
-    Console.WriteLine(
-        $"a 2 px press moves nothing: {d.Document.Elements[0].X},{d.Document.Elements[0].Y} "
-        + "(expected 200,120)");
+    Check(
+        "a 2 px press moves nothing",
+        $"{d.Document.Elements[0].X},{d.Document.Elements[0].Y}", "200,120");
 
     // Undo has to land on the edit before the press, which is only true if the press
     // recorded nothing of its own.
     d.UndoCommand.Execute(null);
     Pump(700);
-    Console.WriteLine(
-        $"and records no undo step: {d.Document.Elements[0].X},{d.Document.Elements[0].Y} "
-        + "(expected 250,180, where it sat before the move that IS a step)");
+    Check(
+        "and records no undo step",
+        $"{d.Document.Elements[0].X},{d.Document.Elements[0].Y}", "250,180",
+        "where it sat before the move that IS a step");
     d.RedoCommand.Execute(null);
     Pump(700);
 
@@ -1421,9 +1431,9 @@ if (mode == "designer")
     // differs from run to run: a line that changes every time is a line nobody reads.
     double originAfterPan = canvas.DotsToView(0, 0).X;
     bool panned = originAfterPan < originBeforePan - 1;
-    Console.WriteLine(
-        $"drag at the edge pans the view: {panned} (expected True)"
-        + (panned ? "" : $" [label origin on screen {originBeforePan:0} -> {originAfterPan:0}]"));
+    CheckVerdict(
+        "drag at the edge pans the view", panned, "True", panned,
+        $"label origin on screen {originBeforePan:0} -> {originAfterPan:0}");
     // What the hand is holding, which started 60 dots into the box and stays there for the
     // whole drag: where THAT ends up is how far the drag reached. It is the quantity to
     // check rather than the box's left edge, because the pointer never leaves the canvas,
@@ -1432,10 +1442,10 @@ if (mode == "designer")
     // continues the scroll gets a handful of ticks out of the pump instead of thirty.
     int heldDot = xAfterPan + 60;
     bool reached = heldDot > edgeDotsBefore;
-    Console.WriteLine(
+    CheckVerdict(
         $"and the element keeps following: the held point is past the {edgeDotsBefore:0} dots the "
-        + $"viewport ended at: {reached} (expected True)"
-        + (reached ? "" : $" [held {heldDot}, element x {xAfterPan}]"));
+        + "viewport ended at",
+        reached, "True", reached, $"held {heldDot}, element x {xAfterPan}");
 
     // And it stops: nothing keeps scrolling once the button is up.
     double originAtRest = canvas.DotsToView(0, 0).X;
@@ -1612,15 +1622,16 @@ if (mode == "designer")
     // either way.
     Key openBracketKey = LabelForge.App.Services.KeyboardLayout.KeyThatTypes('[') ?? Key.None;
     Key closeBracketKey = LabelForge.App.Services.KeyboardLayout.KeyThatTypes(']') ?? Key.None;
-    Console.WriteLine(
-        $"the layout carries the brackets: [ on {openBracketKey}, ] on {closeBracketKey} "
-        + "(expected two keys that are not None on Windows)");
+    CheckVerdict(
+        "the layout carries the brackets",
+        $"[ on {openBracketKey}, ] on {closeBracketKey}", "two keys, neither of them None",
+        openBracketKey != Key.None && closeBracketKey != Key.None);
 
     window.KeyPress(openBracketKey, RawInputModifiers.Control, PhysicalKey.None, ControlChar(0x1B));
     Pump(700);
-    Console.WriteLine(
-        $"ctrl+[ sends it back down: back is {tabBack.ZOrder} (expected 1 again), "
-        + $"middle {tabMiddle.ZOrder} (expected 2 again)");
+    Check(
+        "ctrl+[ sends it back down, back and middle",
+        $"{tabBack.ZOrder},{tabMiddle.ZOrder}", "1,2", "where they were before the step up");
 
     // Nothing to pass: the front element stays where it is and records no undo step.
     d.Selection.Set(tabFront);
@@ -2703,6 +2714,26 @@ if (mode == "designer")
 
 Capture($"{mode}.png");
 
+// The grade. Every line above printed whether it held or not, exactly as it always has;
+// this is the part that stops a disagreement depending on somebody noticing it. Only the
+// checks written through the helpers are counted, so the number is smaller than the number
+// of lines and will stay that way until the migration finishes.
+Console.WriteLine();
+if (disagreed.Count == 0)
+{
+    Console.WriteLine($"{graded} checks graded, all agreed");
+}
+else
+{
+    Console.WriteLine($"{graded} checks graded, {disagreed.Count} disagreed:");
+    foreach (string what in disagreed)
+    {
+        Console.WriteLine($"  {what}");
+    }
+}
+
+return disagreed.Count == 0 ? 0 : 1;
+
 int Blocks(string zpl) => zpl.Split("^XA", StringSplitOptions.RemoveEmptyEntries).Length;
 
 int Count(string haystack, string needle) =>
@@ -2726,6 +2757,51 @@ string FindGraphicSource()
 
     return Path.Combine(AppContext.BaseDirectory, "Fixtures", "embedded-graphic-short-name.zpl");
 }
+
+/// <summary>
+/// A value against the value it should be. Prints exactly the line a free-text check prints,
+/// "what: found (expected wanted)", with <paramref name="why"/> becoming the reason after the
+/// colon inside the brackets the way several of these lines already carry one, and compares
+/// the two halves instead of leaving that to whoever reads the run.
+/// </summary>
+void Check(string what, object? found, object? wanted, string? why = null)
+{
+    string f = Show(found);
+    string w = Show(wanted);
+    Console.WriteLine($"{what}: {f} (expected {w}{(why is null ? "" : $": {why}")})");
+    Grade(what, f == w);
+}
+
+/// <summary>
+/// A verdict the caller worked out, for an expectation no single value can state: a range
+/// ("past the 812 dots the viewport ended at"), a multiple, a shape. <paramref name="detail"/>
+/// carries the numbers behind the verdict and prints ONLY when it fails, so a quantity that
+/// differs from run to run stays out of a line that is otherwise stable, which is what makes
+/// the line worth diffing.
+/// </summary>
+void CheckVerdict(string what, object? found, string wanted, bool held, string? detail = null)
+{
+    Console.WriteLine(
+        $"{what}: {Show(found)} (expected {wanted})"
+        + (held || detail is null ? "" : $" [{detail}]"));
+    Grade(what, held);
+}
+
+void Grade(string what, bool held)
+{
+    graded++;
+    if (!held)
+    {
+        disagreed.Add(what);
+    }
+}
+
+// Invariant, for the reason the header gives: a decimal comma from this pt-BR machine would
+// make two machines' runs differ over nothing. A null says so rather than printing as the
+// empty string, which would let two nulls agree in silence.
+string Show(object? value) => value is null
+    ? "null"
+    : Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "null";
 
 // What a key held with Ctrl actually reports as its symbol on Windows. Named rather than
 // written as an escape in the call, because an invisible byte in a source line is exactly
