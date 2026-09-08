@@ -15,7 +15,62 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 - Visual designer: an icon tool bar with click-to-place elements, drag, eight-handle resize,
   continuous rotation snapping to the four ZPL orientations, multi-select with marquee,
   copy/paste/duplicate, z-order, arrow-key nudge, and zoom/pan with scrollbars and a floating zoom
-  control (50/100/200% presets, fit; 100% shows real printer dots).
+  control (50/100/200% presets, fit; 100% shows real printer dots). Ctrl and the plus or minus key
+  zoom about the middle of the view, which is the half the wheel does not do, and holding Space
+  and dragging pans for a mouse with no middle button.
+- Canvas gestures answer to the modifiers the tools people already know use. A press does not
+  become a drag until the pointer has travelled four screen pixels, so an unsteady click stays a
+  click instead of shifting an element by a few dots and recording an undo step for the accident.
+  Shift locks a move to one axis, Ctrl leaves a copy behind and moves the copy, and Alt drags free
+  of every kind of snapping. On a resize handle Ctrl works from the middle outwards and Shift lets
+  a corner's two sides go their own way. Alt-clicking picks the element under the one selected and
+  keeps going down, which on a dense label is the only way to reach a field buried under two
+  others. Adding to the selection happens as the button goes down, because a drag that follows
+  should move everything picked; removing one waits for a release that never moved, since pressing
+  on something already selected is the ordinary way to start dragging the whole group.
+- Escape puts a gesture back. Mid-drag, mid-resize or mid-rotate the elements return to the state
+  they were in when the gesture began and nothing is recorded, so a drag that went wrong costs
+  nothing and does not need an undo afterwards. It restores from a copy taken at the start rather
+  than by arithmetic, because a resize quantizes: a barcode dragged from three module widths to
+  four does not come back to three by subtracting what was added.
+- Dragging to the edge of the view brings the rest of the label into it. A drag used to stop where
+  the viewport did, so anything further out meant letting go, panning, and picking the element up
+  again. Now the view scrolls once the pointer comes within a couple of dozen pixels of an edge and
+  the element keeps following it: the pointer is standing still and the label is moving underneath.
+  A rotation deliberately does not do this, since turning something does not take it anywhere.
+- The canvas says what is under the pointer before you commit to it: a thin outline on whatever a
+  click would take, and in the corner opposite the zoom control, the pointer position in
+  millimeters and dots beside the drawn width and height of the selection. Those are the bounds the
+  canvas outlines, which is the only answer defined for every element type, so they can read
+  differently from the properties panel's X and Y for a barcode that prints digits outside its bars
+  or for a field placed by its own baseline. Both numbers are right, and they are answering
+  different questions.
+- Reaching an element without the mouse: Tab steps down the stacking order and Shift + Tab back up,
+  both wrapping, which is the point on a label carrying sixty fields. Ctrl + A takes everything
+  visible. Double-clicking an element puts the caret in its content field with the text selected,
+  which is the cheap form of editing in place and the only one that keeps the rule that the canvas
+  draws the renderer's own bitmap and never sets type itself.
+- Bring Forward and Send Backward beside the existing Bring to Front and Send to Back, on Ctrl + ]
+  and Ctrl + [, with Ctrl + Shift + Up and Down bound beside them for layouts where a bracket is
+  not a key of its own. They swap with the neighbour they pass rather than assigning fresh numbers,
+  so the set of z-order values in the document is the same set afterwards.
+- Groups: Ctrl + G makes several elements behave as one, and Ctrl + Shift + G takes it back. A
+  click selects the whole group, a drag moves it together, align and distribute treat it as one box
+  that keeps its internal layout, and a single locked member holds all of it, because a group that
+  half moves is not a group. Double-clicking opens a group and takes the member under the pointer,
+  and Alt-clicking reaches one member without opening it. Grouping is saved with the label and
+  never reaches the printer: a design generates the same bytes grouped or not.
+- Cut, and paste back where it came from. Ctrl + X was missing outright and every paste cascaded
+  from the last one, so there was no way to put a copy exactly where the original stood.
+  Ctrl + Shift + V does that, and it deliberately does not clamp to the label, because an element
+  parked on the pasteboard is outside it on purpose.
+- Handles that do not promise what ZPL cannot do. The rotation handle appears only on the fields a
+  printer will actually turn, which is text and the four symbol types: a box, an ellipse and an
+  image carry no orientation in their commands and print identically at 0 and 90, so offering to
+  turn them would be a claim the preview would then have to make good on. Ctrl + R
+  is the quarter turn for the ones that do turn. The eight resize handles go while both sides of
+  the selection are under about two dozen screen pixels, both sides, so a long thin line keeps the
+  handles that are its only way to be resized.
 - A drafting-table workspace: millimeter rulers pinned top and left (tick steps adapt to zoom, all
   conversion through the label density), and a pasteboard around the label where elements can be
   parked. Off-label content stays visible, dimmed, with an amber outline and a clear warning; at
@@ -26,9 +81,16 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   ruler to delete, save with the document, and participate in undo.
 - Snapping while dragging and resizing: to guides, label edges and center, and the edges and
   centers of other elements (smart guides), with a highlight on the matched line; Alt drags free.
-- Align and distribute tools: left/center/right and top/middle/bottom (one element aligns against
-  the label, several align within their own bounding box) plus horizontal/vertical distribution
-  with equalized gaps.
+  Each kind can be switched off on its own from the View menu, and the status line says which are
+  on. The label's own edges and center are deliberately not on that list: they are the label
+  itself, not something laid over it.
+- Align and distribute tools: left/center/right and top/middle/bottom plus horizontal/vertical
+  distribution with equalized gaps. What they align against is a switch rather than a rule about
+  how many things happen to be selected: either the rest of the selection or the label itself, with
+  each button's tooltip saying which is in force. Center on Label does both axes at once. Beside
+  them, Same Width, Same Height and Same Size copy from the element picked last, resizing through
+  the same clamps a handle drag obeys and saying how many elements could only land on a step, as a
+  barcode does.
 - An optional design grid (View > Grid) at 1, 2, 2.5, 5 or 10 mm. Drags and resizes snap to
   it alongside the guides, edges and other elements, by proximity rather than as a cage, and
   Alt still drags free of everything. Saved with the label and never printed.
@@ -48,11 +110,12 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   so a run of elements can be dealt with one after another.
 - Snapshot-based undo/redo that shares the save format, so a document that undoes correctly is
   guaranteed to save and reopen correctly. Related edits coalesce into one step by identity.
-- Element types: text, linear barcode (Code 128, Code 39, EAN-13, UPC-A), QR code, Data Matrix,
-  PDF417, image, line, box, with a per-type properties panel and positions typed in dots or
-  millimeters. Barcode data is validated against its symbology with a clear warning when it cannot
-  be encoded. A PDF417 states the shape its settings produce, and says so when the column count is
-  left automatic, because that hands the shape to the printer.
+- Element types: text, linear barcode (Code 128, Code 39, EAN-13, UPC-A, Interleaved 2 of 5 and so
+  ITF-14), QR code, Data Matrix, PDF417, image, line, box, ellipse, diagonal line, with a per-type
+  properties panel and positions and sizes typed in dots or millimeters. Barcode data is validated
+  against its symbology with a clear warning when it cannot be encoded. A PDF417 states the shape
+  its settings produce, and says so when the column count is left automatic, because that hands the
+  shape to the printer.
 - GS1-128 support: a payload written with `>;>8` (Code 128 subset C plus FNC1, which is how
   real labels write it) is shown broken into its application identifiers, as
   `(01)07891234567895 (3102)001234`, and structural problems are named. The one that matters
@@ -97,8 +160,11 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   offline renderer has no clock.
 - Job settings saved with the label: copies (`^PQ`), darkness adjust (`^MD`), and print speed
   (`^PR`), where zero means "leave the printer's default" and adds nothing to the ZPL.
-- Live offline preview driven by our own ZPL generator through a swappable renderer, debounced and
-  rendered off the UI thread.
+- Live offline preview driven by our own ZPL generator through a swappable renderer, rendered off
+  the UI thread with one render in flight and one waiting, and the one waiting is always the newest.
+  A render that has finished is shown even when something newer is already queued behind it,
+  because the drawing has no point at which it can be cancelled and throwing a finished answer away
+  is what used to blank the canvas in the middle of a drag.
 - ZPL viewer: an editable ZPL pane with syntax highlighting, a live preview, auto-sizing from
   `^PW`/`^LL`, a selector for files with multiple `^XA` blocks, and a diagnostics strip for
   unsupported commands and engine errors. It tolerates non-ZPL template markers and comment lines.
