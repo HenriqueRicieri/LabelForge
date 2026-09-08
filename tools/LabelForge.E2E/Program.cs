@@ -425,12 +425,23 @@ if (mode == "designer")
         // for its two stops. A quarter turn takes the box with it: "/" across 200 by 140,
         // turned, is "\" across 140 by 200, and flipping only the letter would leave the
         // line crossing a box it no longer fits.
+        //
+        // A turn is the one panel edit that changes another control ON THE SAME PANEL, so it
+        // is also the one that has to say so: the size spinners are bound to width and
+        // height, and Edit only announces the property that was set. Watched here rather
+        // than assumed, because a stale spinner is exactly the "value you cannot read in the
+        // panel" this item existed to stop.
+        bool announcedTheRest = false;
+        diagonal.PropertyChanged += (_, e) => announcedTheRest |= string.IsNullOrEmpty(e.PropertyName);
         diagonal.SelectedOrientation = diagonal.Orientations[1];
         Pump(500);
         Check(
             "the panel turns a diagonal, box and all",
             d.GeneratedZpl.Contains("^GD140,200,3,B,L"), true,
             "^GD140,200,3,B,L: leaning the other way, in a box on its side");
+        Check(
+            "and the size boxes are told, not left showing the old numbers",
+            announcedTheRest, true, "the sides traded places under them");
 
         // A one-dot diagonal prints and the preview cannot draw it, so the panel says so
         // instead of the thickness being quietly clamped to what the canvas can show.
@@ -1864,6 +1875,20 @@ if (mode == "designer")
         "ctrl+r turns a diagonal, lean and box together",
         $"{turningDiagonal.LeansRight},{turningDiagonal.WidthDots}x{turningDiagonal.HeightDots}",
         "False,80x240", "a quarter turn of / is \\ in a box on its side");
+
+    // And one undo takes all three fields back, not one of them. The diagonal is the turn
+    // worth checking this on: it moves three properties where the line moves one, so it is
+    // the one that could record two steps or come back half turned.
+    d.UndoCommand.Execute(null);
+    Pump(700);
+    var diagonalAfterUndo = d.Document.Elements
+        .OfType<LabelForge.Core.Model.DiagonalLineElement>().FirstOrDefault(el => el.ZOrder == 61);
+    Check(
+        "and one undo brings the whole turn back",
+        diagonalAfterUndo is null
+            ? "the diagonal is gone, so the undo took the add"
+            : $"{diagonalAfterUndo.LeansRight},{diagonalAfterUndo.WidthDots}x{diagonalAfterUndo.HeightDots}",
+        "True,240x80");
     RemoveScratch(61);
 
     // The checkbox is gone from the panel, checked in the rendered panel rather than on the

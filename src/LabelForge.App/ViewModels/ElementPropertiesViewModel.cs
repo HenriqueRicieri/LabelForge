@@ -196,10 +196,20 @@ public abstract class ElementPropertiesViewModel : ObservableObject
     public OrientationOption SelectedOrientation
     {
         get => Orientations.First(o => o.Value == FieldRotation.Get(Element));
-        set => Edit(
-            FieldRotation.Get(Element),
-            value?.Value ?? Orientation.Normal,
-            v => FieldRotation.Set(Element, v));
+        set
+        {
+            Edit(
+                FieldRotation.Get(Element),
+                value?.Value ?? Orientation.Normal,
+                v => FieldRotation.Set(Element, v));
+
+            // The one panel edit that changes another control on the same panel: a
+            // diagonal's sides trade places when it turns. Edit announces only the property
+            // that was set, so without this the width and height spinners keep showing the
+            // numbers from before the turn, which is the value-you-cannot-read problem this
+            // control was added to solve, reintroduced two fields along.
+            Refresh();
+        }
     }
 
     public IReadOnlyList<AnchorOption> Anchors { get; } =
