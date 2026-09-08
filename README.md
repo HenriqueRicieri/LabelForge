@@ -12,12 +12,17 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 
 ## What works today
 
-- Visual designer: an icon tool bar with click-to-place elements, drag, eight-handle resize,
-  continuous rotation snapping to the four ZPL orientations, multi-select with marquee,
+- Visual designer: an icon tool bar with click-to-place or drag-to-draw elements, drag,
+  eight-handle resize, rotation snapping to each field's supported orientations, marquee selection,
   copy/paste/duplicate, z-order, arrow-key nudge, and zoom/pan with scrollbars and a floating zoom
   control (50/100/200% presets, fit; 100% shows real printer dots). Ctrl and the plus or minus key
   zoom about the middle of the view, which is the half the wheel does not do, and holding Space
   and dragging pans for a mouse with no middle button.
+- Draw from one corner to the other in any direction. A click places the default size;
+  dragging sizes the element, with Shift constraining shapes and image aspect, and Alt
+  disabling snapping. Release records one undo step; Escape discards the unfinished element.
+  Box, Ellipse and Diagonal line share a Shapes button that remembers the last choice for
+  the session. Line keeps its own button.
 - Canvas gestures answer to the modifiers the tools people already know use. A press does not
   become a drag until the pointer has travelled four screen pixels, so an unsteady click stays a
   click instead of shifting an element by a few dots and recording an undo step for the accident.
@@ -59,18 +64,19 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   that keeps its internal layout, and a single locked member holds all of it, because a group that
   half moves is not a group. Double-clicking opens a group and takes the member under the pointer,
   and Alt-clicking reaches one member without opening it. Grouping is saved with the label and
-  never reaches the printer: a design generates the same bytes grouped or not.
+  never reaches the printer: a design generates the same bytes grouped or not. Deleting or
+  cutting members until only one remains dissolves the group; undo restores it.
 - Cut, and paste back where it came from. Ctrl + X was missing outright and every paste cascaded
   from the last one, so there was no way to put a copy exactly where the original stood.
   Ctrl + Shift + V does that, and it deliberately does not clamp to the label, because an element
   parked on the pasteboard is outside it on purpose.
-- Handles that do not promise what ZPL cannot do. The rotation handle appears only on the fields a
-  printer will actually turn, which is text and the four symbol types: a box, an ellipse and an
-  image carry no orientation in their commands and print identically at 0 and 90, so offering to
-  turn them would be a claim the preview would then have to make good on. Ctrl + R
-  is the quarter turn for the ones that do turn. The eight resize handles go while both sides of
-  the selection are under about two dozen screen pixels, both sides, so a long thin line keeps the
-  handles that are its only way to be resized.
+- Rotation handles support text, the four symbol types, straight lines and diagonal lines.
+  Straight lines switch between horizontal and vertical; diagonals change lean and swap their
+  width and height. Canvas rotation keeps the drawn centre fixed, with whole-dot rounding,
+  and line outlines show the actual snapped bounds. Boxes, ellipses and images have no
+  rotation handle. Ctrl + R turns a supported element by a quarter turn at its stored origin.
+  Resize handles hide when both selection dimensions are under about two dozen screen pixels;
+  a long thin line keeps its handles.
 - A drafting-table workspace: millimeter rulers pinned top and left (tick steps adapt to zoom, all
   conversion through the label density), and a pasteboard around the label where elements can be
   parked. Off-label content stays visible, dimmed, with an amber outline and a clear warning; at
