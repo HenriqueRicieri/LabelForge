@@ -1612,12 +1612,18 @@ if (mode == "designer")
         + $"middle {tabMiddle.ZOrder} (expected 1), z-orders still {zAfter} (expected {zBefore})");
 
     // And the brackets, pressed the way a real keyboard sends them. This check used to hand
-    // the handler a "[" as the key symbol, which is a character Windows does not send: a
-    // bracket held with Ctrl arrives as a control character (U+001B and U+001C on ABNT2,
-    // measured), so the character match never fired and the keys did nothing in the running
-    // app while this line read as a pass. The symbols below are those control characters, and
-    // the keys are whatever the layout in force says carries a bracket, which is the same
-    // question DesignerView asks. Nothing here is a fixed key: the answer is ABNT2's Oem6 and
+    // the handler a "[" as the key symbol, which is a character Windows does not send, so the
+    // character match never fired and the keys did nothing in the running app while this line
+    // read as a pass.
+    //
+    // What a real press does send was measured by injecting one through the OS into a real
+    // Avalonia window (the probe is not in the repo; its numbers are in PLAN-NOTES.md 20).
+    // On ABNT2 with Ctrl held, "[" arrives as Key.Oem6 carrying U+001B with PhysicalKey
+    // BracketRight, and "]" as Key.Oem5 carrying NO SYMBOL AT ALL with PhysicalKey Backslash.
+    // Those are the four values below, rather than anything invented here.
+    //
+    // The keys themselves are whatever the layout in force says carries a bracket, the same
+    // question DesignerView asks, so nothing here is written down: the answer is Oem6 and
     // Oem5 on this machine and OemOpenBrackets and Oem6 on a US one, and the check holds
     // either way.
     Key openBracketKey = LabelForge.App.Services.KeyboardLayout.KeyThatTypes('[') ?? Key.None;
@@ -1627,7 +1633,8 @@ if (mode == "designer")
         $"[ on {openBracketKey}, ] on {closeBracketKey}", "two keys, neither of them None",
         openBracketKey != Key.None && closeBracketKey != Key.None);
 
-    window.KeyPress(openBracketKey, RawInputModifiers.Control, PhysicalKey.None, ControlChar(0x1B));
+    window.KeyPress(
+        openBracketKey, RawInputModifiers.Control, PhysicalKey.BracketRight, ControlChar(0x1B));
     Pump(700);
     Check(
         "ctrl+[ sends it back down, back and middle",
@@ -1637,7 +1644,7 @@ if (mode == "designer")
     d.Selection.Set(tabFront);
     Pump(200);
     int undosBefore = d.Document.Elements.Count;
-    window.KeyPress(closeBracketKey, RawInputModifiers.Control, PhysicalKey.None, ControlChar(0x1C));
+    window.KeyPress(closeBracketKey, RawInputModifiers.Control, PhysicalKey.Backslash, null);
     Pump(700);
     Console.WriteLine(
         $"and stops at the front: {tabFront.ZOrder} (expected 3), "

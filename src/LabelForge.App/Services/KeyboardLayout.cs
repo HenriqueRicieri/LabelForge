@@ -14,12 +14,12 @@ namespace LabelForge.App.Services;
 /// OEM_6 types "[" and the one it calls OEM_5 types "]", the reverse of the names. Binding
 /// the key would swap the two commands depending on whose keyboard it is.
 ///
-/// Matching the CHARACTER instead was the first answer and it does not work on Windows,
-/// measured with <c>ToUnicodeEx</c> on layout 0x0416 with Ctrl in the key state: the "["
-/// key reports U+001B and the "]" key U+001C, control characters, so
-/// <see cref="KeyEventArgs.KeySymbol"/> is never a bracket while Ctrl is held. Mapping those
-/// control characters back is not an option either, because which one a bracket produces
-/// depends on the layout.
+/// Matching the CHARACTER instead was the first answer and it does not work on Windows.
+/// Injecting a real Ctrl-held press into a real window on this layout shows why: "[" arrives
+/// carrying U+001B, a control character, and "]" arrives carrying no character at all, so
+/// <see cref="KeyEventArgs.KeySymbol"/> is never a bracket while Ctrl is held. Mapping the
+/// control character back is not an option either, because which one a bracket produces
+/// depends on the layout, and for one of the two there is nothing to map.
 ///
 /// So the question is asked the other way round. Avalonia hands a key handler a
 /// <see cref="Key"/>, not a virtual key or a scan code, which puts <c>ToUnicodeEx</c> out of
