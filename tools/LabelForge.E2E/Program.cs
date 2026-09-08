@@ -2815,7 +2815,6 @@ if (mode == "designer")
         Check("cancelled draw leaves recovery unchanged", RecoveryStamp() == beforeDrawRecovery, true);
     }
 
-    // Crash recovery: the snapshot follows the edits, a real save clears it because the
     {
         var shapes = window.GetVisualDescendants().OfType<SplitButton>().Single(b => b.Name == "ShapesButton");
         var shapeFlyout = (MenuFlyout)shapes.Flyout!;
@@ -2840,6 +2839,29 @@ if (mode == "designer")
         Capture("designer-toolbar-shapes.png");
         shapeFlyout.Hide();
         d.CancelInsert();
+    }
+
+    foreach (bool cutMembers in new[] { false, true })
+    {
+        d.NewDocumentCommand.Execute(null);
+        Guid groupId = Guid.NewGuid();
+        var groupMembers = Enumerable.Range(0, 3).Select(i => new LabelForge.Core.Model.BoxElement
+        {
+            X = 100 + i * 100, Y = 100, GroupId = groupId, ZOrder = i,
+        }).ToArray();
+        foreach (var member in groupMembers) d.Document.Elements.Add(member);
+        d.NotifyDocumentEdited();
+        Pump(700);
+        d.Selection.SetMany(groupMembers.Take(2));
+        if (cutMembers) d.CutCommand.Execute(null);
+        else d.DeleteSelectedCommand.Execute(null);
+        Pump(700);
+        Check($"{(cutMembers ? "cut" : "delete")} dissolves a singleton group",
+            d.Document.Elements.Count == 1 && d.Document.Elements[0].GroupId is null, true);
+        Check("outline has no singleton header", d.Outline.Any(row => row.IsGroupHeader), false);
+        d.UndoCommand.Execute(null);
+        Pump(700);
+        Check("undo restores all three group members", d.Document.Elements.Count(e => e.GroupId == groupId), 3);
     }
 
     // Crash recovery: the snapshot follows the edits, a real save clears it because the

@@ -2465,6 +2465,7 @@ public partial class DesignerViewModel : ViewModelBase
             Document.Elements.Remove(element);
         }
 
+        Groups.DissolveSingles(Document);
         Selection.Clear();
         RecordUndo();
         ScheduleRender();

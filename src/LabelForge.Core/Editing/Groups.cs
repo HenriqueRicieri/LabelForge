@@ -13,6 +13,18 @@ namespace LabelForge.Core.Editing;
 /// </summary>
 public static class Groups
 {
+    /// <summary>Clears groups reduced to one member by a delete or cut.</summary>
+    public static void DissolveSingles(LabelDocument document)
+    {
+        foreach (var group in document.Elements.Where(e => e.GroupId is not null).GroupBy(e => e.GroupId))
+        {
+            if (group.Count() == 1)
+            {
+                group.Single().GroupId = null;
+            }
+        }
+    }
+
     /// <summary>
     /// Everything in the same group as this element, in z-order, or just the element itself
     /// when it is not in one. Never empty.
