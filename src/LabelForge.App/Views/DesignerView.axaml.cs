@@ -9,6 +9,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using LabelForge.App.Services;
 using LabelForge.App.ViewModels;
 using LabelForge.Core.Io;
 
@@ -846,14 +847,6 @@ public partial class DesignerView : UserControl
             return;
         }
 
-        // The brackets are the convention for stepping through the stacking order, and they
-        // are the one binding that cannot be written down as a key. Windows names these keys
-        // after a US keyboard: on the ABNT2 layout this app is written for, the key it calls
-        // OEM_6 types "[" while on a US layout the same name types "]". Binding the key would
-        // therefore swap the two commands depending on whose keyboard it is. The CHARACTER the
-        // key produced is the part that means the same thing everywhere, so that is what is
-        // matched. Ctrl+Shift+Up and Down are bound beside them for the layouts and platforms
-        // where a key held with Ctrl reports no character at all.
         switch (e.KeySymbol)
         {
             case "=" or "+":
@@ -865,24 +858,41 @@ public partial class DesignerView : UserControl
                 Canvas.ZoomBy(1 / 1.25);
                 e.Handled = true;
                 return;
+        }
 
-            case "[" or "{":
-                if (vm.SendBackwardCommand.CanExecute(null))
-                {
-                    vm.SendBackwardCommand.Execute(null);
-                }
+        // The brackets are the convention for stepping through the stacking order, and they
+        // are the one binding that cannot be written down as a key: Windows names these keys
+        // after a US keyboard, and on the ABNT2 layout this app is written for the key it
+        // calls OEM_6 types "[" while on a US layout the same name types "]". Binding the key
+        // would swap the two commands depending on whose keyboard it is.
+        //
+        // Matching the character instead was the first answer and it is wrong on Windows,
+        // where a bracket held with Ctrl arrives as a control character and KeySymbol is
+        // never a bracket at all: measured, and confirmed by the keys doing nothing. So on
+        // Windows the layout is asked which key carries the bracket, per keydown because a
+        // layout switch needs no restart, and that is what e.Key is compared against.
+        // Everywhere else the character does arrive and the character is matched. Where
+        // neither answers, Ctrl+Shift+Up and Down are bound beside them.
+        if (BracketPressed(e, '[', "{"))
+        {
+            if (vm.SendBackwardCommand.CanExecute(null))
+            {
+                vm.SendBackwardCommand.Execute(null);
+            }
 
-                e.Handled = true;
-                return;
+            e.Handled = true;
+            return;
+        }
 
-            case "]" or "}":
-                if (vm.BringForwardCommand.CanExecute(null))
-                {
-                    vm.BringForwardCommand.Execute(null);
-                }
+        if (BracketPressed(e, ']', "}"))
+        {
+            if (vm.BringForwardCommand.CanExecute(null))
+            {
+                vm.BringForwardCommand.Execute(null);
+            }
 
-                e.Handled = true;
-                return;
+            e.Handled = true;
+            return;
         }
 
         switch (e.Key)
@@ -1059,4 +1069,15 @@ public partial class DesignerView : UserControl
                 break;
         }
     }
+
+    /// <summary>
+    /// Whether this keydown is the bracket key, asked the way the platform can answer it.
+    /// On Windows the character is gone by the time the event arrives, so the layout is
+    /// asked which key carries <paramref name="character"/> and that key is compared;
+    /// elsewhere the character is there and it is compared, shifted form included.
+    /// </summary>
+    private static bool BracketPressed(KeyEventArgs e, char character, string shifted) =>
+        OperatingSystem.IsWindows()
+            ? KeyboardLayout.KeyThatTypes(character) is { } key && e.Key == key
+            : e.KeySymbol == character.ToString() || e.KeySymbol == shifted;
 }

@@ -1601,10 +1601,22 @@ if (mode == "designer")
         $"ctrl+shift+up brings it forward: back is now {tabBack.ZOrder} (expected 2), "
         + $"middle {tabMiddle.ZOrder} (expected 1), z-orders still {zAfter} (expected {zBefore})");
 
-    // And the brackets, matched on the CHARACTER the key produced rather than on the key,
-    // because Windows names these keys after a US keyboard and this one is ABNT2: there, the
-    // key called OEM_6 types "[". Binding the key would swap the two commands by layout.
-    window.KeyPress(Key.OemCloseBrackets, RawInputModifiers.Control, PhysicalKey.BracketRight, "[");
+    // And the brackets, pressed the way a real keyboard sends them. This check used to hand
+    // the handler a "[" as the key symbol, which is a character Windows does not send: a
+    // bracket held with Ctrl arrives as a control character (U+001B and U+001C on ABNT2,
+    // measured), so the character match never fired and the keys did nothing in the running
+    // app while this line read as a pass. The symbols below are those control characters, and
+    // the keys are whatever the layout in force says carries a bracket, which is the same
+    // question DesignerView asks. Nothing here is a fixed key: the answer is ABNT2's Oem6 and
+    // Oem5 on this machine and OemOpenBrackets and Oem6 on a US one, and the check holds
+    // either way.
+    Key openBracketKey = LabelForge.App.Services.KeyboardLayout.KeyThatTypes('[') ?? Key.None;
+    Key closeBracketKey = LabelForge.App.Services.KeyboardLayout.KeyThatTypes(']') ?? Key.None;
+    Console.WriteLine(
+        $"the layout carries the brackets: [ on {openBracketKey}, ] on {closeBracketKey} "
+        + "(expected two keys that are not None on Windows)");
+
+    window.KeyPress(openBracketKey, RawInputModifiers.Control, PhysicalKey.None, ControlChar(0x1B));
     Pump(700);
     Console.WriteLine(
         $"ctrl+[ sends it back down: back is {tabBack.ZOrder} (expected 1 again), "
@@ -1614,7 +1626,7 @@ if (mode == "designer")
     d.Selection.Set(tabFront);
     Pump(200);
     int undosBefore = d.Document.Elements.Count;
-    window.KeyPress(Key.OemPipe, RawInputModifiers.Control, PhysicalKey.Backslash, "]");
+    window.KeyPress(closeBracketKey, RawInputModifiers.Control, PhysicalKey.None, ControlChar(0x1C));
     Pump(700);
     Console.WriteLine(
         $"and stops at the front: {tabFront.ZOrder} (expected 3), "
@@ -2714,6 +2726,12 @@ string FindGraphicSource()
 
     return Path.Combine(AppContext.BaseDirectory, "Fixtures", "embedded-graphic-short-name.zpl");
 }
+
+// What a key held with Ctrl actually reports as its symbol on Windows. Named rather than
+// written as an escape in the call, because an invisible byte in a source line is exactly
+// the kind of thing that gets copied wrong, and because the point of these two is that they
+// are NOT the bracket the old check was sending.
+static string ControlChar(int code) => ((char)code).ToString();
 
 void Pump(int ms)
 {

@@ -47,7 +47,7 @@ public sealed class ShortcutsViewModel
             new("Ctrl + Shift + V", "Paste where it was copied from"),
             new("Ctrl + D", "Duplicate the selection"),
             new("Ctrl + ]  /  Ctrl + [", "One step forward or back in the stacking order"),
-            new("Ctrl + Shift + Up / Down", "The same, for keyboards where the brackets do not carry"),
+            new("Ctrl + Shift + Up / Down", "The same, where a bracket is not a key of its own"),
             new("Delete", "Delete the selection"),
             new("Escape", "Cancel an insert that is waiting for a click"),
         ]),
