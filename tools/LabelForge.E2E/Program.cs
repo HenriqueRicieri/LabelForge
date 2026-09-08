@@ -1820,6 +1820,17 @@ if (mode == "designer")
     window.MouseUp(new Avalonia.Point(lineRotGrab.X + 90, lineRotGrab.Y + 90), MouseButton.Left);
     Pump(700);
     Check("dragging a line's rotation handle stands it up", turningLine.IsVertical, true);
+    Check("the line lands inside the rotated outline", $"{turningLine.X},{turningLine.Y}", "347,353");
+    var cancelRect = new LabelForge.Core.Model.ElementBoundsCalculator().GetBounds(turningLine);
+    var cancelTop = canvas.DotsToView(cancelRect.X + cancelRect.Width / 2, cancelRect.Y);
+    var cancelGrab = canvas.TranslatePoint(new Avalonia.Point(cancelTop.X, cancelTop.Y - 26), window)!.Value;
+    window.MouseDown(cancelGrab, MouseButton.Left);
+    window.MouseMove(new Avalonia.Point(cancelGrab.X + 160, cancelGrab.Y + 180));
+    window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+    window.MouseUp(new Avalonia.Point(cancelGrab.X + 160, cancelGrab.Y + 180), MouseButton.Left);
+    Pump(700);
+    Check("Escape restores the rotated line's position and direction",
+        $"{turningLine.X},{turningLine.Y},{turningLine.IsVertical}", "347,353,True");
     Check(
         "and it says so where the generator reads it, not where it does not",
         $"{turningLine.IsVertical},{turningLine.Orientation}", "True,Normal",

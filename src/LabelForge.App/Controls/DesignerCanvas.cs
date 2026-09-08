@@ -875,6 +875,17 @@ public sealed class DesignerCanvas : Control
                 // During a rotation the outline rotates continuously with the pointer.
                 if (singleGesture && _rotating && element == selection.Primary)
                 {
+                    if (_rotateStops == 2)
+                    {
+                        DotRect actual = _bounds.GetBounds(element);
+                        var preview = new Rect(origin.X + actual.X * scale, origin.Y + actual.Y * scale,
+                            actual.Width * scale, actual.Height * scale);
+                        context.DrawRectangle(null, SelectionPen, preview);
+                        DrawReadout(context, $"{OrientationDegrees(FieldRotation.Get(element))}°",
+                            new Point(preview.Right + 8, preview.Top - 24));
+                        continue;
+                    }
+
                     var start = new Rect(
                         origin.X + _rotateStartBounds.X * scale,
                         origin.Y + _rotateStartBounds.Y * scale,
@@ -2191,7 +2202,7 @@ public sealed class DesignerCanvas : Control
                 Orientation snapped = DegreesToOrientation(nearest);
                 if (FieldRotation.Get(primary) != snapped)
                 {
-                    FieldRotation.Set(primary, snapped);
+                    RotationGesture.Apply(primary, snapped, _rotateStartBounds);
                     LiveEdited?.Invoke(this, EventArgs.Empty);
                 }
             }
