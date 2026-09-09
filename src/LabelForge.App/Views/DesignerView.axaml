@@ -332,7 +332,7 @@
                         <MenuItem Header="Export _PNG..." Click="OnExportPng" />
                         <MenuItem Header="Export P_DF..." Click="OnExportPdf" />
                     </MenuItem>
-                    <MenuItem Header="_Edit">
+                    <MenuItem Name="EditOptionsMenu" Header="_Edit">
                         <MenuItem Header="_Undo" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
                         <MenuItem Header="_Redo" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" />
                         <Separator />
@@ -343,8 +343,8 @@
                                   InputGesture="Ctrl+Shift+V" />
                         <MenuItem Header="D_uplicate" Command="{Binding DuplicateCommand}" InputGesture="Ctrl+D" />
                         <Separator />
-                        <MenuItem Header="Align to _label"
-                                  ToggleType="CheckBox" IsChecked="{Binding AlignToLabel}"
+                        <MenuItem Name="AlignEditMenu" Header="Align to _label"
+                                  ToggleType="CheckBox" IsChecked="{Binding AlignToLabel, Mode=TwoWay}"
                                   ToolTip.Tip="Line things up with the label rather than with each other" />
                         <MenuItem Header="Center on La_bel" Command="{Binding CenterOnLabelCommand}" />
                         <MenuItem Header="Same _Width" Command="{Binding MatchWidthCommand}" />
@@ -379,8 +379,8 @@
                         <Separator />
                         <MenuItem Header="_Delete" Command="{Binding DeleteSelectedCommand}" InputGesture="Delete" />
                     </MenuItem>
-                    <MenuItem Header="_View">
-                        <MenuItem Header="Quiet zones" ToggleType="CheckBox" IsChecked="{Binding CheckQuietZones}" />
+                    <MenuItem Name="ViewOptionsMenu" Header="_View">
+                        <MenuItem Name="QuietZonesMenu" Header="Quiet zones" ToggleType="CheckBox" IsChecked="{Binding CheckQuietZones, Mode=TwoWay}" />
                         <MenuItem x:Name="GridMenu" Header="_Grid" />
                         <MenuItem Name="PrinterDotGridMenu" Header="Printer dot grid (800%+)" ToggleType="CheckBox"
                                   IsChecked="{Binding ShowPrinterDotGrid, Mode=TwoWay}"
@@ -389,12 +389,12 @@
                                   IsChecked="{Binding ShowElementOutlines, Mode=TwoWay}"
                                   ToolTip.Tip="Show element bounds, including white and covered elements" />
                         <Separator />
-                        <MenuItem Header="Snap to g_uides" ToggleType="CheckBox"
-                                  IsChecked="{Binding SnapToGuides}" />
-                        <MenuItem Header="Snap to g_rid" ToggleType="CheckBox"
-                                  IsChecked="{Binding SnapToGrid}" />
-                        <MenuItem Header="Snap to _objects" ToggleType="CheckBox"
-                                  IsChecked="{Binding SnapToObjects}"
+                        <MenuItem Name="SnapGuidesMenu" Header="Snap to g_uides" ToggleType="CheckBox"
+                                  IsChecked="{Binding SnapToGuides, Mode=TwoWay}" />
+                        <MenuItem Name="SnapGridMenu" Header="Snap to g_rid" ToggleType="CheckBox"
+                                  IsChecked="{Binding SnapToGrid, Mode=TwoWay}" />
+                        <MenuItem Name="SnapObjectsMenu" Header="Snap to _objects" ToggleType="CheckBox"
+                                  IsChecked="{Binding SnapToObjects, Mode=TwoWay}"
                                   ToolTip.Tip="Holding Alt escapes all three for one gesture" />
                         <Separator />
                         <MenuItem Header="Theme: _System" Click="OnThemeSystem" />
@@ -647,7 +647,7 @@
                         <Button Name="ArrangeButton" Content="Arrange" Padding="10,4"
                                 ToolTip.Tip="{Binding AlignTargetName, StringFormat='Arrange ({0})'}">
                             <Button.Flyout><MenuFlyout Placement="Bottom">
-                                <MenuItem Header="Align to label" ToggleType="CheckBox" IsChecked="{Binding AlignToLabel}" />
+                                <MenuItem Name="AlignArrangeMenu" Header="Align to label" ToggleType="CheckBox" IsChecked="{Binding AlignToLabel, Mode=TwoWay}" />
                                 <Separator />
                                 <MenuItem Header="Align left" Command="{Binding AlignLeftCommand}" />
                                 <MenuItem Header="Align horizontal centers" Command="{Binding AlignCenterHorizontalCommand}" />

@@ -50,7 +50,7 @@ if (args.Contains("dark"))
 // Media presets, field catalogs and crash snapshots all live per machine. Point every
 // one of them at scratch locations, so a harness run never touches what the person using
 // the app has saved.
-string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display"
+string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options"
     ? Path.Combine(AppContext.BaseDirectory, args[0] + "-scratch")
     : AppContext.BaseDirectory;
 Directory.CreateDirectory(scratchRoot);
@@ -89,6 +89,14 @@ if (args.FirstOrDefault() == "ui-layout")
 // over these two and a captured local has to be assigned at every place it is called from.
 int graded = 0;
 var disagreed = new List<string>();
+if (args.FirstOrDefault() == "menu-options")
+{
+    MenuOptionChecks.Run(window, vm.Designer, settingsPath, (label, held) => Check(label, held, true));
+    Console.WriteLine($"{graded} menu checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
 if (args.FirstOrDefault() == "canvas-display")
 {
     CanvasDisplayChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
@@ -3224,7 +3232,10 @@ if (mode == "designer")
 }
 
 if (mode == "designer")
+{
     CanvasDisplayChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
+    MenuOptionChecks.Run(window, vm.Designer, settingsPath, (label, held) => Check(label, held, true));
+}
 
 Capture($"{mode}.png");
 
