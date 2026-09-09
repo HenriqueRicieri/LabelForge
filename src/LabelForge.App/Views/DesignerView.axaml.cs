@@ -504,22 +504,21 @@ public partial class DesignerView : UserControl
     /// follows. Elements with nothing to type (a box, a line) have no such field and this
     /// does nothing, which is the right amount to do.
     /// </summary>
-    private void FocusContentField() => Dispatcher.UIThread.Post(
-        () =>
+    private void FocusContentField()
+    {
+        InspectorTabs.SelectedIndex = 0;
+        ContentSection.IsExpanded = true;
+        Dispatcher.UIThread.Post(() =>
         {
-            if (PropertiesContent.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault()
-                is not { } box)
-            {
+            if (PropertiesContent.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault() is not { } box)
                 return;
-            }
 
+            box.BringIntoView();
             box.Focus();
             if (box.GetVisualDescendants().OfType<TextBox>().FirstOrDefault() is { } inner)
-            {
                 inner.SelectAll();
-            }
-        },
-        DispatcherPriority.Background);
+        }, DispatcherPriority.Background);
+    }
 
     private void OnFieldBoxAttached(object? sender, VisualTreeAttachmentEventArgs e)
     {

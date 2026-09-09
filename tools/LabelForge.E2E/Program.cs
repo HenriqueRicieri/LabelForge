@@ -2485,14 +2485,8 @@ if (mode == "designer")
     Console.WriteLine(
         $"named row: '{d.Outline.First(r => r.Element == row.Element).Display}' (expected Peso liquido)");
 
-    // Open the list for the capture; collapsed by default so the panel stays quiet on a
-    // label small enough not to need it.
-    var outlineExpander = window.GetVisualDescendants().OfType<Expander>()
-        .FirstOrDefault(x => (x.Header as string)?.StartsWith("Elements", StringComparison.Ordinal) == true);
-    if (outlineExpander is not null)
-    {
-        outlineExpander.IsExpanded = true;
-    }
+    var inspectorTabs = window.GetVisualDescendants().OfType<TabControl>().Single(t => t.Name == "InspectorTabs");
+    inspectorTabs.SelectedIndex = 1;
 
     Pump(500);
     Capture("designer-outline.png");
