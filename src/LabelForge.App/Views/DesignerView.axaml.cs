@@ -23,11 +23,7 @@ public partial class DesignerView : UserControl
     public DesignerView()
     {
         InitializeComponent();
-
-        // Custom filter so "4000d 50.8" narrows by material and size together;
-        // the rule lives in Core (StockCatalog) and is unit-tested there.
-        MediaBox.ItemFilter = (query, item) =>
-            item is Core.Media.StockMedia media && Core.Media.StockCatalog.IsMatch(media, query);
+        SizeChanged += (_, _) => ZplText.Height = Math.Clamp(Bounds.Height * 0.22, 50, 140);
 
         // The recent-files submenu is rebuilt in code: a handful of items, and it
         // sidesteps binding ancestor lookups inside menu popups.
@@ -352,6 +348,19 @@ public partial class DesignerView : UserControl
                 Command = vm.OpenRecentCommand,
                 CommandParameter = path,
             });
+        }
+    }
+
+    private async void OnOpenLabelSetup(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is Window owner && ViewModel is { } vm)
+        {
+            await new LabelSetupWindow
+            {
+                DataContext = vm,
+                Height = Math.Max(240, Math.Min(660, owner.ClientSize.Height - 40)),
+                Width = Math.Max(280, Math.Min(520, owner.ClientSize.Width - 40)),
+            }.ShowDialog(owner);
         }
     }
 

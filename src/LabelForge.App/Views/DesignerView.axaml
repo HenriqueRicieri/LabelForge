@@ -307,10 +307,9 @@
 
     </UserControl.DataTemplates>
 
-    <DockPanel>
-
+    <Grid Name="DesignerRoot" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <!-- Menu bar -->
-        <Border DockPanel.Dock="Top" Padding="4,0" Background="{DynamicResource AppBarBackground}">
+        <Border Grid.Row="0" Padding="4,0" Background="{DynamicResource AppBarBackground}">
             <DockPanel>
                 <Menu DockPanel.Dock="Left" VerticalAlignment="Center">
                     <MenuItem Header="_File">
@@ -378,6 +377,7 @@
                         <MenuItem Header="_Delete" Command="{Binding DeleteSelectedCommand}" InputGesture="Delete" />
                     </MenuItem>
                     <MenuItem Header="_View">
+                        <MenuItem Header="Quiet zones" ToggleType="CheckBox" IsChecked="{Binding CheckQuietZones}" />
                         <MenuItem x:Name="GridMenu" Header="_Grid" />
                         <Separator />
                         <MenuItem Header="Snap to g_uides" ToggleType="CheckBox"
@@ -481,7 +481,7 @@
         </Border>
 
         <!-- Recovery offer: only after a session that did not shut down -->
-        <Border DockPanel.Dock="Top" Padding="10,6" Background="#FEF3C7"
+        <Border Grid.Row="1" Padding="10,6" Background="#FEF3C7"
                 IsVisible="{Binding HasRecoveryOffer}">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Content="Discard" Margin="6,0,0,0"
@@ -494,13 +494,13 @@
         </Border>
 
         <!-- The other labels in an imported file, while there are any -->
-        <Border DockPanel.Dock="Top" Padding="10,6" Background="{DynamicResource AppToolbarBackground}"
+        <Border Grid.Row="2" Padding="10,6" Background="{DynamicResource AppToolbarBackground}"
                 IsVisible="{Binding HasImportedBlocks}">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Content="Done" Margin="6,0,0,0"
                         Command="{Binding CloseImportedFileCommand}"
                         ToolTip.Tip="Stop offering the other labels from this file" />
-                <TextBlock Text="{Binding ImportedFrom}" VerticalAlignment="Center"
+                <TextBlock MaxWidth="180" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ImportedFrom}" Text="{Binding ImportedFrom}" VerticalAlignment="Center"
                            Opacity="0.7" Margin="0,0,8,0" />
                 <ComboBox ItemsSource="{Binding ImportedBlocks}"
                           SelectedItem="{Binding SelectedImportedBlock}"
@@ -509,123 +509,159 @@
             </DockPanel>
         </Border>
 
-        <!-- Label setup -->
-        <Border Name="LabelSetupBar" DockPanel.Dock="Top" Padding="10,8" Background="{DynamicResource AppToolbarBackground}">
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <TextBlock Text="Width (mm)" VerticalAlignment="Center" />
-                <NumericUpDown Value="{Binding WidthMm}" Minimum="5" Maximum="600"
-                               Increment="1" FormatString="0.#" Width="110" />
-                <TextBlock Text="Height (mm)" VerticalAlignment="Center" />
-                <NumericUpDown Value="{Binding HeightMm}" Minimum="5" Maximum="1000"
-                               Increment="1" FormatString="0.#" Width="110"
-                               IsEnabled="{Binding HasFixedLength}"
-                               ToolTip.Tip="{Binding LengthHint}" />
-                <CheckBox Content="Continuous" IsChecked="{Binding IsContinuous}"
-                          VerticalAlignment="Center"
-                          ToolTip.Tip="Stock with no gaps or die cuts. The label becomes exactly as long as its content, and the ZPL tells the printer to stop sensing gaps." />
-                <TextBlock Text="Gap (mm)" VerticalAlignment="Center"
-                           IsVisible="{Binding IsContinuous}"
-                           ToolTip.Tip="Blank stock left after the last ink, so the next label has something to start after." />
-                <NumericUpDown Value="{Binding ContinuousMarginMm}" Minimum="0" Maximum="50"
-                               Increment="0.5" FormatString="0.##" Width="105"
-                               IsVisible="{Binding IsContinuous}" />
-                <TextBlock Text="Corner (mm)" VerticalAlignment="Center"
-                           IsVisible="{Binding HasFixedLength}"
-                           ToolTip.Tip="Die-cut corner radius. Shapes the canvas and the exported PDF so the design is checked against the real label; it never changes the ZPL." />
-                <NumericUpDown Value="{Binding CornerRadiusMm}" Minimum="0" Maximum="50"
-                               Increment="0.5" FormatString="0.##" Width="105"
-                               IsVisible="{Binding HasFixedLength}" />
-                <TextBlock Text="Across" VerticalAlignment="Center"
-                           ToolTip.Tip="How many of this label sit side by side on the web. The design stays one label; a print repeats it across the roll." />
-                <NumericUpDown Value="{Binding LabelsAcross}" Minimum="1" Maximum="20"
-                               Increment="1" FormatString="0" Width="95"
-                               ToolTip.Tip="{Binding AcrossHint}" />
-                <TextBlock Text="Web gap (mm)" VerticalAlignment="Center"
-                           IsVisible="{Binding IsMultiAcross}"
-                           ToolTip.Tip="Liner between one column and the next. With the label width it makes the pitch each column is offset by." />
-                <NumericUpDown Value="{Binding AcrossGapMm}" Minimum="0" Maximum="50"
-                               Increment="0.5" FormatString="0.##" Width="105"
-                               IsVisible="{Binding IsMultiAcross}" />
-                <CheckBox Content="Quiet zones" IsChecked="{Binding CheckQuietZones}"
-                          VerticalAlignment="Center"
-                          ToolTip.Tip="Warn when something crowds the blank margin a barcode needs to scan. A design aid only: it never changes the generated ZPL." />
-                <TextBlock Text="Media" VerticalAlignment="Center"
-                           ToolTip.Tip="Set the label size from a Zebra part number or one of your own saved media" />
-                <AutoCompleteBox x:Name="MediaBox" Width="230"
-                                 PlaceholderText="Part number or my media"
-                                 ItemsSource="{Binding MediaCatalog}"
-                                 SelectedItem="{Binding SelectedMedia}"
-                                 FilterMode="Custom"
-                                 MinimumPrefixLength="2" />
-                <Button Content="My media..."
-                        ToolTip.Tip="Save the current label size as your own media, for stock the Zebra catalog does not list">
-                    <Button.Flyout>
-                        <Flyout Placement="Bottom">
-                            <StackPanel Spacing="6" Width="270">
-                                <TextBlock Text="Save this size as my media" FontWeight="SemiBold" FontSize="12" />
-                                <TextBlock Text="{Binding NewMediaSizeText}" FontSize="12" Opacity="0.7" />
-                                <TextBlock Text="Name" FontSize="12" Opacity="0.8" />
-                                <TextBox Text="{Binding NewMediaName}" PlaceholderText="Etiqueta 50 x 30" />
-                                <TextBlock Text="Material (optional)" FontSize="12" Opacity="0.8" />
-                                <TextBox Text="{Binding NewMediaMaterial}" PlaceholderText="Couche, termico, BOPP" />
-                                <TextBlock Text="Corner radius in mm (recorded, not drawn yet)"
-                                           FontSize="12" Opacity="0.8" TextWrapping="Wrap" />
-                                <NumericUpDown Value="{Binding NewMediaRadiusMm}" Minimum="0" Maximum="20"
-                                               Increment="0.5" FormatString="0.##" />
-                                <CheckBox Content="Continuous roll" FontSize="12"
-                                          IsChecked="{Binding NewMediaContinuous}" />
-                                <Button Content="Save" HorizontalAlignment="Stretch"
-                                        Command="{Binding SaveUserMediaCommand}" />
-
-                                <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="0,6" />
-                                <TextBlock Text="My media" FontWeight="SemiBold" FontSize="12" />
-                                <TextBlock Text="Nothing saved yet. Set the width and height, then save them under a name."
-                                           IsVisible="{Binding !HasUserMedia}"
-                                           FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
-                                <ItemsControl ItemsSource="{Binding UserMedia}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="vm:UserMediaEntryViewModel">
-                                            <DockPanel Margin="0,2">
-                                                <Button DockPanel.Dock="Right" Content="Remove"
-                                                        FontSize="11" Padding="6,2"
-                                                        Command="{Binding RemoveCommand}" />
-                                                <TextBlock Text="{Binding Display}" VerticalAlignment="Center"
-                                                           FontSize="11" TextWrapping="Wrap" Margin="0,0,6,0" />
-                                            </DockPanel>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Flyout>
-                    </Button.Flyout>
+        <Border Name="LabelSetupBar" Grid.Row="3" Padding="12,6" Background="{DynamicResource AppToolbarBackground}">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding SetupSummary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                           ToolTip.Tip="{Binding SetupSummary}" />
+                <Button Name="LabelSetupButton" Grid.Column="1" Content="Label setup..." Click="OnOpenLabelSetup" />
+            </Grid>
+        </Border>
+        <Grid Name="WorkspaceGrid" Grid.Row="4" ColumnDefinitions="Auto,*,Auto">
+        <!-- Tool bar: insert tools, then alignment, as square icon buttons -->
+        <Border Name="CreationRail" Grid.Column="0" Background="{DynamicResource AppToolbarBackground}" Padding="5,8">
+            <StackPanel Spacing="3">
+                <Button Classes="tool" Classes.armed="{Binding IsTextArmed}"
+                        Command="{Binding AddTextCommand}" ToolTip.Tip="Add text">
+                    <PathIcon Data="M2,2 L14,2 L14,5 L9.4,5 L9.4,14 L6.6,14 L6.6,5 L2,5 Z" />
                 </Button>
-                <TextBlock Text="Density" VerticalAlignment="Center" />
-                <ComboBox ItemsSource="{Binding Densities}"
-                          SelectedItem="{Binding SelectedDensity}" Width="100" />
-                <Rectangle Width="1" Height="22" Fill="{DynamicResource AppSeparator}" />
-                <TextBlock Text="Printer" VerticalAlignment="Center" />
-                <ComboBox ItemsSource="{Binding Printers}"
-                          SelectedItem="{Binding SelectedPrinter}" MinWidth="160"
-                          ToolTip.Tip="Selecting a printer adopts its density and validates the label against the print head" />
-                <TextBlock Text="{Binding PrinterWarning}" VerticalAlignment="Center"
-                           Foreground="#D97706" FontSize="12" FontWeight="SemiBold"
-                           TextWrapping="Wrap" MaxWidth="300" />
-                <TextBlock Text="{Binding ValidationWarning}" VerticalAlignment="Center"
-                           IsVisible="{Binding ValidationWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                           Foreground="#D97706" FontSize="12" FontWeight="SemiBold"
-                           TextWrapping="Wrap" MaxWidth="300"
-                           ToolTip.Tip="{Binding ValidationWarning}" />
-                <TextBlock Text="{Binding PlacementWarning}" VerticalAlignment="Center"
-                           IsVisible="{Binding PlacementWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                           Foreground="#D97706" FontSize="12" FontWeight="SemiBold"
-                           TextWrapping="Wrap" MaxWidth="340"
-                           ToolTip.Tip="{Binding PlacementWarning}" />
-                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Opacity="0.6" />
+                <SplitButton x:Name="ShapesButton" Classes="tool" Classes.armed="{Binding IsShapeArmed}"
+                             Command="{Binding AddShapeCommand}" ToolTip.Tip="Shapes" AutomationProperties.Name="Shapes">
+                    <PathIcon Width="16" Height="16" Data="{Binding ShapeIcon}" />
+                    <SplitButton.Flyout>
+                        <MenuFlyout>
+                            <MenuItem Header="Box" Command="{Binding AddBoxCommand}" />
+                            <MenuItem Header="Ellipse" Command="{Binding AddEllipseCommand}" />
+                            <MenuItem Header="Diagonal line" Command="{Binding AddDiagonalCommand}" />
+                        </MenuFlyout>
+                    </SplitButton.Flyout>
+                </SplitButton>
+                <Button Classes="tool" Classes.armed="{Binding IsLineArmed}"
+                        Command="{Binding AddLineCommand}" ToolTip.Tip="Add line">
+                    <PathIcon Data="M2.2,12.4 L12.4,2.2 L13.8,3.6 L3.6,13.8 Z" />
+                </Button>
+                <Button Classes="tool" Classes.armed="{Binding IsBarcodeArmed}"
+                        Command="{Binding AddBarcodeCommand}" ToolTip.Tip="Add barcode">
+                    <PathIcon Data="M2,3 L3.4,3 L3.4,13 L2,13 Z M4.6,3 L5.6,3 L5.6,13 L4.6,13 Z M7,3 L9.4,3 L9.4,13 L7,13 Z M10.6,3 L11.6,3 L11.6,13 L10.6,13 Z M12.8,3 L14,3 L14,13 L12.8,13 Z" />
+                </Button>
+                <Button Classes="tool" Classes.armed="{Binding IsQrArmed}"
+                        Command="{Binding AddQrCommand}" ToolTip.Tip="Add QR code">
+                    <PathIcon Data="M2,2 L7,2 L7,7 L2,7 Z M3.6,3.6 L5.4,3.6 L5.4,5.4 L3.6,5.4 Z M9,2 L14,2 L14,7 L9,7 Z M10.6,3.6 L12.4,3.6 L12.4,5.4 L10.6,5.4 Z M2,9 L7,9 L7,14 L2,14 Z M3.6,10.6 L5.4,10.6 L5.4,12.4 L3.6,12.4 Z M9,9 L11,9 L11,11 L9,11 Z M12,9 L14,9 L14,11 L12,11 Z M9,12 L11,12 L11,14 L9,14 Z M12,12 L14,12 L14,14 L12,14 Z" />
+                </Button>
+                <Button Classes="tool" Classes.armed="{Binding IsDataMatrixArmed}"
+                        Command="{Binding AddDataMatrixCommand}" ToolTip.Tip="Add Data Matrix">
+                    <PathIcon Data="M2,2 L3.6,2 L3.6,14 L2,14 Z M2,12.4 L14,12.4 L14,14 L2,14 Z M5,2 L6.6,2 L6.6,3.6 L5,3.6 Z M8,2 L9.6,2 L9.6,3.6 L8,3.6 Z M11,2 L12.6,2 L12.6,3.6 L11,3.6 Z M12.4,5 L14,5 L14,6.6 L12.4,6.6 Z M12.4,8 L14,8 L14,9.6 L12.4,9.6 Z M6,5 L7.6,5 L7.6,6.6 L6,6.6 Z M9,7 L10.6,7 L10.6,8.6 L9,8.6 Z M5.5,9 L7.1,9 L7.1,10.6 L5.5,10.6 Z" />
+                </Button>
+                <Button Classes="tool" Classes.armed="{Binding IsPdf417Armed}"
+                        Command="{Binding AddPdf417Command}" ToolTip.Tip="Add PDF417">
+                    <PathIcon Data="M2,2.4 L3.2,2.4 L3.2,4.6 L2,4.6 Z M4,2.4 L4.8,2.4 L4.8,4.6 L4,4.6 Z M5.6,2.4 L7.2,2.4 L7.2,4.6 L5.6,4.6 Z M8,2.4 L8.8,2.4 L8.8,4.6 L8,4.6 Z M9.6,2.4 L11.6,2.4 L11.6,4.6 L9.6,4.6 Z M12.4,2.4 L14,2.4 L14,4.6 L12.4,4.6 Z M2,5.6 L3.6,5.6 L3.6,7.8 L2,7.8 Z M4.4,5.6 L5.2,5.6 L5.2,7.8 L4.4,7.8 Z M6,5.6 L8,5.6 L8,7.8 L6,7.8 Z M8.8,5.6 L9.6,5.6 L9.6,7.8 L8.8,7.8 Z M10.4,5.6 L11.2,5.6 L11.2,7.8 L10.4,7.8 Z M12,5.6 L14,5.6 L14,7.8 L12,7.8 Z M2,8.8 L3.2,8.8 L3.2,11 L2,11 Z M4,8.8 L6,8.8 L6,11 L4,11 Z M6.8,8.8 L7.6,8.8 L7.6,11 L6.8,11 Z M8.4,8.8 L10,8.8 L10,11 L8.4,11 Z M10.8,8.8 L11.6,8.8 L11.6,11 L10.8,11 Z M12.4,8.8 L14,8.8 L14,11 L12.4,11 Z M2,12 L3.6,12 L3.6,14.2 L2,14.2 Z M4.4,12 L5.2,12 L5.2,14.2 L4.4,14.2 Z M6,12 L6.8,12 L6.8,14.2 L6,14.2 Z M7.6,12 L9.6,12 L9.6,14.2 L7.6,14.2 Z M10.4,12 L11.2,12 L11.2,14.2 L10.4,14.2 Z M12,12 L14,12 L14,14.2 L12,14.2 Z" />
+                </Button>
+                <Button Classes="tool" Classes.armed="{Binding IsImageArmed}"
+                        Click="OnAddImage" ToolTip.Tip="Add image (PNG, JPEG, BMP)">
+                    <PathIcon Data="M2,3 L14,3 L14,13 L2,13 Z M3.4,4.4 L12.6,4.4 L12.6,11.6 L3.4,11.6 Z M4.8,5.6 L6.8,5.6 L6.8,7.6 L4.8,7.6 Z M4.2,11 L7.6,7.4 L9.4,9.6 L10.9,7.9 L12,11 Z" />
+                </Button>
+
+                <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="2,5" />
+
+                <Button Classes="tool" Command="{Binding AlignLeftCommand}"
+                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align left ({0})'}">
+                    <PathIcon Data="M2,2 L3.6,2 L3.6,14 L2,14 Z M5.2,3.6 L14,3.6 L14,6.4 L5.2,6.4 Z M5.2,9.6 L10.5,9.6 L10.5,12.4 L5.2,12.4 Z" />
+                </Button>
+                <Button Classes="tool" Command="{Binding AlignCenterHorizontalCommand}"
+                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align horizontal centers ({0})'}">
+                    <PathIcon Data="F1 M7.2,2 L8.8,2 L8.8,14 L7.2,14 Z M3,3.6 L13,3.6 L13,6.4 L3,6.4 Z M5,9.6 L11,9.6 L11,12.4 L5,12.4 Z" />
+                </Button>
+                <Button Classes="tool" Command="{Binding AlignRightCommand}"
+                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align right ({0})'}">
+                    <PathIcon Data="M12.4,2 L14,2 L14,14 L12.4,14 Z M2,3.6 L10.8,3.6 L10.8,6.4 L2,6.4 Z M5.5,9.6 L10.8,9.6 L10.8,12.4 L5.5,12.4 Z" />
+                </Button>
+                <Button Classes="tool" Command="{Binding AlignTopCommand}"
+                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align top ({0})'}">
+                    <PathIcon Data="M2,2 L14,2 L14,3.6 L2,3.6 Z M3.6,5.2 L6.4,5.2 L6.4,14 L3.6,14 Z M9.6,5.2 L12.4,5.2 L12.4,10.5 L9.6,10.5 Z" />
+                </Button>
+                <Button Classes="tool" Command="{Binding AlignMiddleCommand}"
+                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align vertical centers ({0})'}">
+                    <PathIcon Data="F1 M2,7.2 L14,7.2 L14,8.8 L2,8.8 Z M3.6,3 L6.4,3 L6.4,13 L3.6,13 Z M9.6,5 L12.4,5 L12.4,11 L9.6,11 Z" />
+                </Button>
+                <Button Classes="tool" Command="{Binding AlignBottomCommand}"
+                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align bottom ({0})'}">
+                    <PathIcon Data="M2,12.4 L14,12.4 L14,14 L2,14 Z M3.6,2 L6.4,2 L6.4,10.8 L3.6,10.8 Z M9.6,5.5 L12.4,5.5 L12.4,10.8 L9.6,10.8 Z" />
+                </Button>
+
+                <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="2,5" />
+
+                <Button Classes="tool" Command="{Binding DistributeHorizontalCommand}"
+                        ToolTip.Tip="Distribute horizontally (needs 3+ elements)">
+                    <PathIcon Data="M2,2 L3.6,2 L3.6,14 L2,14 Z M12.4,2 L14,2 L14,14 L12.4,14 Z M6.6,4.5 L9.4,4.5 L9.4,11.5 L6.6,11.5 Z" />
+                </Button>
+                <Button Classes="tool" Command="{Binding DistributeVerticalCommand}"
+                        ToolTip.Tip="Distribute vertically (needs 3+ elements)">
+                    <PathIcon Data="M2,2 L14,2 L14,3.6 L2,3.6 Z M2,12.4 L14,12.4 L14,14 L2,14 Z M4.5,6.6 L11.5,6.6 L11.5,9.4 L4.5,9.4 Z" />
+                </Button>
             </StackPanel>
         </Border>
 
+        <!-- Canvas with mm rulers (drawn by the control) and scrollbars -->
+        <Grid Grid.Column="1" Name="CanvasRegion" RowDefinitions="*,Auto" ColumnDefinitions="*,Auto">
+            <controls:DesignerCanvas Name="Canvas"
+                                     Underlay="{Binding Underlay}"
+                                     UnderlayMarginDots="{Binding UnderlayMarginDots}"
+                                     CanvasRevision="{Binding CanvasRevision}"
+                                     Document="{Binding Document}"
+                                     Selection="{Binding Selection}"
+                                     IsPlacing="{Binding IsPlacing}"
+                                     SnapToGuides="{Binding SnapToGuides}"
+                                     SnapToGrid="{Binding SnapToGrid}"
+                                     SnapToObjects="{Binding SnapToObjects}" />
+            <ScrollBar Name="CanvasVScroll" Grid.Column="1" Orientation="Vertical"
+                       AllowAutoHide="False" Visibility="Visible" />
+            <ScrollBar Name="CanvasHScroll" Grid.Row="1" Orientation="Horizontal"
+                       AllowAutoHide="False" Visibility="Visible" />
+
+            <!-- Pointer and selection coordinates, floating over the opposite corner
+                 from the zoom control. Not in the toolbar above: that one is already
+                 full, and numbers that change width on every pointer move would shuffle
+                 whatever sat beside them. -->
+            <Border Grid.Row="0" Grid.Column="0" IsHitTestVisible="False"
+                    HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="12,0,0,12"
+                    IsVisible="{Binding CanvasReadout, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                    Background="{DynamicResource AppPanelBackground}"
+                    BorderBrush="{DynamicResource AppSeparator}" BorderThickness="1"
+                    CornerRadius="4" Padding="8,3">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock Text="{Binding CanvasReadout}" FontSize="12" Opacity="0.75" />
+                    <TextBlock Text="{Binding SnapSummary}" FontSize="12" Opacity="0.55" />
+                </StackPanel>
+            </Border>
+
+            <!-- Floating zoom control over the canvas corner -->
+            <Border Grid.Row="0" Grid.Column="0"
+                    HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,12,12"
+                    Background="{DynamicResource AppPanelBackground}"
+                    BorderBrush="{DynamicResource AppSeparator}" BorderThickness="1"
+                    CornerRadius="4" Padding="2">
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                    <Button Name="ZoomOutButton" Content="-" Padding="8,2" FontSize="12"
+                            ToolTip.Tip="Zoom out (Ctrl+wheel)" />
+                    <Button Name="ZoomLevelButton" Content="100%" MinWidth="58" Padding="6,2"
+                            FontSize="12" HorizontalContentAlignment="Center"
+                            ToolTip.Tip="Zoom presets; 100% = 1 dot per pixel">
+                        <Button.Flyout>
+                            <MenuFlyout Placement="Top">
+                                <MenuItem Header="50%" Click="OnZoom50" />
+                                <MenuItem Header="100%" Click="OnZoom100" />
+                                <MenuItem Header="200%" Click="OnZoom200" />
+                                <MenuItem Header="Fit label" Click="OnZoomFit" InputGesture="Ctrl+0" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                    <Button Name="ZoomInButton" Content="+" Padding="8,2" FontSize="12"
+                            ToolTip.Tip="Zoom in (Ctrl+wheel)" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
         <!-- Properties panel -->
-        <Border Name="InspectorPanel" DockPanel.Dock="Right" Width="260" Background="{DynamicResource AppPanelBackground}" Padding="12">
+        <Border Name="InspectorPanel" Grid.Column="2" Width="260" Background="{DynamicResource AppPanelBackground}" Padding="12">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="8">
                     <!-- Which data source's fields this label is written against -->
@@ -847,156 +883,34 @@
             </ScrollViewer>
         </Border>
 
+        </Grid>
+        <Grid Grid.Row="5" RowDefinitions="Auto,Auto">
         <!-- Generated ZPL -->
-        <Expander Name="ZplPanel" DockPanel.Dock="Bottom" Header="Generated ZPL" IsExpanded="False">
-            <TextBox Text="{Binding GeneratedZpl}" IsReadOnly="True"
+        <Expander Name="ZplPanel" Grid.Row="0" Header="Generated ZPL" IsExpanded="False">
+            <TextBox Name="ZplText" Text="{Binding GeneratedZpl}" IsReadOnly="True"
                      FontFamily="Consolas,Menlo,Monospace" FontSize="12"
                      Height="140" TextWrapping="NoWrap" />
         </Expander>
 
-        <!-- Tool bar: insert tools, then alignment, as square icon buttons -->
-        <Border Name="CreationRail" DockPanel.Dock="Left" Background="{DynamicResource AppToolbarBackground}" Padding="5,8">
-            <StackPanel Spacing="3">
-                <Button Classes="tool" Classes.armed="{Binding IsTextArmed}"
-                        Command="{Binding AddTextCommand}" ToolTip.Tip="Add text">
-                    <PathIcon Data="M2,2 L14,2 L14,5 L9.4,5 L9.4,14 L6.6,14 L6.6,5 L2,5 Z" />
+        <Border Grid.Row="1" Background="{DynamicResource AppPanelBackground}" Padding="12,4">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding WorkspaceStatus}" TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" FontSize="12" ToolTip.Tip="{Binding WorkspaceStatus}" />
+                <Button Grid.Column="1" Content="Details" IsVisible="{Binding HasWorkspaceMessages}" Padding="8,2">
+                    <Button.Flyout>
+                        <Flyout Placement="Top">
+                            <ScrollViewer MaxHeight="220" Width="360" HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding WorkspaceMessages}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,4" /></DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Flyout>
+                    </Button.Flyout>
                 </Button>
-                <SplitButton x:Name="ShapesButton" Classes="tool" Classes.armed="{Binding IsShapeArmed}"
-                             Command="{Binding AddShapeCommand}" ToolTip.Tip="Shapes" AutomationProperties.Name="Shapes">
-                    <PathIcon Width="16" Height="16" Data="{Binding ShapeIcon}" />
-                    <SplitButton.Flyout>
-                        <MenuFlyout>
-                            <MenuItem Header="Box" Command="{Binding AddBoxCommand}" />
-                            <MenuItem Header="Ellipse" Command="{Binding AddEllipseCommand}" />
-                            <MenuItem Header="Diagonal line" Command="{Binding AddDiagonalCommand}" />
-                        </MenuFlyout>
-                    </SplitButton.Flyout>
-                </SplitButton>
-                <Button Classes="tool" Classes.armed="{Binding IsLineArmed}"
-                        Command="{Binding AddLineCommand}" ToolTip.Tip="Add line">
-                    <PathIcon Data="M2.2,12.4 L12.4,2.2 L13.8,3.6 L3.6,13.8 Z" />
-                </Button>
-                <Button Classes="tool" Classes.armed="{Binding IsBarcodeArmed}"
-                        Command="{Binding AddBarcodeCommand}" ToolTip.Tip="Add barcode">
-                    <PathIcon Data="M2,3 L3.4,3 L3.4,13 L2,13 Z M4.6,3 L5.6,3 L5.6,13 L4.6,13 Z M7,3 L9.4,3 L9.4,13 L7,13 Z M10.6,3 L11.6,3 L11.6,13 L10.6,13 Z M12.8,3 L14,3 L14,13 L12.8,13 Z" />
-                </Button>
-                <Button Classes="tool" Classes.armed="{Binding IsQrArmed}"
-                        Command="{Binding AddQrCommand}" ToolTip.Tip="Add QR code">
-                    <PathIcon Data="M2,2 L7,2 L7,7 L2,7 Z M3.6,3.6 L5.4,3.6 L5.4,5.4 L3.6,5.4 Z M9,2 L14,2 L14,7 L9,7 Z M10.6,3.6 L12.4,3.6 L12.4,5.4 L10.6,5.4 Z M2,9 L7,9 L7,14 L2,14 Z M3.6,10.6 L5.4,10.6 L5.4,12.4 L3.6,12.4 Z M9,9 L11,9 L11,11 L9,11 Z M12,9 L14,9 L14,11 L12,11 Z M9,12 L11,12 L11,14 L9,14 Z M12,12 L14,12 L14,14 L12,14 Z" />
-                </Button>
-                <Button Classes="tool" Classes.armed="{Binding IsDataMatrixArmed}"
-                        Command="{Binding AddDataMatrixCommand}" ToolTip.Tip="Add Data Matrix">
-                    <PathIcon Data="M2,2 L3.6,2 L3.6,14 L2,14 Z M2,12.4 L14,12.4 L14,14 L2,14 Z M5,2 L6.6,2 L6.6,3.6 L5,3.6 Z M8,2 L9.6,2 L9.6,3.6 L8,3.6 Z M11,2 L12.6,2 L12.6,3.6 L11,3.6 Z M12.4,5 L14,5 L14,6.6 L12.4,6.6 Z M12.4,8 L14,8 L14,9.6 L12.4,9.6 Z M6,5 L7.6,5 L7.6,6.6 L6,6.6 Z M9,7 L10.6,7 L10.6,8.6 L9,8.6 Z M5.5,9 L7.1,9 L7.1,10.6 L5.5,10.6 Z" />
-                </Button>
-                <Button Classes="tool" Classes.armed="{Binding IsPdf417Armed}"
-                        Command="{Binding AddPdf417Command}" ToolTip.Tip="Add PDF417">
-                    <PathIcon Data="M2,2.4 L3.2,2.4 L3.2,4.6 L2,4.6 Z M4,2.4 L4.8,2.4 L4.8,4.6 L4,4.6 Z M5.6,2.4 L7.2,2.4 L7.2,4.6 L5.6,4.6 Z M8,2.4 L8.8,2.4 L8.8,4.6 L8,4.6 Z M9.6,2.4 L11.6,2.4 L11.6,4.6 L9.6,4.6 Z M12.4,2.4 L14,2.4 L14,4.6 L12.4,4.6 Z M2,5.6 L3.6,5.6 L3.6,7.8 L2,7.8 Z M4.4,5.6 L5.2,5.6 L5.2,7.8 L4.4,7.8 Z M6,5.6 L8,5.6 L8,7.8 L6,7.8 Z M8.8,5.6 L9.6,5.6 L9.6,7.8 L8.8,7.8 Z M10.4,5.6 L11.2,5.6 L11.2,7.8 L10.4,7.8 Z M12,5.6 L14,5.6 L14,7.8 L12,7.8 Z M2,8.8 L3.2,8.8 L3.2,11 L2,11 Z M4,8.8 L6,8.8 L6,11 L4,11 Z M6.8,8.8 L7.6,8.8 L7.6,11 L6.8,11 Z M8.4,8.8 L10,8.8 L10,11 L8.4,11 Z M10.8,8.8 L11.6,8.8 L11.6,11 L10.8,11 Z M12.4,8.8 L14,8.8 L14,11 L12.4,11 Z M2,12 L3.6,12 L3.6,14.2 L2,14.2 Z M4.4,12 L5.2,12 L5.2,14.2 L4.4,14.2 Z M6,12 L6.8,12 L6.8,14.2 L6,14.2 Z M7.6,12 L9.6,12 L9.6,14.2 L7.6,14.2 Z M10.4,12 L11.2,12 L11.2,14.2 L10.4,14.2 Z M12,12 L14,12 L14,14.2 L12,14.2 Z" />
-                </Button>
-                <Button Classes="tool" Classes.armed="{Binding IsImageArmed}"
-                        Click="OnAddImage" ToolTip.Tip="Add image (PNG, JPEG, BMP)">
-                    <PathIcon Data="M2,3 L14,3 L14,13 L2,13 Z M3.4,4.4 L12.6,4.4 L12.6,11.6 L3.4,11.6 Z M4.8,5.6 L6.8,5.6 L6.8,7.6 L4.8,7.6 Z M4.2,11 L7.6,7.4 L9.4,9.6 L10.9,7.9 L12,11 Z" />
-                </Button>
-
-                <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="2,5" />
-
-                <Button Classes="tool" Command="{Binding AlignLeftCommand}"
-                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align left ({0})'}">
-                    <PathIcon Data="M2,2 L3.6,2 L3.6,14 L2,14 Z M5.2,3.6 L14,3.6 L14,6.4 L5.2,6.4 Z M5.2,9.6 L10.5,9.6 L10.5,12.4 L5.2,12.4 Z" />
-                </Button>
-                <Button Classes="tool" Command="{Binding AlignCenterHorizontalCommand}"
-                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align horizontal centers ({0})'}">
-                    <PathIcon Data="F1 M7.2,2 L8.8,2 L8.8,14 L7.2,14 Z M3,3.6 L13,3.6 L13,6.4 L3,6.4 Z M5,9.6 L11,9.6 L11,12.4 L5,12.4 Z" />
-                </Button>
-                <Button Classes="tool" Command="{Binding AlignRightCommand}"
-                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align right ({0})'}">
-                    <PathIcon Data="M12.4,2 L14,2 L14,14 L12.4,14 Z M2,3.6 L10.8,3.6 L10.8,6.4 L2,6.4 Z M5.5,9.6 L10.8,9.6 L10.8,12.4 L5.5,12.4 Z" />
-                </Button>
-                <Button Classes="tool" Command="{Binding AlignTopCommand}"
-                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align top ({0})'}">
-                    <PathIcon Data="M2,2 L14,2 L14,3.6 L2,3.6 Z M3.6,5.2 L6.4,5.2 L6.4,14 L3.6,14 Z M9.6,5.2 L12.4,5.2 L12.4,10.5 L9.6,10.5 Z" />
-                </Button>
-                <Button Classes="tool" Command="{Binding AlignMiddleCommand}"
-                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align vertical centers ({0})'}">
-                    <PathIcon Data="F1 M2,7.2 L14,7.2 L14,8.8 L2,8.8 Z M3.6,3 L6.4,3 L6.4,13 L3.6,13 Z M9.6,5 L12.4,5 L12.4,11 L9.6,11 Z" />
-                </Button>
-                <Button Classes="tool" Command="{Binding AlignBottomCommand}"
-                        ToolTip.Tip="{Binding AlignTargetName, StringFormat='Align bottom ({0})'}">
-                    <PathIcon Data="M2,12.4 L14,12.4 L14,14 L2,14 Z M3.6,2 L6.4,2 L6.4,10.8 L3.6,10.8 Z M9.6,5.5 L12.4,5.5 L12.4,10.8 L9.6,10.8 Z" />
-                </Button>
-
-                <Rectangle Height="1" Fill="{DynamicResource AppSeparator}" Margin="2,5" />
-
-                <Button Classes="tool" Command="{Binding DistributeHorizontalCommand}"
-                        ToolTip.Tip="Distribute horizontally (needs 3+ elements)">
-                    <PathIcon Data="M2,2 L3.6,2 L3.6,14 L2,14 Z M12.4,2 L14,2 L14,14 L12.4,14 Z M6.6,4.5 L9.4,4.5 L9.4,11.5 L6.6,11.5 Z" />
-                </Button>
-                <Button Classes="tool" Command="{Binding DistributeVerticalCommand}"
-                        ToolTip.Tip="Distribute vertically (needs 3+ elements)">
-                    <PathIcon Data="M2,2 L14,2 L14,3.6 L2,3.6 Z M2,12.4 L14,12.4 L14,14 L2,14 Z M4.5,6.6 L11.5,6.6 L11.5,9.4 L4.5,9.4 Z" />
-                </Button>
-            </StackPanel>
+            </Grid>
         </Border>
-
-        <!-- Canvas with mm rulers (drawn by the control) and scrollbars -->
-        <Grid Name="CanvasRegion" RowDefinitions="*,Auto" ColumnDefinitions="*,Auto">
-            <controls:DesignerCanvas Name="Canvas"
-                                     Underlay="{Binding Underlay}"
-                                     UnderlayMarginDots="{Binding UnderlayMarginDots}"
-                                     CanvasRevision="{Binding CanvasRevision}"
-                                     Document="{Binding Document}"
-                                     Selection="{Binding Selection}"
-                                     IsPlacing="{Binding IsPlacing}"
-                                     SnapToGuides="{Binding SnapToGuides}"
-                                     SnapToGrid="{Binding SnapToGrid}"
-                                     SnapToObjects="{Binding SnapToObjects}" />
-            <ScrollBar Name="CanvasVScroll" Grid.Column="1" Orientation="Vertical"
-                       AllowAutoHide="False" Visibility="Visible" />
-            <ScrollBar Name="CanvasHScroll" Grid.Row="1" Orientation="Horizontal"
-                       AllowAutoHide="False" Visibility="Visible" />
-
-            <!-- Pointer and selection coordinates, floating over the opposite corner
-                 from the zoom control. Not in the toolbar above: that one is already
-                 full, and numbers that change width on every pointer move would shuffle
-                 whatever sat beside them. -->
-            <Border Grid.Row="0" Grid.Column="0" IsHitTestVisible="False"
-                    HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="12,0,0,12"
-                    IsVisible="{Binding CanvasReadout, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                    Background="{DynamicResource AppPanelBackground}"
-                    BorderBrush="{DynamicResource AppSeparator}" BorderThickness="1"
-                    CornerRadius="4" Padding="8,3">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBlock Text="{Binding CanvasReadout}" FontSize="12" Opacity="0.75" />
-                    <TextBlock Text="{Binding SnapSummary}" FontSize="12" Opacity="0.55" />
-                </StackPanel>
-            </Border>
-
-            <!-- Floating zoom control over the canvas corner -->
-            <Border Grid.Row="0" Grid.Column="0"
-                    HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,12,12"
-                    Background="{DynamicResource AppPanelBackground}"
-                    BorderBrush="{DynamicResource AppSeparator}" BorderThickness="1"
-                    CornerRadius="4" Padding="2">
-                <StackPanel Orientation="Horizontal" Spacing="2">
-                    <Button Name="ZoomOutButton" Content="-" Padding="8,2" FontSize="12"
-                            ToolTip.Tip="Zoom out (Ctrl+wheel)" />
-                    <Button Name="ZoomLevelButton" Content="100%" MinWidth="58" Padding="6,2"
-                            FontSize="12" HorizontalContentAlignment="Center"
-                            ToolTip.Tip="Zoom presets; 100% = 1 dot per pixel">
-                        <Button.Flyout>
-                            <MenuFlyout Placement="Top">
-                                <MenuItem Header="50%" Click="OnZoom50" />
-                                <MenuItem Header="100%" Click="OnZoom100" />
-                                <MenuItem Header="200%" Click="OnZoom200" />
-                                <MenuItem Header="Fit label" Click="OnZoomFit" InputGesture="Ctrl+0" />
-                            </MenuFlyout>
-                        </Button.Flyout>
-                    </Button>
-                    <Button Name="ZoomInButton" Content="+" Padding="8,2" FontSize="12"
-                            ToolTip.Tip="Zoom in (Ctrl+wheel)" />
-                </StackPanel>
-            </Border>
         </Grid>
-
-    </DockPanel>
-
+    </Grid>
 </UserControl>

@@ -27,6 +27,24 @@ internal static class UiLayoutChecks
             {
                 window.Width = size.Item1;
                 window.Height = size.Item2;
+                Pump(100);
+                if (!baseline)
+                {
+                    view.FindControl<Button>("LabelSetupButton")!.RaiseEvent(
+                        new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                    Pump(100);
+                    var setupWindow = window.OwnedWindows.OfType<LabelSetupWindow>().Single();
+                    Check("setup uses the active document", ReferenceEquals(setupWindow.DataContext, d));
+                    Check("setup fits its owner", setupWindow.Width <= window.Width && setupWindow.Height <= window.Height);
+                    var width = setupWindow.FindControl<NumericUpDown>("LabelWidthInput")!;
+                    width.Value = 110;
+                    Pump(60);
+                    Check("setup width edits the document", d.WidthMm == 110);
+                    Check("media picker remains available", setupWindow.FindControl<AutoCompleteBox>("MediaBox") is not null);
+                    using var setupFrame = setupWindow.CaptureRenderedFrame();
+                    setupFrame?.Save(Path.Combine(output, $"{theme}-{size.Item1}x{size.Item2}-setup.png"), PngBitmapEncoderOptions.Default);
+                    setupWindow.Close();
+                }
                 foreach (string scene in new[] { "blank", "text", "barcode", "data" })
                 {
                     d.NewDocumentCommand.Execute(null);

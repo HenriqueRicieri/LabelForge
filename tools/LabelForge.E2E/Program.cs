@@ -714,12 +714,17 @@ if (mode == "designer")
     d.NewMediaName = "Etiqueta Filial";
     d.NewMediaMaterial = "Couche";
     d.SaveUserMediaCommand.Execute(null);
-    var myMediaButton = window.GetVisualDescendants().OfType<Button>()
+    var setupButton = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "LabelSetupButton");
+    setupButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+    Pump(200);
+    var setupWindow = window.OwnedWindows.OfType<LabelSetupWindow>().Single();
+    var myMediaButton = setupWindow.GetVisualDescendants().OfType<Button>()
         .First(b => b.Content as string == "My media...");
     myMediaButton.Flyout?.ShowAt(myMediaButton);
     Pump(500);
-    Capture("designer-my-media.png");
+    Capture("designer-my-media.png", setupWindow);
     myMediaButton.Flyout?.Hide();
+    setupWindow.Close();
     d.UserMedia[0].RemoveCommand.Execute(null);
     Pump(200);
 
