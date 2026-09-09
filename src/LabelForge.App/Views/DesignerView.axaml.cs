@@ -51,6 +51,11 @@ public partial class DesignerView : UserControl
         Canvas.DrawCancelled += (_, _) => ViewModel?.CancelDraw();
         Canvas.CancelRequested += (_, _) => ViewModel?.CancelInsert();
 
+        DragDrop.SetAllowDrop(Canvas, true);
+        DragDrop.AddDragEnterHandler(Canvas, OnImageDragOver);
+        DragDrop.AddDragOverHandler(Canvas, OnImageDragOver);
+        DragDrop.AddDropHandler(Canvas, OnImageDrop);
+
         Canvas.ViewChanged += (_, _) => SyncScrollBars();
         CanvasHScroll.ValueChanged += (_, _) => OnScrollBarChanged();
         CanvasVScroll.ValueChanged += (_, _) => OnScrollBarChanged();
@@ -372,9 +377,57 @@ public partial class DesignerView : UserControl
             return;
         }
 
+        await LoadImageAsync(vm, path);
+    }
+
+    private void OnImageDragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = TryGetImageDrop(e) is not null ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void OnImageDrop(object? sender, DragEventArgs e)
+    {
+        var drop = TryGetImageDrop(e);
+        e.DragEffects = drop is not null ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+        if (drop is { } image && ViewModel is { } vm)
+        {
+            await LoadImageAsync(vm, image.Path, image.Position);
+        }
+    }
+
+    private (string Path, Point Position)? TryGetImageDrop(DragEventArgs e)
+    {
+        if ((e.DragEffects & DragDropEffects.Copy) == 0 ||
+            Canvas.ViewToLabel(e.GetPosition(Canvas)) is not { } position)
+        {
+            return null;
+        }
+
+        var files = e.DataTransfer.TryGetFiles()?.Take(2).ToArray();
+        if (files is not [IStorageFile file] || file.TryGetLocalPath() is not { } path)
+        {
+            return null;
+        }
+
+        return System.IO.Path.GetExtension(path).ToLowerInvariant() is
+            ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".webp"
+            ? (path, position)
+            : null;
+    }
+
+    private async Task LoadImageAsync(DesignerViewModel vm, string path, Point? position = null)
+    {
+        var document = vm.Document;
         try
         {
             byte[] data = await File.ReadAllBytesAsync(path);
+            if (ViewModel != vm || vm.Document != document)
+            {
+                return;
+            }
+
             if (Core.Imaging.ImageRasterizer.Probe(data) is not { } size)
             {
                 vm.StatusText = $"Could not read {Path.GetFileName(path)} as an image";
@@ -382,10 +435,18 @@ public partial class DesignerView : UserControl
             }
 
             vm.ArmInsertImage(data, size.Width, size.Height);
+            if (position is { } point)
+            {
+                vm.PlaceAt((int)Math.Round(point.X), (int)Math.Round(point.Y));
+                Canvas.Focus();
+            }
         }
         catch (Exception ex)
         {
-            vm.StatusText = $"Could not read the image: {ex.Message}";
+            if (ViewModel == vm && vm.Document == document)
+            {
+                vm.StatusText = $"Could not read the image: {ex.Message}";
+            }
         }
     }
 

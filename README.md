@@ -137,7 +137,8 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   (threshold for logos, ordered, Floyd-Steinberg for photos) and embedded in the label as an
   inline `^GF` graphic field, so the saved file and the exported ZPL are self-contained. Place the
   same image twice and it is downloaded once as `~DG` and recalled with `^XG` instead of repeating
-  the payload; a single placement stays inline and leaves the printer's memory alone.
+  the payload; a single placement stays inline and leaves the printer's memory alone. Drop one
+  image file from Explorer onto the label to place it at that point, with one undo step.
 - A ZPL file holding several labels stays open: a strip names the file and lists its
   labels with how much each one holds, so the bare printer-configuration block real files
   start with is visible as empty and the one you want is a click away. Files in the sample

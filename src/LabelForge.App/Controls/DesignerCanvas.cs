@@ -602,6 +602,21 @@ public sealed class DesignerCanvas : Control
         return new Point(origin.X + x * scale, origin.Y + y * scale);
     }
 
+    public Point? ViewToLabel(Point position)
+    {
+        if (Document is not { } doc || position.X < RulerSize || position.Y < RulerSize ||
+            !new Rect(Bounds.Size).Contains(position))
+        {
+            return null;
+        }
+
+        var (scale, origin) = GetTransform();
+        var dots = new Point((position.X - origin.X) / scale, (position.Y - origin.Y) / scale);
+        return dots.X >= 0 && dots.Y >= 0 && dots.X < doc.WidthDots && dots.Y < doc.HeightDots
+            ? dots
+            : null;
+    }
+
     /// <summary>Extent, viewport, and offset of one scroll axis, in screen pixels.
     /// The extent is the label plus the pasteboard margin on both sides.</summary>
     public readonly record struct ScrollAxisInfo(double Extent, double Viewport, double Offset);

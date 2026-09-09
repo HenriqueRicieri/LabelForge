@@ -2864,6 +2864,119 @@ if (mode == "designer")
         Check("undo restores all three group members", d.Document.Elements.Count(e => e.GroupId == groupId), 3);
     }
 
+    {
+        string dropPath = Path.Combine(AppContext.BaseDirectory, "e2e-drop.PNG");
+        using (var bitmap = new SkiaSharp.SKBitmap(80, 40))
+        {
+            bitmap.Erase(SkiaSharp.SKColors.Black);
+            using var png = bitmap.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+            File.WriteAllBytes(dropPath, png.ToArray());
+        }
+
+        Avalonia.Platform.Storage.IStorageFile DropFile(string path) =>
+            window.StorageProvider.TryGetFileFromPathAsync(new Uri(path)).GetAwaiter().GetResult()
+            ?? throw new InvalidOperationException($"Storage provider could not open {path}");
+
+        using var imageTransfer = new DataTransfer();
+        imageTransfer.Add(DataTransferItem.CreateFile(DropFile(dropPath)));
+
+        DragEventArgs SendDropEvent(Avalonia.Interactivity.RoutedEvent<DragEventArgs> routedEvent,
+            IDataTransfer transfer, Point at, DragDropEffects effects = DragDropEffects.Copy)
+        {
+            var e = new DragEventArgs(routedEvent, transfer, canvas, at, KeyModifiers.None)
+            {
+                DragEffects = effects,
+            };
+            canvas.RaiseEvent(e);
+            return e;
+        }
+
+        Check("image drop enabled on the canvas", DragDrop.GetAllowDrop(canvas), true);
+        foreach (int dpmm in new[] { 8, 12, 24 })
+        {
+            d.NewDocumentCommand.Execute(null);
+            d.Document.Dpmm = dpmm;
+            d.NotifyDocumentEdited();
+            Pump(400);
+            canvas.SetZoom(2);
+            canvas.SetScrollOffsets(dpmm * 40 + 100, dpmm * 40 + 80);
+            Pump(200);
+            var at = canvas.DotsToView(100, 100);
+            var hover = SendDropEvent(DragDrop.DragOverEvent, imageTransfer, at);
+            Check($"image hover at {dpmm} dpmm offers Copy", hover.DragEffects, DragDropEffects.Copy);
+            var drop = SendDropEvent(DragDrop.DropEvent, imageTransfer, at);
+            Pump(900);
+            var image = d.Document.Elements.OfType<LabelForge.Core.Model.ImageElement>().SingleOrDefault();
+            Check($"image drop at {dpmm} dpmm is handled", drop.Handled, true);
+            Check($"image drop at {dpmm} dpmm follows zoom and pan", $"{image?.X},{image?.Y}", "100,100");
+            Check($"image drop at {dpmm} dpmm uses the insert size",
+                $"{image?.WidthDots},{image?.HeightDots},{image?.SourcePixelWidth},{image?.SourcePixelHeight}",
+                "240,120,80,40");
+            Check($"image drop at {dpmm} dpmm preserves the source",
+                image?.ImageData.SequenceEqual(File.ReadAllBytes(dropPath)), true);
+            Check($"image drop at {dpmm} dpmm selects the image and ends placement",
+                image is not null && d.SelectedElement == image && !d.IsPlacing, true);
+            Check($"image drop at {dpmm} dpmm reaches the ZPL", d.GeneratedZpl.Contains("^GF"), true);
+            d.UndoCommand.Execute(null);
+            Pump(300);
+            Check($"one undo removes the image at {dpmm} dpmm", d.Document.Elements.Count, 0);
+            d.RedoCommand.Execute(null);
+            Pump(500);
+            image = d.Document.Elements.OfType<LabelForge.Core.Model.ImageElement>().SingleOrDefault();
+            Check($"redo restores the image at {dpmm} dpmm", $"{image?.X},{image?.Y}", "100,100");
+        }
+        Capture("designer-image-drop.png");
+
+        d.NewDocumentCommand.Execute(null);
+        Pump(300);
+        canvas.ResetView();
+        Pump(200);
+        var dropPoint = canvas.DotsToView(100, 100);
+        foreach (var extension in new[] { ".zpl", ".lfl", ".txt" })
+        {
+            File.WriteAllText(Path.ChangeExtension(dropPath, extension), "Not an image");
+            using var transfer = new DataTransfer();
+            transfer.Add(DataTransferItem.CreateFile(DropFile(Path.ChangeExtension(dropPath, extension))));
+            Check($"image drop refuses {extension}", SendDropEvent(DragDrop.DropEvent, transfer, dropPoint).DragEffects,
+                DragDropEffects.None);
+        }
+
+        using var multiple = new DataTransfer();
+        multiple.Add(DataTransferItem.CreateFile(DropFile(dropPath)));
+        multiple.Add(DataTransferItem.CreateFile(DropFile(dropPath)));
+        Check("image drop refuses multiple files",
+            SendDropEvent(DragDrop.DropEvent, multiple, dropPoint).DragEffects, DragDropEffects.None);
+        Check("image drop refuses move-only transfers",
+            SendDropEvent(DragDrop.DropEvent, imageTransfer, dropPoint, DragDropEffects.Move).DragEffects,
+            DragDropEffects.None);
+        Check("image drop refuses the ruler",
+            SendDropEvent(DragDrop.DropEvent, imageTransfer, new Point(100, 13)).DragEffects, DragDropEffects.None);
+        Check("image drop refuses the pasteboard",
+            SendDropEvent(DragDrop.DropEvent, imageTransfer, canvas.DotsToView(-5, 100)).DragEffects, DragDropEffects.None);
+        Pump(300);
+        Check("rejected drops leave the document unchanged", d.Document.Elements.Count, 0);
+
+        string brokenPath = Path.Combine(AppContext.BaseDirectory, "e2e-broken-image.png");
+        File.WriteAllText(brokenPath, "This is not a PNG");
+        using var broken = new DataTransfer();
+        broken.Add(DataTransferItem.CreateFile(DropFile(brokenPath)));
+        d.AddTextCommand.Execute(null);
+        SendDropEvent(DragDrop.DropEvent, broken, dropPoint);
+        Pump(500);
+        Check("invalid image reports a read failure", d.StatusText.Contains("Could not read"), true);
+        Check("invalid image preserves the armed tool", d.ArmedTool, "Text");
+        Check("invalid image inserts nothing", d.Document.Elements.Count, 0);
+
+        File.Delete(brokenPath);
+        SendDropEvent(DragDrop.DropEvent, broken, dropPoint);
+        Pump(500);
+        Check("missing image reports a read failure", d.StatusText.Contains("Could not read the image:"), true);
+        Check("missing image inserts nothing", d.Document.Elements.Count, 0);
+        Check("failed image drops add no undo step", d.CanUndo, false);
+        d.CancelInsert();
+    }
+
+
     // Crash recovery: the snapshot follows the edits, a real save clears it because the
     // work is safe elsewhere, and a snapshot left by a dead session is offered on start.
     d.NewDocumentCommand.Execute(null);
