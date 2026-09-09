@@ -10,8 +10,6 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Spacing="8" Margin="0,0,12,0">
                 <TextBlock Text="Media" FontSize="18" FontWeight="SemiBold" />
-                <TextBlock Text="Media" VerticalAlignment="Center"
-                           ToolTip.Tip="Set the label size from a Zebra part number or one of your own saved media" />
                 <AutoCompleteBox x:Name="MediaBox" HorizontalAlignment="Stretch"
                                  PlaceholderText="Part number or my media"
                                  ItemsSource="{Binding MediaCatalog}"

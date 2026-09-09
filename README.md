@@ -12,11 +12,17 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 
 ## What works today
 
-- Visual designer: an icon tool bar with click-to-place or drag-to-draw elements, drag,
+- The designer has a scrollable creation rail and a resizable inspector with Properties,
+  Elements and Data tabs. Arrange holds alignment, distribution, sizing and grouping.
+  Hide the inspector for more canvas space; narrow windows open it over the canvas.
+  Label setup holds media, dimensions, stock layout and printer settings in a scrollable
+  dialog. Changes apply as you edit. Generated ZPL and diagnostic details have their own
+  bounded areas, and double-clicking an element reveals its content editor.
+- Visual designer: click-to-place or drag-to-draw elements, drag,
   eight-handle resize, rotation snapping to each field's supported orientations, marquee selection,
-  copy/paste/duplicate, z-order, arrow-key nudge, and zoom/pan with scrollbars and a floating zoom
-  control (50/100/200% presets, fit; 100% shows real printer dots). Ctrl and the plus or minus key
-  zoom about the middle of the view, which is the half the wheel does not do, and holding Space
+  copy/paste/duplicate, z-order, arrow-key nudge, and zoom/pan with scrollbars and a zoom
+  control below the canvas (50/100/200% presets, fit; 100% shows real printer dots).
+  Ctrl and the plus or minus key zoom about the middle of the view, which is the half the wheel does not do, and holding Space
   and dragging pans for a mouse with no middle button.
 - Draw from one corner to the other in any direction. A click places the default size;
   dragging sizes the element, with Shift constraining shapes and image aspect, and Alt
@@ -44,7 +50,7 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   the element keeps following it: the pointer is standing still and the label is moving underneath.
   A rotation deliberately does not do this, since turning something does not take it anywhere.
 - The canvas says what is under the pointer before you commit to it: a thin outline on whatever a
-  click would take, and in the corner opposite the zoom control, the pointer position in
+  click would take, and below the canvas beside the zoom control, the pointer position in
   millimeters and dots beside the drawn width and height of the selection. Those are the bounds the
   canvas outlines, which is the only answer defined for every element type, so they can read
   differently from the properties panel's X and Y for a barcode that prints digits outside its bars

@@ -513,14 +513,19 @@
         </Border>
 
         <Border Name="LabelSetupBar" Grid.Row="3" Padding="12,6" Background="{DynamicResource AppToolbarBackground}">
-            <Grid ColumnDefinitions="*,Auto">
+            <Grid ColumnDefinitions="*,Auto,Auto">
                 <TextBlock Text="{Binding SetupSummary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                            ToolTip.Tip="{Binding SetupSummary}" />
                 <Button Name="LabelSetupButton" Grid.Column="1" Content="Label setup..." Click="OnOpenLabelSetup" />
+                <Button Name="ShowInspectorButton" Grid.Column="2" Content="Inspector" Margin="8,0,0,0"
+                        Click="OnToggleInspector" ToolTip.Tip="Show or hide the inspector" />
             </Grid>
         </Border>
-        <Grid Name="WorkspaceGrid" Grid.Row="4" ColumnDefinitions="Auto,*,Auto">
-        <!-- Tool bar: insert tools, then alignment, as square icon buttons -->
+        <Grid Name="WorkspaceGrid" Grid.Row="4" ColumnDefinitions="64,*,4,320">
+            <GridSplitter Name="InspectorSplitter" Grid.Column="2" Width="4" HorizontalAlignment="Stretch"
+                          ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"
+                          Background="{DynamicResource AppSeparator}" />
+        <!-- Creation tools -->
         <Border Name="CreationRail" Grid.Column="0" Background="{DynamicResource AppToolbarBackground}" Width="64" Padding="4,10">
             <ScrollViewer Name="CreationScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Spacing="4" HorizontalAlignment="Center">
@@ -569,7 +574,7 @@
         </Border>
 
         <!-- Canvas with mm rulers (drawn by the control) and scrollbars -->
-        <Grid Grid.Column="1" Name="CanvasRegion" RowDefinitions="*,Auto" ColumnDefinitions="*,Auto">
+        <Grid Grid.Column="1" Name="CanvasRegion" RowDefinitions="*,Auto,Auto" ColumnDefinitions="*,Auto">
             <controls:DesignerCanvas Name="Canvas"
                                      Underlay="{Binding Underlay}"
                                      UnderlayMarginDots="{Binding UnderlayMarginDots}"
@@ -585,25 +590,21 @@
             <ScrollBar Name="CanvasHScroll" Grid.Row="1" Orientation="Horizontal"
                        AllowAutoHide="False" Visibility="Visible" />
 
-            <!-- Pointer and selection coordinates, floating over the opposite corner
-                 from the zoom control. Not in the toolbar above: that one is already
-                 full, and numbers that change width on every pointer move would shuffle
-                 whatever sat beside them. -->
-            <Border Grid.Row="0" Grid.Column="0" IsHitTestVisible="False"
-                    HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="12,0,0,12"
+            <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="4">
+            <Border Grid.Column="0" IsHitTestVisible="False"
+                    HorizontalAlignment="Stretch" Margin="0"
                     IsVisible="{Binding CanvasReadout, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                     Background="{DynamicResource AppPanelBackground}"
                     BorderBrush="{DynamicResource AppSeparator}" BorderThickness="1"
                     CornerRadius="4" Padding="8,3">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBlock Text="{Binding CanvasReadout}" FontSize="12" Opacity="0.75" />
-                    <TextBlock Text="{Binding SnapSummary}" FontSize="12" Opacity="0.55" />
+                <StackPanel Spacing="0">
+                    <TextBlock Text="{Binding CanvasReadout}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CanvasReadout}" FontSize="12" Opacity="0.75" />
+                    <TextBlock Text="{Binding SnapSummary}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SnapSummary}" FontSize="12" Opacity="0.55" />
                 </StackPanel>
             </Border>
 
-            <!-- Floating zoom control over the canvas corner -->
-            <Border Grid.Row="0" Grid.Column="0"
-                    HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,12,12"
+            <Border Grid.Column="1"
+                    HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6,0,0,0"
                     Background="{DynamicResource AppPanelBackground}"
                     BorderBrush="{DynamicResource AppSeparator}" BorderThickness="1"
                     CornerRadius="4" Padding="2">
@@ -626,9 +627,10 @@
                             ToolTip.Tip="Zoom in (Ctrl+wheel)" />
                 </StackPanel>
             </Border>
+            </Grid>
         </Grid>
 
-        <Border Name="InspectorPanel" Grid.Column="2" Width="320" Background="{DynamicResource AppPanelBackground}"
+        <Border Name="InspectorPanel" Grid.Column="3" Background="{DynamicResource AppPanelBackground}"
                 BorderBrush="{DynamicResource AppSeparator}" BorderThickness="1,0,0,0">
             <Grid RowDefinitions="Auto,*">
                 <Grid ColumnDefinitions="*,Auto" Margin="12,8">
@@ -662,6 +664,7 @@
                                 <MenuItem Header="Send to back" Command="{Binding SendToBackCommand}" />
                             </MenuFlyout></Button.Flyout>
                         </Button>
+                        <Button Name="HideInspectorButton" Content="Hide" Padding="8,4" Click="OnHideInspector" ToolTip.Tip="Hide inspector" />
                     </StackPanel>
                 </Grid>
                 <TabControl Name="InspectorTabs" Grid.Row="1" Padding="0">
@@ -852,7 +855,7 @@
 
                                         <StackPanel IsVisible="{Binding IsCounter}" Spacing="2">
                                             <TextBlock Classes="propLabel" Text="Start" />
-                                            <NumericUpDown Value="{Binding CounterStart}"
+                                            <NumericUpDown Name="CounterStartInput" Value="{Binding CounterStart}"
                                                            Minimum="0" Maximum="999999999999"
                                                            Increment="1" FormatString="0" />
                                             <TextBlock Classes="propLabel" Text="Step (negative counts down)" />
@@ -874,7 +877,7 @@
                                                       SelectedItem="{Binding SelectedClockPreset}"
                                                       PlaceholderText="Pick a format"
                                                       HorizontalAlignment="Stretch" />
-                                            <TextBox Text="{Binding ClockFormat}"
+                                            <TextBox Name="ClockFormatInput" Text="{Binding ClockFormat}"
                                                      PlaceholderText="dd/MM/yyyy"
                                                      ToolTip.Tip="Date format: dd, MM, yyyy, yy, HH, mm, ss" />
                                             <CheckBox Content="Use the printer's clock (^FC)" FontSize="12"
@@ -906,7 +909,7 @@
         </Grid>
         <Grid Grid.Row="5" RowDefinitions="Auto,Auto">
         <!-- Generated ZPL -->
-        <Expander Name="ZplPanel" Grid.Row="0" Header="Generated ZPL" IsExpanded="False">
+        <Expander Name="ZplPanel" Grid.Row="0" HorizontalAlignment="Stretch" Header="Generated ZPL" IsExpanded="False">
             <TextBox Name="ZplText" Text="{Binding GeneratedZpl}" IsReadOnly="True"
                      FontFamily="Consolas,Menlo,Monospace" FontSize="12"
                      Height="140" TextWrapping="NoWrap" />

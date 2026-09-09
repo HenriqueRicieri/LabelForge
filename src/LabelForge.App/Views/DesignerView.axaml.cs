@@ -23,7 +23,7 @@ public partial class DesignerView : UserControl
     public DesignerView()
     {
         InitializeComponent();
-        SizeChanged += (_, _) => ZplText.Height = Math.Clamp(Bounds.Height * 0.22, 50, 140);
+        InitializeWorkspace();
 
         // The recent-files submenu is rebuilt in code: a handful of items, and it
         // sidesteps binding ancestor lookups inside menu popups.
@@ -506,6 +506,7 @@ public partial class DesignerView : UserControl
     /// </summary>
     private void FocusContentField()
     {
+        RevealInspector();
         InspectorTabs.SelectedIndex = 0;
         ContentSection.IsExpanded = true;
         Dispatcher.UIThread.Post(() =>

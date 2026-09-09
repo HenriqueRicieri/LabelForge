@@ -13,7 +13,7 @@
                    FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4" />
         <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Opacity="0.65" FontSize="12"
                    Margin="0,0,0,12"
-                   Text="Everything the designer answers to. The same actions are on the menus and on the right-click menus, so nothing here is the only way to reach anything." />
+                   Text="Use the left rail to create elements. The inspector has Properties, Elements and Data tabs, with alignment and grouping under Arrange. Double-click an element to open its content editor. Label setup holds media, dimensions and printer settings." />
 
         <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right"
                 Margin="0,12,0,0" Click="OnClose" IsCancel="True" />
