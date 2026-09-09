@@ -1,11 +1,14 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace LabelForge.App.ViewModels;
 
 public partial class DesignerViewModel
 {
+    [ObservableProperty] private bool _showElementOutlines;
+
     public string SetupSummary =>
         $"{Document.WidthMm:0.##} x {Document.HeightMm:0.##} mm  |  {SelectedDensity}"
         + (Document.IsContinuous ? "  |  Continuous" : "")

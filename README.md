@@ -18,6 +18,8 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   Label setup holds media, dimensions, stock layout and printer settings in a scrollable
   dialog. Changes apply as you edit. Generated ZPL and diagnostic details have their own
   bounded areas, and double-clicking an element reveals its content editor.
+- View > Element outlines reveals the bounds of white, covered and locked elements.
+  Hidden elements stay hidden. This display option does not change the label or its ZPL.
 - Visual designer: click-to-place or drag-to-draw elements, drag,
   eight-handle resize, rotation snapping to each field's supported orientations, marquee selection,
   copy/paste/duplicate, z-order, arrow-key nudge, and zoom/pan with scrollbars and a zoom

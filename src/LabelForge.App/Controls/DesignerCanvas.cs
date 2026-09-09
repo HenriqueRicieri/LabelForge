@@ -33,6 +33,15 @@ public sealed class DesignerCanvas : Control
     public static readonly StyledProperty<SelectionSet?> SelectionProperty =
         AvaloniaProperty.Register<DesignerCanvas, SelectionSet?>(nameof(Selection));
 
+    public static readonly StyledProperty<bool> ShowElementOutlinesProperty =
+        AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(ShowElementOutlines));
+
+    public bool ShowElementOutlines
+    {
+        get => GetValue(ShowElementOutlinesProperty);
+        set => SetValue(ShowElementOutlinesProperty, value);
+    }
+
     public static readonly StyledProperty<bool> IsPlacingProperty =
         AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(IsPlacing));
 
@@ -71,7 +80,7 @@ public sealed class DesignerCanvas : Control
     {
         AffectsRender<DesignerCanvas>(
             UnderlayProperty, DocumentProperty, SelectionProperty, UnderlayMarginDotsProperty,
-            CanvasRevisionProperty);
+            CanvasRevisionProperty, ShowElementOutlinesProperty);
     }
 
     private enum ResizeHandle
@@ -98,6 +107,7 @@ public sealed class DesignerCanvas : Control
     private static readonly SolidColorBrush SurfaceBrush = new(Color.FromRgb(0xD9, 0xD9, 0xD9));
     private static readonly SolidColorBrush DarkSurfaceBrush = new(Color.FromRgb(0x3C, 0x3C, 0x3C));
     private static readonly Pen LabelBorderPen = new(Brushes.Gray, 1);
+    private static readonly Pen ElementOutlinePen = new(new SolidColorBrush(Color.FromRgb(0x8B, 0x5C, 0xF6)), 1);
     private static readonly SolidColorBrush AccentBrush = new(Color.FromRgb(0x25, 0x63, 0xEB));
     private static readonly Pen SelectionPen = new(new SolidColorBrush(Color.FromRgb(0x25, 0x63, 0xEB)), 1.5);
     private static readonly Pen GhostPen = new(
@@ -802,19 +812,23 @@ public sealed class DesignerCanvas : Control
             }
         }
 
-        // Dashed outline on anything that will not print exactly as drawn: amber when
-        // the layout caused it, grey when the user asked for it.
+        // Placement warnings keep their styling when the optional outlines are on.
         foreach (Element element in doc.Elements.Where(el => el.IsVisible))
         {
             DotRect b = _bounds.GetBounds(element);
             PlacementStatus status =
                 ElementPlacement.Classify(element, b, doc);
-            if (status == PlacementStatus.Inside)
+            if (status == PlacementStatus.Inside && !ShowElementOutlines)
             {
                 continue;
             }
 
-            Pen pen = status == PlacementStatus.Suppressed ? SuppressedPen : WarnPen;
+            Pen pen = status switch
+            {
+                PlacementStatus.Inside => ElementOutlinePen,
+                PlacementStatus.Suppressed => SuppressedPen,
+                _ => WarnPen,
+            };
             context.DrawRectangle(null, pen, new Rect(
                 origin.X + b.X * scale,
                 origin.Y + b.Y * scale,
