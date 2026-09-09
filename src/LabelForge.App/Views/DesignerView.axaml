@@ -382,6 +382,9 @@
                     <MenuItem Header="_View">
                         <MenuItem Header="Quiet zones" ToggleType="CheckBox" IsChecked="{Binding CheckQuietZones}" />
                         <MenuItem x:Name="GridMenu" Header="_Grid" />
+                        <MenuItem Name="PrinterDotGridMenu" Header="Printer dot grid (800%+)" ToggleType="CheckBox"
+                                  IsChecked="{Binding ShowPrinterDotGrid, Mode=TwoWay}"
+                                  ToolTip.Tip="Show the boundaries between printer dots at high zoom" />
                         <MenuItem Name="ElementOutlinesMenu" Header="Element outlines" ToggleType="CheckBox"
                                   IsChecked="{Binding ShowElementOutlines, Mode=TwoWay}"
                                   ToolTip.Tip="Show element bounds, including white and covered elements" />
@@ -583,6 +586,7 @@
                                      UnderlayMarginDots="{Binding UnderlayMarginDots}"
                                      CanvasRevision="{Binding CanvasRevision}"
                                      ShowElementOutlines="{Binding ShowElementOutlines}"
+                                     ShowPrinterDotGrid="{Binding ShowPrinterDotGrid}"
                                      Document="{Binding Document}"
                                      Selection="{Binding Selection}"
                                      IsPlacing="{Binding IsPlacing}"

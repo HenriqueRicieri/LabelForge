@@ -65,6 +65,8 @@ internal static class CanvasDisplayChecks
             var whiteEdge = canvas.TranslatePoint(canvas.DotsToView(80, 110), window)!.Value;
             check($"{theme}: disabling outlines restores the preview", !DifferentNear(before, restored, whiteEdge));
 
+            CheckDotGrid(window, designer, canvas, view, theme, check);
+
             bool ChangedAt(double x, double y) => DifferentNear(before, after,
                 canvas.TranslatePoint(canvas.DotsToView(x, y), window)!.Value);
         }
@@ -72,6 +74,65 @@ internal static class CanvasDisplayChecks
         designer.NewDocumentCommand.Execute(null);
         canvas.ResetView();
         Pump(200);
+    }
+
+    private static void CheckDotGrid(MainWindow window, DesignerViewModel designer, DesignerCanvas canvas,
+        DesignerView view, ThemeVariant theme, Action<string, bool> check)
+    {
+        var menu = view.FindControl<MenuItem>("PrinterDotGridMenu")!;
+        check($"{theme}: dot grid is enabled by default", canvas.ShowPrinterDotGrid && menu.IsChecked);
+        foreach (int density in new[] { 8, 12, 24 })
+        {
+            designer.NewDocumentCommand.Execute(null);
+            designer.Document.Dpmm = density;
+            designer.Document.Elements.Add(new TextElement
+            {
+                X = designer.Document.WidthDots / 2 - 40,
+                Y = designer.Document.HeightDots / 2 - 30,
+                Text = "Aa", FontHeightDots = 60,
+            });
+            designer.NotifyDocumentEdited();
+            Pump(500);
+            string document = designer.SerializeDocument();
+            string zpl = designer.GeneratedZpl;
+            bool undo = designer.CanUndo;
+            var underlay = designer.Underlay;
+            foreach (double scale in new[] { 7.99, 8, 12.5, 40 })
+            {
+                canvas.ResetView();
+                canvas.SetZoom(scale);
+                var scroll = canvas.GetScrollInfo();
+                canvas.SetScrollOffsets(scroll.Horizontal.Offset + 13.25, scroll.Vertical.Offset + 17.75);
+                menu.IsChecked = false;
+                Pump(100);
+                using var before = Capture(window);
+                menu.IsChecked = true;
+                Pump(100);
+                using var after = Capture(window);
+                Point middle = canvas.ViewToLabel(new Point(canvas.Bounds.Width / 2, canvas.Bounds.Height / 2))!.Value;
+                double x = Math.Floor(middle.X), y = Math.Floor(middle.Y);
+                string tag = $"{theme} {density} dpmm {scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}x";
+                check($"{tag}: vertical dot boundaries follow zoom and pan", ChangedAt(x, y + 0.5) == (scale >= 8));
+                check($"{tag}: horizontal dot boundaries follow zoom and pan", ChangedAt(x + 0.5, y) == (scale >= 8));
+                check($"{tag}: dot interiors keep their original pixels", !ChangedAt(x + 0.5, y + 0.5));
+                check($"{tag}: dot grid leaves rulers alone", !DifferentNear(before, after,
+                    canvas.TranslatePoint(new Point(13, 100), window)!.Value));
+                if (density == 8 && scale == 8)
+                {
+                    using var frame = window.CaptureRenderedFrame();
+                    frame!.Save(Path.Combine(AppContext.BaseDirectory, $"designer-dot-grid-{theme}.png"), PngBitmapEncoderOptions.Default);
+                }
+
+                bool ChangedAt(double dx, double dy) => DifferentNear(before, after,
+                    canvas.TranslatePoint(canvas.DotsToView(dx, dy), window)!.Value);
+            }
+            check($"{theme} {density} dpmm: dot grid preserves label and undo", designer.SerializeDocument() == document && designer.CanUndo == undo);
+            check($"{theme} {density} dpmm: dot grid preserves ZPL and underlay", designer.GeneratedZpl == zpl && ReferenceEquals(underlay, designer.Underlay));
+            menu.IsChecked = false;
+            Pump(100);
+            check($"{theme} {density} dpmm: View disables the dot grid", !canvas.ShowPrinterDotGrid);
+            menu.IsChecked = true;
+        }
     }
 
     private static SKBitmap Capture(Window window)

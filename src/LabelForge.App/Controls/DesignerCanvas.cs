@@ -42,6 +42,15 @@ public sealed class DesignerCanvas : Control
         set => SetValue(ShowElementOutlinesProperty, value);
     }
 
+    public static readonly StyledProperty<bool> ShowPrinterDotGridProperty =
+        AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(ShowPrinterDotGrid), defaultValue: true);
+
+    public bool ShowPrinterDotGrid
+    {
+        get => GetValue(ShowPrinterDotGridProperty);
+        set => SetValue(ShowPrinterDotGridProperty, value);
+    }
+
     public static readonly StyledProperty<bool> IsPlacingProperty =
         AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(IsPlacing));
 
@@ -80,7 +89,7 @@ public sealed class DesignerCanvas : Control
     {
         AffectsRender<DesignerCanvas>(
             UnderlayProperty, DocumentProperty, SelectionProperty, UnderlayMarginDotsProperty,
-            CanvasRevisionProperty, ShowElementOutlinesProperty);
+            CanvasRevisionProperty, ShowElementOutlinesProperty, ShowPrinterDotGridProperty);
     }
 
     private enum ResizeHandle
@@ -122,6 +131,8 @@ public sealed class DesignerCanvas : Control
     // different at a glance rather than as a slightly different shade of the same thing.
     private static readonly Pen SuppressedPen = new(
         new SolidColorBrush(Color.FromRgb(0x6B, 0x72, 0x80)), 1.5, new DashStyle([8, 4], 0));
+
+    private static readonly Pen PrinterDotGridPen = new(new SolidColorBrush(Color.FromArgb(0x50, 0x80, 0x80, 0x80)), 1);
 
     // The design grid: faint enough to read the label through, since it is scaffolding
     // and not content.
@@ -812,6 +823,8 @@ public sealed class DesignerCanvas : Control
             }
         }
 
+        DrawPrinterDotGrid(context, doc, scale, origin, labelRect);
+
         // Placement warnings keep their styling when the optional outlines are on.
         foreach (Element element in doc.Elements.Where(el => el.IsVisible))
         {
@@ -989,6 +1002,34 @@ public sealed class DesignerCanvas : Control
 
         DrawGuides(context, doc, scale, origin);
         DrawRulers(context, doc, scale, origin);
+    }
+
+    private void DrawPrinterDotGrid(DrawingContext context, LabelDocument doc, double scale, Point origin, Rect labelRect)
+    {
+        if (!ShowPrinterDotGrid || scale < 8) return;
+
+        // Enumerate only visible dots: a large label can extend far beyond the viewport.
+        Rect visible = labelRect.Intersect(new Rect(RulerSize, RulerSize,
+            Math.Max(0, Bounds.Width - RulerSize), Math.Max(0, Bounds.Height - RulerSize)));
+        if (visible.Width <= 0 || visible.Height <= 0) return;
+
+        int firstX = Math.Max(1, (int)Math.Ceiling((visible.Left - origin.X) / scale));
+        int lastX = Math.Min(doc.WidthDots - 1, (int)Math.Floor((visible.Right - origin.X) / scale));
+        int firstY = Math.Max(1, (int)Math.Ceiling((visible.Top - origin.Y) / scale));
+        int lastY = Math.Min(doc.HeightDots - 1, (int)Math.Floor((visible.Bottom - origin.Y) / scale));
+        using (context.PushClip(visible))
+        {
+            for (int x = firstX; x <= lastX; x++)
+            {
+                double px = Math.Round(origin.X + x * scale) + 0.5;
+                context.DrawLine(PrinterDotGridPen, new Point(px, visible.Top), new Point(px, visible.Bottom));
+            }
+            for (int y = firstY; y <= lastY; y++)
+            {
+                double py = Math.Round(origin.Y + y * scale) + 0.5;
+                context.DrawLine(PrinterDotGridPen, new Point(visible.Left, py), new Point(visible.Right, py));
+            }
+        }
     }
 
     /// <summary>Permanent guides, the snap highlight, and the transient ruler-press

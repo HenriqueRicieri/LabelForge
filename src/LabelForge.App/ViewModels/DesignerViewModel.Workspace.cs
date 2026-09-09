@@ -8,6 +8,7 @@ namespace LabelForge.App.ViewModels;
 public partial class DesignerViewModel
 {
     [ObservableProperty] private bool _showElementOutlines;
+    [ObservableProperty] private bool _showPrinterDotGrid = true;
 
     public string SetupSummary =>
         $"{Document.WidthMm:0.##} x {Document.HeightMm:0.##} mm  |  {SelectedDensity}"
