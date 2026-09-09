@@ -50,10 +50,14 @@ if (args.Contains("dark"))
 // Media presets, field catalogs and crash snapshots all live per machine. Point every
 // one of them at scratch locations, so a harness run never touches what the person using
 // the app has saved.
-string presetsPath = Path.Combine(AppContext.BaseDirectory, "e2e-user-media.json");
-string catalogsPath = Path.Combine(AppContext.BaseDirectory, "e2e-field-catalogs.json");
-string recoveryDir = Path.Combine(AppContext.BaseDirectory, "e2e-recovery");
-string settingsPath = Path.Combine(AppContext.BaseDirectory, "e2e-user-settings.json");
+string scratchRoot = args.FirstOrDefault() == "ui-layout"
+    ? Path.Combine(AppContext.BaseDirectory, "ui-layout-scratch")
+    : AppContext.BaseDirectory;
+Directory.CreateDirectory(scratchRoot);
+string presetsPath = Path.Combine(scratchRoot, "e2e-user-media.json");
+string catalogsPath = Path.Combine(scratchRoot, "e2e-field-catalogs.json");
+string recoveryDir = Path.Combine(scratchRoot, "e2e-recovery");
+string settingsPath = Path.Combine(scratchRoot, "e2e-user-settings.json");
 File.Delete(presetsPath);
 File.Delete(catalogsPath);
 File.Delete(settingsPath);
@@ -75,6 +79,11 @@ var vm = new MainViewModel(
     new LabelForge.Core.Settings.UserSettingsStore(settingsPath));
 var window = new MainWindow { DataContext = vm };
 window.Show();
+
+if (args.FirstOrDefault() == "ui-layout")
+{
+    return UiLayoutChecks.Run(window, vm, args.Contains("baseline"));
+}
 
 // The grade. Declared before either mode's block, because the helpers that raise it close
 // over these two and a captured local has to be assigned at every place it is called from.

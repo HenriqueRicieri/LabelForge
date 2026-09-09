@@ -510,7 +510,7 @@
         </Border>
 
         <!-- Label setup -->
-        <Border DockPanel.Dock="Top" Padding="10,8" Background="{DynamicResource AppToolbarBackground}">
+        <Border Name="LabelSetupBar" DockPanel.Dock="Top" Padding="10,8" Background="{DynamicResource AppToolbarBackground}">
             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <TextBlock Text="Width (mm)" VerticalAlignment="Center" />
                 <NumericUpDown Value="{Binding WidthMm}" Minimum="5" Maximum="600"
@@ -625,7 +625,7 @@
         </Border>
 
         <!-- Properties panel -->
-        <Border DockPanel.Dock="Right" Width="260" Background="{DynamicResource AppPanelBackground}" Padding="12">
+        <Border Name="InspectorPanel" DockPanel.Dock="Right" Width="260" Background="{DynamicResource AppPanelBackground}" Padding="12">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="8">
                     <!-- Which data source's fields this label is written against -->
@@ -848,14 +848,14 @@
         </Border>
 
         <!-- Generated ZPL -->
-        <Expander DockPanel.Dock="Bottom" Header="Generated ZPL" IsExpanded="False">
+        <Expander Name="ZplPanel" DockPanel.Dock="Bottom" Header="Generated ZPL" IsExpanded="False">
             <TextBox Text="{Binding GeneratedZpl}" IsReadOnly="True"
                      FontFamily="Consolas,Menlo,Monospace" FontSize="12"
                      Height="140" TextWrapping="NoWrap" />
         </Expander>
 
         <!-- Tool bar: insert tools, then alignment, as square icon buttons -->
-        <Border DockPanel.Dock="Left" Background="{DynamicResource AppToolbarBackground}" Padding="5,8">
+        <Border Name="CreationRail" DockPanel.Dock="Left" Background="{DynamicResource AppToolbarBackground}" Padding="5,8">
             <StackPanel Spacing="3">
                 <Button Classes="tool" Classes.armed="{Binding IsTextArmed}"
                         Command="{Binding AddTextCommand}" ToolTip.Tip="Add text">
@@ -938,7 +938,7 @@
         </Border>
 
         <!-- Canvas with mm rulers (drawn by the control) and scrollbars -->
-        <Grid RowDefinitions="*,Auto" ColumnDefinitions="*,Auto">
+        <Grid Name="CanvasRegion" RowDefinitions="*,Auto" ColumnDefinitions="*,Auto">
             <controls:DesignerCanvas Name="Canvas"
                                      Underlay="{Binding Underlay}"
                                      UnderlayMarginDots="{Binding UnderlayMarginDots}"
