@@ -139,6 +139,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   scan: it swallows the fields after it and returns the wrong value from a barcode that
   looks perfect. Element footprints understand the subset escapes, so a GS1 barcode's
   outline matches its ink instead of being nearly twice too wide.
+- Drag rows in the Elements inspector to change stacking order. Groups move together; a
+  blue insertion line marks the destination, the list scrolls at its edges, and Escape
+  cancels the drag. Reordering takes one undo step.
 - Quiet zone checking: every symbology's standard asks for a blank margin around the symbol, and a
   barcode that takes a second pass to scan is a label that failed. The canvas draws that margin for
   the selected symbol and warns when a neighbour sits in it or when the symbol is flush with the

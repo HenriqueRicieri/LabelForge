@@ -24,6 +24,7 @@ public partial class DesignerView : UserControl
     {
         InitializeComponent();
         InitializeWorkspace();
+        InitializeOutlineDrag();
 
         // The recent-files submenu is rebuilt in code: a handful of items, and it
         // sidesteps binding ancestor lookups inside menu popups.

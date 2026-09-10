@@ -753,9 +753,10 @@
                     <TabItem Header="Elements">
                         <Grid RowDefinitions="Auto,*" Margin="8">
                             <TextBlock Text="{Binding OutlineHeader}" Opacity="0.65" Margin="4,8" />
-                            <Grid Grid.Row="1">
+                            <Grid Grid.Row="1" ClipToBounds="True">
                             <ListBox Name="ElementsList" ItemsSource="{Binding Outline}"
                                      SelectedItem="{Binding SelectedOutlineRow}"
+                                     ToolTip.Tip="Drag a row to change stacking order. Groups move together. Escape cancels."
                                      Background="Transparent"
                                      BorderThickness="0" Padding="0">
                                 <ListBox.ItemTemplate>
@@ -773,7 +774,10 @@
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
-                            </ListBox>                            </Grid>
+                            </ListBox>
+                            <Border Name="OutlineDropMarker" Height="2" VerticalAlignment="Top"
+                                    Background="#4080FF" IsVisible="False" IsHitTestVisible="False" />
+                            </Grid>
                         </Grid>
                     </TabItem>
                     <TabItem Header="Data">
