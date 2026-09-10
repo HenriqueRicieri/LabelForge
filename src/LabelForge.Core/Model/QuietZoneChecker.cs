@@ -15,7 +15,8 @@ public sealed record QuietZoneFinding(Element Code, Element? Intruder, DotRect Z
 /// Design-time only: a quiet zone is blank, so nothing here changes a single byte of
 /// the generated ZPL. It is measured from the same footprints the canvas draws its
 /// outlines from, which are close to the ink but not the ink itself, so this is a
-/// warning worth reading rather than a measurement to certify a label by.
+/// warning worth reading rather than a measurement to certify a label by. Square-cornered
+/// hollow boxes use their border strips instead of treating the empty interior as ink.
 /// </summary>
 public static class QuietZoneChecker
 {
@@ -58,7 +59,7 @@ public static class QuietZoneChecker
             foreach (Element other in printing)
             {
                 if (!ReferenceEquals(other, code) &&
-                    zone.Intersects(calculator.GetBounds(other)))
+                    CrowdsZone(other, calculator.GetBounds(other), zone))
                 {
                     findings.Add(new QuietZoneFinding(code, other, zone));
                 }
@@ -66,5 +67,22 @@ public static class QuietZoneChecker
         }
 
         return findings;
+    }
+
+    private static bool CrowdsZone(Element element, DotRect bounds, DotRect zone)
+    {
+        if (!zone.Intersects(bounds)) return false;
+        if (element is not BoxElement { CornerRoundness: 0, ThicknessDots: > 0 } box)
+            return true;
+
+        int thickness = box.ThicknessDots;
+        if (2L * thickness >= bounds.Width || 2L * thickness >= bounds.Height)
+            return true;
+
+        // A square-cornered frame only touches a zone that reaches past its empty interior.
+        return zone.X < (long)bounds.X + thickness ||
+               zone.Y < (long)bounds.Y + thickness ||
+               (long)zone.X + zone.Width > (long)bounds.X + bounds.Width - thickness ||
+               (long)zone.Y + zone.Height > (long)bounds.Y + bounds.Height - thickness;
     }
 }
