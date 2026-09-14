@@ -14,4 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\LabelForge.App\LabelForge.App.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures\*.zpl" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

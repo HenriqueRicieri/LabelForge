@@ -36,6 +36,8 @@ using LabelForge.App.Views;
 //     so two gestures meant to be separate need a Pump() between them
 //   - decimals go out through a formatter that pins InvariantCulture: this is built on a
 //     pt-BR machine, and a decimal comma would make two machines' runs differ for no reason
+// Pass synthetic with designer to use the committed import fixture even when the local
+// corpus is present, reproducing the input available on CI.
 
 AppBuilder.Configure<LabelForge.App.App>()
     .UseSkia()
@@ -1178,10 +1180,9 @@ if (mode == "designer")
         LabelForge.Core.Io.ZplTextFile.Read(File.ReadAllBytes(graphicSource)).Text,
         Path.GetFileName(graphicSource));
     Pump(900);
-    Console.WriteLine(
-        $"imported file offers its labels: {d.ImportedBlocks.Count} blocks, "
-        + $"strip shown={d.HasImportedBlocks}, on '{d.SelectedImportedBlock}' "
-        + "(expected 4, True, the first with content)");
+    Check("imported file offers its labels", d.ImportedBlocks.Count, 4);
+    Check("imported file shows the block picker", d.HasImportedBlocks, true);
+    Check("imported file starts with content", d.Document.Elements.Count > 0, true);
     Console.WriteLine(
         $"blocks are described: {string.Join(" | ", d.ImportedBlocks)}");
     Capture("designer-imported-blocks.png");
@@ -3295,6 +3296,9 @@ int Count(string haystack, string needle) =>
 /// otherwise the committed fixture, so the harness runs on a clean clone too.</summary>
 string FindGraphicSource()
 {
+    string fixture = Path.Combine(AppContext.BaseDirectory, "Fixtures", "designer-import.zpl");
+    if (args.Contains("synthetic")) return fixture;
+
     var dir = new DirectoryInfo(AppContext.BaseDirectory);
     while (dir is not null)
     {
@@ -3307,7 +3311,7 @@ string FindGraphicSource()
         dir = dir.Parent;
     }
 
-    return Path.Combine(AppContext.BaseDirectory, "Fixtures", "embedded-graphic-short-name.zpl");
+    return fixture;
 }
 
 /// <summary>
