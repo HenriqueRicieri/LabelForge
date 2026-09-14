@@ -198,7 +198,7 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   accents instead of silently filling with replacement characters.
 - Printer profiles (203/300/600 dpi Zebra models) with design-time head-width and density warnings.
 - A built-in catalog of 797 official Zebra media specifications: search by part number, material,
-  or size in the label setup bar and the label takes the exact die-cut dimensions of the stock on
+  or size in the Label setup dialog and the label takes the exact die-cut dimensions of the stock on
   the roll.
 - Continuous stock, for rolls with no gaps or die cuts. The label stops having a fixed height and
   becomes exactly as long as its content plus a trailing gap you set, so the canvas grows as you
@@ -237,11 +237,11 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 
 ## Not yet built
 
-- Complete ZPL-to-model import. File > Import ZPL reads a label back into the designer and covers
-  every command LabelForge itself writes, so a label it generated round-trips byte for byte, and a
-  foreign label comes back as far as those commands reach. What it does not model yet, mainly `^FB`
-  word wrap, `^FR` reverse fields, and fonts other than the scalable font 0, is reported on import
-  rather than dropped in silence.
+- Complete ZPL-to-model import. Import supports `^FB` text blocks, `^FR` reverse fields,
+  and built-in fonts 0 and A-H. Remaining gaps include downloaded fonts, stored formats
+  (`^DF`/`^XF`), and printer-clock definitions (`^FC`). Unsupported fonts fall back to
+  font 0 with a warning; graphics stored only on the printer cannot be recovered.
+  Import reports unmodelled commands and missing resources.
 - The full variable-data system. Samples, counters, and date/time sources exist today; per-variable
   prompts and input rules (pick lists, masks, lengths) are future work, as is storing the layout on
   the printer (`^DF`/`^XF`) so a batch sends only its data.
@@ -275,7 +275,9 @@ round-trips, printer validation, and a corpus smoke test that renders a committe
 ZPL fixtures (and, when present, a local private corpus of real labels) without crashing. A headless
 Avalonia harness under `tools/LabelForge.E2E` drives the designer end to end, including simulated
 pointer input on the rulers and snap drags, and captures screenshots in both themes. CI runs build
-and test on every push and pull request.
+and unit tests, the full designer harness in both themes, and workspace layout checks on pushes
+to main and pull requests targeting main. Failed UI runs retain their transcript and screenshots
+for seven days.
 
 ## License
 
