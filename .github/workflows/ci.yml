@@ -27,3 +27,46 @@ jobs:
 
       - name: Test
         run: dotnet test --no-build --configuration Release --verbosity normal
+
+  ui-regression:
+    name: UI (${{ matrix.scenario }})
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: designer-light
+            arguments: designer synthetic
+          - scenario: designer-dark
+            arguments: designer dark synthetic
+          - scenario: workspace-layout
+            arguments: ui-layout
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build UI harness
+        run: dotnet build tools/LabelForge.E2E --configuration Release
+
+      - name: Run UI regression
+        shell: pwsh
+        run: |
+          dotnet run --project tools/LabelForge.E2E --no-build --configuration Release -- ${{ matrix.arguments }} 2>&1 | Tee-Object -FilePath ui-checks.log
+          exit $LASTEXITCODE
+
+      - name: Keep failed UI diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-${{ matrix.scenario }}
+          path: |
+            ui-checks.log
+            tools/LabelForge.E2E/bin/Release/net10.0/**/*.png
+          retention-days: 7

@@ -23,11 +23,8 @@ public partial class DesignerView : UserControl
     public DesignerView()
     {
         InitializeComponent();
-
-        // Custom filter so "4000d 50.8" narrows by material and size together;
-        // the rule lives in Core (StockCatalog) and is unit-tested there.
-        MediaBox.ItemFilter = (query, item) =>
-            item is Core.Media.StockMedia media && Core.Media.StockCatalog.IsMatch(media, query);
+        InitializeWorkspace();
+        InitializeOutlineDrag();
 
         // The recent-files submenu is rebuilt in code: a handful of items, and it
         // sidesteps binding ancestor lookups inside menu popups.
@@ -50,6 +47,11 @@ public partial class DesignerView : UserControl
         Canvas.DrawCommitted += (_, _) => ViewModel?.CommitDraw();
         Canvas.DrawCancelled += (_, _) => ViewModel?.CancelDraw();
         Canvas.CancelRequested += (_, _) => ViewModel?.CancelInsert();
+
+        DragDrop.SetAllowDrop(Canvas, true);
+        DragDrop.AddDragEnterHandler(Canvas, OnImageDragOver);
+        DragDrop.AddDragOverHandler(Canvas, OnImageDragOver);
+        DragDrop.AddDropHandler(Canvas, OnImageDrop);
 
         Canvas.ViewChanged += (_, _) => SyncScrollBars();
         CanvasHScroll.ValueChanged += (_, _) => OnScrollBarChanged();
@@ -350,6 +352,19 @@ public partial class DesignerView : UserControl
         }
     }
 
+    private async void OnOpenLabelSetup(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is Window owner && ViewModel is { } vm)
+        {
+            await new LabelSetupWindow
+            {
+                DataContext = vm,
+                Height = Math.Max(240, Math.Min(660, owner.ClientSize.Height - 40)),
+                Width = Math.Max(280, Math.Min(520, owner.ClientSize.Width - 40)),
+            }.ShowDialog(owner);
+        }
+    }
+
     private async void OnAddImage(object? sender, RoutedEventArgs e)
     {
         if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)
@@ -372,9 +387,57 @@ public partial class DesignerView : UserControl
             return;
         }
 
+        await LoadImageAsync(vm, path);
+    }
+
+    private void OnImageDragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = TryGetImageDrop(e) is not null ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void OnImageDrop(object? sender, DragEventArgs e)
+    {
+        var drop = TryGetImageDrop(e);
+        e.DragEffects = drop is not null ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+        if (drop is { } image && ViewModel is { } vm)
+        {
+            await LoadImageAsync(vm, image.Path, image.Position);
+        }
+    }
+
+    private (string Path, Point Position)? TryGetImageDrop(DragEventArgs e)
+    {
+        if ((e.DragEffects & DragDropEffects.Copy) == 0 ||
+            Canvas.ViewToLabel(e.GetPosition(Canvas)) is not { } position)
+        {
+            return null;
+        }
+
+        var files = e.DataTransfer.TryGetFiles()?.Take(2).ToArray();
+        if (files is not [IStorageFile file] || file.TryGetLocalPath() is not { } path)
+        {
+            return null;
+        }
+
+        return System.IO.Path.GetExtension(path).ToLowerInvariant() is
+            ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".webp"
+            ? (path, position)
+            : null;
+    }
+
+    private async Task LoadImageAsync(DesignerViewModel vm, string path, Point? position = null)
+    {
+        var document = vm.Document;
         try
         {
             byte[] data = await File.ReadAllBytesAsync(path);
+            if (ViewModel != vm || vm.Document != document)
+            {
+                return;
+            }
+
             if (Core.Imaging.ImageRasterizer.Probe(data) is not { } size)
             {
                 vm.StatusText = $"Could not read {Path.GetFileName(path)} as an image";
@@ -382,10 +445,18 @@ public partial class DesignerView : UserControl
             }
 
             vm.ArmInsertImage(data, size.Width, size.Height);
+            if (position is { } point)
+            {
+                vm.PlaceAt((int)Math.Round(point.X), (int)Math.Round(point.Y));
+                Canvas.Focus();
+            }
         }
         catch (Exception ex)
         {
-            vm.StatusText = $"Could not read the image: {ex.Message}";
+            if (ViewModel == vm && vm.Document == document)
+            {
+                vm.StatusText = $"Could not read the image: {ex.Message}";
+            }
         }
     }
 
@@ -434,22 +505,22 @@ public partial class DesignerView : UserControl
     /// follows. Elements with nothing to type (a box, a line) have no such field and this
     /// does nothing, which is the right amount to do.
     /// </summary>
-    private void FocusContentField() => Dispatcher.UIThread.Post(
-        () =>
+    private void FocusContentField()
+    {
+        RevealInspector();
+        InspectorTabs.SelectedIndex = 0;
+        ContentSection.IsExpanded = true;
+        Dispatcher.UIThread.Post(() =>
         {
-            if (PropertiesContent.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault()
-                is not { } box)
-            {
+            if (PropertiesContent.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault() is not { } box)
                 return;
-            }
 
+            box.BringIntoView();
             box.Focus();
             if (box.GetVisualDescendants().OfType<TextBox>().FirstOrDefault() is { } inner)
-            {
                 inner.SelectAll();
-            }
-        },
-        DispatcherPriority.Background);
+        }, DispatcherPriority.Background);
+    }
 
     private void OnFieldBoxAttached(object? sender, VisualTreeAttachmentEventArgs e)
     {

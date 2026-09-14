@@ -2285,40 +2285,10 @@ public partial class DesignerViewModel : ViewModelBase
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private void BringToFront()
-    {
-        if (Selection.Count == 0)
-        {
-            return;
-        }
-
-        int nextZ = Document.Elements.Max(e => e.ZOrder) + 1;
-        foreach (Element element in Selection.Items.OrderBy(e => e.ZOrder))
-        {
-            element.ZOrder = nextZ++;
-        }
-
-        RecordUndo();
-        ScheduleRender();
-    }
+    private void BringToFront() => CommitZOrder(ZOrder.BringToFront(Document, Selection.Items));
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private void SendToBack()
-    {
-        if (Selection.Count == 0)
-        {
-            return;
-        }
-
-        int nextZ = Document.Elements.Min(e => e.ZOrder) - Selection.Count;
-        foreach (Element element in Selection.Items.OrderBy(e => e.ZOrder))
-        {
-            element.ZOrder = nextZ++;
-        }
-
-        RecordUndo();
-        ScheduleRender();
-    }
+    private void SendToBack() => CommitZOrder(ZOrder.SendToBack(Document, Selection.Items));
 
     /// <summary>True while grouping would actually do something. Not simply "more than one
     /// selected": one whole group selected is more than one element and grouping it again
@@ -2389,64 +2359,17 @@ public partial class DesignerViewModel : ViewModelBase
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private void BringForward() => Reorder(forward: true);
+    private void BringForward() => CommitZOrder(ZOrder.Step(Document, Selection.Items, forward: true));
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private void SendBackward() => Reorder(forward: false);
+    private void SendBackward() => CommitZOrder(ZOrder.Step(Document, Selection.Items, forward: false));
 
-    /// <summary>
-    /// Moves the selection one step through the stacking order by SWAPPING z-orders with the
-    /// neighbour it is passing, so the set of values in the document is the same set
-    /// afterwards, just dealt out differently. Assigning fresh numbers would work on one
-    /// label and drift on the next.
-    ///
-    /// Stepping starts from the end the selection is heading towards, and a selected element
-    /// never swaps with another selected one, so several elements picked at once move as a
-    /// block and keep their order within it.
-    ///
-    /// Two elements sharing a z-order cannot pass each other this way, since swapping equal
-    /// values changes nothing. That ambiguity is older than this command (which of two tied
-    /// elements is on top is already undefined) and is left alone rather than renumbering the
-    /// whole document behind the user's back.
-    /// </summary>
-    private void Reorder(bool forward)
+    public void MoveOutlineElement(Element source, Element target, bool inFront) =>
+        CommitZOrder(ZOrder.Move(Document, source, target, inFront));
+
+    private void CommitZOrder(bool changed)
     {
-        if (Selection.Count == 0)
-        {
-            return;
-        }
-
-        List<Element> order = [.. Document.Elements.OrderBy(e => e.ZOrder)];
-        IEnumerable<int> steps = forward
-            ? Enumerable.Range(0, order.Count).Reverse()
-            : Enumerable.Range(0, order.Count);
-
-        bool moved = false;
-        foreach (int i in steps)
-        {
-            if (!Selection.Contains(order[i]))
-            {
-                continue;
-            }
-
-            int j = forward ? i + 1 : i - 1;
-            if (j < 0 || j >= order.Count ||
-                Selection.Contains(order[j]) ||
-                order[i].ZOrder == order[j].ZOrder)
-            {
-                continue;
-            }
-
-            (order[i].ZOrder, order[j].ZOrder) = (order[j].ZOrder, order[i].ZOrder);
-            (order[i], order[j]) = (order[j], order[i]);
-            moved = true;
-        }
-
-        if (!moved)
-        {
-            return;
-        }
-
+        if (!changed) return;
         RefreshOutline();
         RecordUndo();
         ScheduleRender();

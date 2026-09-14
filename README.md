@@ -12,11 +12,21 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 
 ## What works today
 
-- Visual designer: an icon tool bar with click-to-place or drag-to-draw elements, drag,
+- The designer has a scrollable creation rail and a resizable inspector with Properties,
+  Elements and Data tabs. Arrange holds alignment, distribution, sizing and grouping.
+  Hide the inspector for more canvas space; narrow windows open it over the canvas.
+  Label setup holds media, dimensions, stock layout and printer settings in a scrollable
+  dialog. Changes apply as you edit. Generated ZPL and diagnostic details have their own
+  bounded areas, and double-clicking an element reveals its content editor.
+- View > Element outlines reveals the bounds of white, covered and locked elements.
+  Hidden elements stay hidden. View > Printer dot grid shows individual printer-dot
+  boundaries at 800% zoom and above; it can be disabled independently of the design grid.
+  These display options do not change the label or its ZPL.
+- Visual designer: click-to-place or drag-to-draw elements, drag,
   eight-handle resize, rotation snapping to each field's supported orientations, marquee selection,
-  copy/paste/duplicate, z-order, arrow-key nudge, and zoom/pan with scrollbars and a floating zoom
-  control (50/100/200% presets, fit; 100% shows real printer dots). Ctrl and the plus or minus key
-  zoom about the middle of the view, which is the half the wheel does not do, and holding Space
+  copy/paste/duplicate, z-order, arrow-key nudge, and zoom/pan with scrollbars and a zoom
+  control below the canvas (50/100/200% presets, fit; 100% shows real printer dots).
+  Ctrl and the plus or minus key zoom about the middle of the view, which is the half the wheel does not do, and holding Space
   and dragging pans for a mouse with no middle button.
 - Draw from one corner to the other in any direction. A click places the default size;
   dragging sizes the element, with Shift constraining shapes and image aspect, and Alt
@@ -44,7 +54,7 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   the element keeps following it: the pointer is standing still and the label is moving underneath.
   A rotation deliberately does not do this, since turning something does not take it anywhere.
 - The canvas says what is under the pointer before you commit to it: a thin outline on whatever a
-  click would take, and in the corner opposite the zoom control, the pointer position in
+  click would take, and below the canvas beside the zoom control, the pointer position in
   millimeters and dots beside the drawn width and height of the selection. Those are the bounds the
   canvas outlines, which is the only answer defined for every element type, so they can read
   differently from the properties panel's X and Y for a barcode that prints digits outside its bars
@@ -129,15 +139,23 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   scan: it swallows the fields after it and returns the wrong value from a barcode that
   looks perfect. Element footprints understand the subset escapes, so a GS1 barcode's
   outline matches its ink instead of being nearly twice too wide.
+- View > Canvas performance optionally shows canvas drawing time and redraw rate. It stays
+  off by default and measures the canvas separately from ZPL rendering and display presentation.
+- Drag rows in the Elements inspector to change stacking order. Groups move together; a
+  blue insertion line marks the destination, the list scrolls at its edges, and Escape
+  cancels the drag. Reordering takes one undo step.
 - Quiet zone checking: every symbology's standard asks for a blank margin around the symbol, and a
   barcode that takes a second pass to scan is a label that failed. The canvas draws that margin for
   the selected symbol and warns when a neighbour sits in it or when the symbol is flush with the
-  edge of the stock. A design aid only, so it never changes the generated ZPL.
+  edge of the stock. Square-cornered hollow frames count only at their borders, so a barcode
+  inside a clear frame does not trigger a warning. A design aid only, so it never changes the
+  generated ZPL.
 - Images (PNG, JPEG, BMP) are converted to the printer's 1-bit black with a selectable dither
   (threshold for logos, ordered, Floyd-Steinberg for photos) and embedded in the label as an
   inline `^GF` graphic field, so the saved file and the exported ZPL are self-contained. Place the
   same image twice and it is downloaded once as `~DG` and recalled with `^XG` instead of repeating
-  the payload; a single placement stays inline and leaves the printer's memory alone.
+  the payload; a single placement stays inline and leaves the printer's memory alone. Drop one
+  image file from Explorer onto the label to place it at that point, with one undo step.
 - A ZPL file holding several labels stays open: a strip names the file and lists its
   labels with how much each one holds, so the bare printer-configuration block real files
   start with is visible as empty and the one you want is a click away. Files in the sample
@@ -180,7 +198,7 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   accents instead of silently filling with replacement characters.
 - Printer profiles (203/300/600 dpi Zebra models) with design-time head-width and density warnings.
 - A built-in catalog of 797 official Zebra media specifications: search by part number, material,
-  or size in the label setup bar and the label takes the exact die-cut dimensions of the stock on
+  or size in the Label setup dialog and the label takes the exact die-cut dimensions of the stock on
   the roll.
 - Continuous stock, for rolls with no gaps or die cuts. The label stops having a fixed height and
   becomes exactly as long as its content plus a trailing gap you set, so the canvas grows as you
@@ -219,11 +237,11 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 
 ## Not yet built
 
-- Complete ZPL-to-model import. File > Import ZPL reads a label back into the designer and covers
-  every command LabelForge itself writes, so a label it generated round-trips byte for byte, and a
-  foreign label comes back as far as those commands reach. What it does not model yet, mainly `^FB`
-  word wrap, `^FR` reverse fields, and fonts other than the scalable font 0, is reported on import
-  rather than dropped in silence.
+- Complete ZPL-to-model import. Import supports `^FB` text blocks, `^FR` reverse fields,
+  and built-in fonts 0 and A-H. Remaining gaps include downloaded fonts, stored formats
+  (`^DF`/`^XF`), and printer-clock definitions (`^FC`). Unsupported fonts fall back to
+  font 0 with a warning; graphics stored only on the printer cannot be recovered.
+  Import reports unmodelled commands and missing resources.
 - The full variable-data system. Samples, counters, and date/time sources exist today; per-variable
   prompts and input rules (pick lists, masks, lengths) are future work, as is storing the layout on
   the printer (`^DF`/`^XF`) so a batch sends only its data.
@@ -257,7 +275,9 @@ round-trips, printer validation, and a corpus smoke test that renders a committe
 ZPL fixtures (and, when present, a local private corpus of real labels) without crashing. A headless
 Avalonia harness under `tools/LabelForge.E2E` drives the designer end to end, including simulated
 pointer input on the rulers and snap drags, and captures screenshots in both themes. CI runs build
-and test on every push and pull request.
+and unit tests, the full designer harness in both themes, and workspace layout checks on pushes
+to main and pull requests targeting main. Failed UI runs retain their transcript and screenshots
+for seven days.
 
 ## License
 

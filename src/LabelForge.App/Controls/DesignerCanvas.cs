@@ -22,7 +22,7 @@ namespace LabelForge.App.Controls;
 /// toggles, dragging on empty space draws a marquee, and dragging a selected
 /// element moves the whole selection.
 /// </summary>
-public sealed class DesignerCanvas : Control
+public sealed partial class DesignerCanvas : Control
 {
     public static readonly StyledProperty<IImage?> UnderlayProperty =
         AvaloniaProperty.Register<DesignerCanvas, IImage?>(nameof(Underlay));
@@ -32,6 +32,24 @@ public sealed class DesignerCanvas : Control
 
     public static readonly StyledProperty<SelectionSet?> SelectionProperty =
         AvaloniaProperty.Register<DesignerCanvas, SelectionSet?>(nameof(Selection));
+
+    public static readonly StyledProperty<bool> ShowElementOutlinesProperty =
+        AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(ShowElementOutlines));
+
+    public bool ShowElementOutlines
+    {
+        get => GetValue(ShowElementOutlinesProperty);
+        set => SetValue(ShowElementOutlinesProperty, value);
+    }
+
+    public static readonly StyledProperty<bool> ShowPrinterDotGridProperty =
+        AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(ShowPrinterDotGrid), defaultValue: true);
+
+    public bool ShowPrinterDotGrid
+    {
+        get => GetValue(ShowPrinterDotGridProperty);
+        set => SetValue(ShowPrinterDotGridProperty, value);
+    }
 
     public static readonly StyledProperty<bool> IsPlacingProperty =
         AvaloniaProperty.Register<DesignerCanvas, bool>(nameof(IsPlacing));
@@ -71,7 +89,7 @@ public sealed class DesignerCanvas : Control
     {
         AffectsRender<DesignerCanvas>(
             UnderlayProperty, DocumentProperty, SelectionProperty, UnderlayMarginDotsProperty,
-            CanvasRevisionProperty);
+            CanvasRevisionProperty, ShowElementOutlinesProperty, ShowPrinterDotGridProperty, ShowCanvasPerformanceProperty);
     }
 
     private enum ResizeHandle
@@ -98,6 +116,7 @@ public sealed class DesignerCanvas : Control
     private static readonly SolidColorBrush SurfaceBrush = new(Color.FromRgb(0xD9, 0xD9, 0xD9));
     private static readonly SolidColorBrush DarkSurfaceBrush = new(Color.FromRgb(0x3C, 0x3C, 0x3C));
     private static readonly Pen LabelBorderPen = new(Brushes.Gray, 1);
+    private static readonly Pen ElementOutlinePen = new(new SolidColorBrush(Color.FromRgb(0x8B, 0x5C, 0xF6)), 1);
     private static readonly SolidColorBrush AccentBrush = new(Color.FromRgb(0x25, 0x63, 0xEB));
     private static readonly Pen SelectionPen = new(new SolidColorBrush(Color.FromRgb(0x25, 0x63, 0xEB)), 1.5);
     private static readonly Pen GhostPen = new(
@@ -112,6 +131,8 @@ public sealed class DesignerCanvas : Control
     // different at a glance rather than as a slightly different shade of the same thing.
     private static readonly Pen SuppressedPen = new(
         new SolidColorBrush(Color.FromRgb(0x6B, 0x72, 0x80)), 1.5, new DashStyle([8, 4], 0));
+
+    private static readonly Pen PrinterDotGridPen = new(new SolidColorBrush(Color.FromArgb(0x50, 0x80, 0x80, 0x80)), 1);
 
     // The design grid: faint enough to read the label through, since it is scaffolding
     // and not content.
@@ -602,6 +623,21 @@ public sealed class DesignerCanvas : Control
         return new Point(origin.X + x * scale, origin.Y + y * scale);
     }
 
+    public Point? ViewToLabel(Point position)
+    {
+        if (Document is not { } doc || position.X < RulerSize || position.Y < RulerSize ||
+            !new Rect(Bounds.Size).Contains(position))
+        {
+            return null;
+        }
+
+        var (scale, origin) = GetTransform();
+        var dots = new Point((position.X - origin.X) / scale, (position.Y - origin.Y) / scale);
+        return dots.X >= 0 && dots.Y >= 0 && dots.X < doc.WidthDots && dots.Y < doc.HeightDots
+            ? dots
+            : null;
+    }
+
     /// <summary>Extent, viewport, and offset of one scroll axis, in screen pixels.
     /// The extent is the label plus the pasteboard margin on both sides.</summary>
     public readonly record struct ScrollAxisInfo(double Extent, double Viewport, double Offset);
@@ -699,7 +735,7 @@ public sealed class DesignerCanvas : Control
         e.Handled = true;
     }
 
-    public override void Render(DrawingContext context)
+    private void RenderCanvas(DrawingContext context)
     {
         context.FillRectangle(SurfaceThemeBrush(), new Rect(Bounds.Size));
 
@@ -787,19 +823,25 @@ public sealed class DesignerCanvas : Control
             }
         }
 
-        // Dashed outline on anything that will not print exactly as drawn: amber when
-        // the layout caused it, grey when the user asked for it.
+        DrawPrinterDotGrid(context, doc, scale, origin, labelRect);
+
+        // Placement warnings keep their styling when the optional outlines are on.
         foreach (Element element in doc.Elements.Where(el => el.IsVisible))
         {
             DotRect b = _bounds.GetBounds(element);
             PlacementStatus status =
                 ElementPlacement.Classify(element, b, doc);
-            if (status == PlacementStatus.Inside)
+            if (status == PlacementStatus.Inside && !ShowElementOutlines)
             {
                 continue;
             }
 
-            Pen pen = status == PlacementStatus.Suppressed ? SuppressedPen : WarnPen;
+            Pen pen = status switch
+            {
+                PlacementStatus.Inside => ElementOutlinePen,
+                PlacementStatus.Suppressed => SuppressedPen,
+                _ => WarnPen,
+            };
             context.DrawRectangle(null, pen, new Rect(
                 origin.X + b.X * scale,
                 origin.Y + b.Y * scale,
@@ -962,6 +1004,34 @@ public sealed class DesignerCanvas : Control
         DrawRulers(context, doc, scale, origin);
     }
 
+    private void DrawPrinterDotGrid(DrawingContext context, LabelDocument doc, double scale, Point origin, Rect labelRect)
+    {
+        if (!ShowPrinterDotGrid || scale < 8) return;
+
+        // Enumerate only visible dots: a large label can extend far beyond the viewport.
+        Rect visible = labelRect.Intersect(new Rect(RulerSize, RulerSize,
+            Math.Max(0, Bounds.Width - RulerSize), Math.Max(0, Bounds.Height - RulerSize)));
+        if (visible.Width <= 0 || visible.Height <= 0) return;
+
+        int firstX = Math.Max(1, (int)Math.Ceiling((visible.Left - origin.X) / scale));
+        int lastX = Math.Min(doc.WidthDots - 1, (int)Math.Floor((visible.Right - origin.X) / scale));
+        int firstY = Math.Max(1, (int)Math.Ceiling((visible.Top - origin.Y) / scale));
+        int lastY = Math.Min(doc.HeightDots - 1, (int)Math.Floor((visible.Bottom - origin.Y) / scale));
+        using (context.PushClip(visible))
+        {
+            for (int x = firstX; x <= lastX; x++)
+            {
+                double px = Math.Round(origin.X + x * scale) + 0.5;
+                context.DrawLine(PrinterDotGridPen, new Point(px, visible.Top), new Point(px, visible.Bottom));
+            }
+            for (int y = firstY; y <= lastY; y++)
+            {
+                double py = Math.Round(origin.Y + y * scale) + 0.5;
+                context.DrawLine(PrinterDotGridPen, new Point(visible.Left, py), new Point(visible.Right, py));
+            }
+        }
+    }
+
     /// <summary>Permanent guides, the snap highlight, and the transient ruler-press
     /// guide. Drawn over the content (guides are chrome) but under the rulers.</summary>
     private void DrawGuides(DrawingContext context, LabelDocument doc, double scale, Point origin)
@@ -1094,9 +1164,7 @@ public sealed class DesignerCanvas : Control
 
         // Corner box with the unit, and hairlines separating the bands from the canvas.
         context.FillRectangle(band, new Rect(0, 0, RulerSize, RulerSize));
-        var unit = new FormattedText(
-            "mm", System.Globalization.CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight, Typeface.Default, 9, text);
+        var unit = RulerLabel(null, text);
         context.DrawText(unit, new Point(
             (RulerSize - unit.Width) / 2, (RulerSize - unit.Height) / 2));
 
@@ -1125,7 +1193,7 @@ public sealed class DesignerCanvas : Control
         return (major, minor);
     }
 
-    private static void DrawRulerAxis(
+    private void DrawRulerAxis(
         DrawingContext context, Pen tick, IBrush text,
         double major, double minor, double pxPerMm,
         double originPx, double limitPx, bool horizontal)
@@ -1158,10 +1226,7 @@ public sealed class DesignerCanvas : Control
 
             if (isMajor)
             {
-                var label = new FormattedText(
-                    Math.Round(mm).ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    FlowDirection.LeftToRight, Typeface.Default, 9, text);
+                var label = RulerLabel(mm, text);
                 context.DrawText(label, horizontal
                     ? new Point(px + 2, 1)
                     : new Point(2, px + 1));
@@ -1305,7 +1370,7 @@ public sealed class DesignerCanvas : Control
             EnsureExplicitTransform();
             _panning = true;
             _panLast = p;
-            Cursor = new Cursor(StandardCursorType.SizeAll);
+            Cursor = SharedCursor(StandardCursorType.SizeAll);
             e.Pointer.Capture(this);
             return;
         }
@@ -1413,7 +1478,7 @@ public sealed class DesignerCanvas : Control
                 _rotateGestureStart = FieldRotation.Get(primary);
                 _gestureBefore = ElementSnapshot.Capture([primary]);
                 _gestureAdded.Clear();
-                Cursor = new Cursor(StandardCursorType.Hand);
+                Cursor = SharedCursor(StandardCursorType.Hand);
                 e.Pointer.Capture(this);
                 InvalidateVisual();
                 return;
@@ -1457,7 +1522,7 @@ public sealed class DesignerCanvas : Control
                 ? doc.VerticalGuides[grabbed.Index]
                 : doc.HorizontalGuides[grabbed.Index];
             _dragGuideDelete = false;
-            Cursor = new Cursor(grabbed.Axis == GuideAxis.Vertical
+            Cursor = SharedCursor(grabbed.Axis == GuideAxis.Vertical
                 ? StandardCursorType.SizeWestEast
                 : StandardCursorType.SizeNorthSouth);
             e.Pointer.Capture(this);
@@ -2463,7 +2528,7 @@ public sealed class DesignerCanvas : Control
         if (IsPlacing)
         {
             _hover = null;
-            Cursor = new Cursor(StandardCursorType.Cross);
+            Cursor = SharedCursor(StandardCursorType.Cross);
             return;
         }
 
@@ -2473,7 +2538,7 @@ public sealed class DesignerCanvas : Control
                 FieldRotation.CanRotate(handlePrimary) &&
                 GrabRect(RotationHandleCenter(selRect)).Contains(p))
             {
-                Cursor = new Cursor(StandardCursorType.Hand);
+                Cursor = SharedCursor(StandardCursorType.Hand);
                 return;
             }
 
@@ -2483,7 +2548,7 @@ public sealed class DesignerCanvas : Control
                 {
                     if (GrabRect(center).Contains(p))
                     {
-                        Cursor = new Cursor(HandleCursor(kind));
+                        Cursor = SharedCursor(HandleCursor(kind));
                         return;
                     }
                 }
@@ -2495,7 +2560,7 @@ public sealed class DesignerCanvas : Control
             var (scale, origin) = GetTransform();
             if (FindGuideAt(doc, p, scale, origin) is { } guide)
             {
-                Cursor = new Cursor(guide.Axis == GuideAxis.Vertical
+                Cursor = SharedCursor(guide.Axis == GuideAxis.Vertical
                     ? StandardCursorType.SizeWestEast
                     : StandardCursorType.SizeNorthSouth);
                 return;
@@ -3045,7 +3110,7 @@ public sealed class DesignerCanvas : Control
             if (!_spaceHeld)
             {
                 _spaceHeld = true;
-                Cursor = new Cursor(StandardCursorType.SizeAll);
+                Cursor = SharedCursor(StandardCursorType.SizeAll);
             }
 
             e.Handled = true;

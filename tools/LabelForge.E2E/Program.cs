@@ -36,6 +36,8 @@ using LabelForge.App.Views;
 //     so two gestures meant to be separate need a Pump() between them
 //   - decimals go out through a formatter that pins InvariantCulture: this is built on a
 //     pt-BR machine, and a decimal comma would make two machines' runs differ for no reason
+// Pass synthetic with designer to use the committed import fixture even when the local
+// corpus is present, reproducing the input available on CI.
 
 AppBuilder.Configure<LabelForge.App.App>()
     .UseSkia()
@@ -50,10 +52,14 @@ if (args.Contains("dark"))
 // Media presets, field catalogs and crash snapshots all live per machine. Point every
 // one of them at scratch locations, so a harness run never touches what the person using
 // the app has saved.
-string presetsPath = Path.Combine(AppContext.BaseDirectory, "e2e-user-media.json");
-string catalogsPath = Path.Combine(AppContext.BaseDirectory, "e2e-field-catalogs.json");
-string recoveryDir = Path.Combine(AppContext.BaseDirectory, "e2e-recovery");
-string settingsPath = Path.Combine(AppContext.BaseDirectory, "e2e-user-settings.json");
+string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint"
+    ? Path.Combine(AppContext.BaseDirectory, args[0] + "-scratch")
+    : AppContext.BaseDirectory;
+Directory.CreateDirectory(scratchRoot);
+string presetsPath = Path.Combine(scratchRoot, "e2e-user-media.json");
+string catalogsPath = Path.Combine(scratchRoot, "e2e-field-catalogs.json");
+string recoveryDir = Path.Combine(scratchRoot, "e2e-recovery");
+string settingsPath = Path.Combine(scratchRoot, "e2e-user-settings.json");
 File.Delete(presetsPath);
 File.Delete(catalogsPath);
 File.Delete(settingsPath);
@@ -76,10 +82,55 @@ var vm = new MainViewModel(
 var window = new MainWindow { DataContext = vm };
 window.Show();
 
+if (args.FirstOrDefault() == "ui-layout")
+{
+    return UiLayoutChecks.Run(window, vm, args.Contains("baseline"));
+}
+
 // The grade. Declared before either mode's block, because the helpers that raise it close
 // over these two and a captured local has to be assigned at every place it is called from.
 int graded = 0;
 var disagreed = new List<string>();
+if (args.FirstOrDefault() == "canvas-paint")
+{
+    CanvasPaintChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true), reportTimings: true);
+    Console.WriteLine($"{graded} paint checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
+if (args.FirstOrDefault() == "outline-reorder")
+{
+    OutlineReorderChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
+    Console.WriteLine($"{graded} outline checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
+if (args.FirstOrDefault() == "quiet-zone-frames")
+{
+    QuietZoneFrameChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
+    Console.WriteLine($"{graded} frame checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
+if (args.FirstOrDefault() == "menu-options")
+{
+    MenuOptionChecks.Run(window, vm.Designer, settingsPath, (label, held) => Check(label, held, true));
+    Console.WriteLine($"{graded} menu checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
+if (args.FirstOrDefault() == "canvas-display")
+{
+    CanvasDisplayChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
+    Console.WriteLine($"{graded} display checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
 
 var tabs = window.FindControl<TabControl>("MainTabs")!;
 string mode = args.Length > 0 ? args[0] : "designer";
@@ -705,12 +756,17 @@ if (mode == "designer")
     d.NewMediaName = "Etiqueta Filial";
     d.NewMediaMaterial = "Couche";
     d.SaveUserMediaCommand.Execute(null);
-    var myMediaButton = window.GetVisualDescendants().OfType<Button>()
+    var setupButton = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "LabelSetupButton");
+    setupButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+    Pump(200);
+    var setupWindow = window.OwnedWindows.OfType<LabelSetupWindow>().Single();
+    var myMediaButton = setupWindow.GetVisualDescendants().OfType<Button>()
         .First(b => b.Content as string == "My media...");
     myMediaButton.Flyout?.ShowAt(myMediaButton);
     Pump(500);
-    Capture("designer-my-media.png");
+    Capture("designer-my-media.png", setupWindow);
     myMediaButton.Flyout?.Hide();
+    setupWindow.Close();
     d.UserMedia[0].RemoveCommand.Execute(null);
     Pump(200);
 
@@ -1124,10 +1180,9 @@ if (mode == "designer")
         LabelForge.Core.Io.ZplTextFile.Read(File.ReadAllBytes(graphicSource)).Text,
         Path.GetFileName(graphicSource));
     Pump(900);
-    Console.WriteLine(
-        $"imported file offers its labels: {d.ImportedBlocks.Count} blocks, "
-        + $"strip shown={d.HasImportedBlocks}, on '{d.SelectedImportedBlock}' "
-        + "(expected 4, True, the first with content)");
+    Check("imported file offers its labels", d.ImportedBlocks.Count, 4);
+    Check("imported file shows the block picker", d.HasImportedBlocks, true);
+    Check("imported file starts with content", d.Document.Elements.Count > 0, true);
     Console.WriteLine(
         $"blocks are described: {string.Join(" | ", d.ImportedBlocks)}");
     Capture("designer-imported-blocks.png");
@@ -2471,14 +2526,8 @@ if (mode == "designer")
     Console.WriteLine(
         $"named row: '{d.Outline.First(r => r.Element == row.Element).Display}' (expected Peso liquido)");
 
-    // Open the list for the capture; collapsed by default so the panel stays quiet on a
-    // label small enough not to need it.
-    var outlineExpander = window.GetVisualDescendants().OfType<Expander>()
-        .FirstOrDefault(x => (x.Header as string)?.StartsWith("Elements", StringComparison.Ordinal) == true);
-    if (outlineExpander is not null)
-    {
-        outlineExpander.IsExpanded = true;
-    }
+    var inspectorTabs = window.GetVisualDescendants().OfType<TabControl>().Single(t => t.Name == "InspectorTabs");
+    inspectorTabs.SelectedIndex = 1;
 
     Pump(500);
     Capture("designer-outline.png");
@@ -2864,6 +2913,119 @@ if (mode == "designer")
         Check("undo restores all three group members", d.Document.Elements.Count(e => e.GroupId == groupId), 3);
     }
 
+    {
+        string dropPath = Path.Combine(AppContext.BaseDirectory, "e2e-drop.PNG");
+        using (var bitmap = new SkiaSharp.SKBitmap(80, 40))
+        {
+            bitmap.Erase(SkiaSharp.SKColors.Black);
+            using var png = bitmap.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+            File.WriteAllBytes(dropPath, png.ToArray());
+        }
+
+        Avalonia.Platform.Storage.IStorageFile DropFile(string path) =>
+            window.StorageProvider.TryGetFileFromPathAsync(new Uri(path)).GetAwaiter().GetResult()
+            ?? throw new InvalidOperationException($"Storage provider could not open {path}");
+
+        using var imageTransfer = new DataTransfer();
+        imageTransfer.Add(DataTransferItem.CreateFile(DropFile(dropPath)));
+
+        DragEventArgs SendDropEvent(Avalonia.Interactivity.RoutedEvent<DragEventArgs> routedEvent,
+            IDataTransfer transfer, Point at, DragDropEffects effects = DragDropEffects.Copy)
+        {
+            var e = new DragEventArgs(routedEvent, transfer, canvas, at, KeyModifiers.None)
+            {
+                DragEffects = effects,
+            };
+            canvas.RaiseEvent(e);
+            return e;
+        }
+
+        Check("image drop enabled on the canvas", DragDrop.GetAllowDrop(canvas), true);
+        foreach (int dpmm in new[] { 8, 12, 24 })
+        {
+            d.NewDocumentCommand.Execute(null);
+            d.Document.Dpmm = dpmm;
+            d.NotifyDocumentEdited();
+            Pump(400);
+            canvas.SetZoom(2);
+            canvas.SetScrollOffsets(dpmm * 40 + 100, dpmm * 40 + 80);
+            Pump(200);
+            var at = canvas.DotsToView(100, 100);
+            var hover = SendDropEvent(DragDrop.DragOverEvent, imageTransfer, at);
+            Check($"image hover at {dpmm} dpmm offers Copy", hover.DragEffects, DragDropEffects.Copy);
+            var drop = SendDropEvent(DragDrop.DropEvent, imageTransfer, at);
+            Pump(900);
+            var image = d.Document.Elements.OfType<LabelForge.Core.Model.ImageElement>().SingleOrDefault();
+            Check($"image drop at {dpmm} dpmm is handled", drop.Handled, true);
+            Check($"image drop at {dpmm} dpmm follows zoom and pan", $"{image?.X},{image?.Y}", "100,100");
+            Check($"image drop at {dpmm} dpmm uses the insert size",
+                $"{image?.WidthDots},{image?.HeightDots},{image?.SourcePixelWidth},{image?.SourcePixelHeight}",
+                "240,120,80,40");
+            Check($"image drop at {dpmm} dpmm preserves the source",
+                image?.ImageData.SequenceEqual(File.ReadAllBytes(dropPath)), true);
+            Check($"image drop at {dpmm} dpmm selects the image and ends placement",
+                image is not null && d.SelectedElement == image && !d.IsPlacing, true);
+            Check($"image drop at {dpmm} dpmm reaches the ZPL", d.GeneratedZpl.Contains("^GF"), true);
+            d.UndoCommand.Execute(null);
+            Pump(300);
+            Check($"one undo removes the image at {dpmm} dpmm", d.Document.Elements.Count, 0);
+            d.RedoCommand.Execute(null);
+            Pump(500);
+            image = d.Document.Elements.OfType<LabelForge.Core.Model.ImageElement>().SingleOrDefault();
+            Check($"redo restores the image at {dpmm} dpmm", $"{image?.X},{image?.Y}", "100,100");
+        }
+        Capture("designer-image-drop.png");
+
+        d.NewDocumentCommand.Execute(null);
+        Pump(300);
+        canvas.ResetView();
+        Pump(200);
+        var dropPoint = canvas.DotsToView(100, 100);
+        foreach (var extension in new[] { ".zpl", ".lfl", ".txt" })
+        {
+            File.WriteAllText(Path.ChangeExtension(dropPath, extension), "Not an image");
+            using var transfer = new DataTransfer();
+            transfer.Add(DataTransferItem.CreateFile(DropFile(Path.ChangeExtension(dropPath, extension))));
+            Check($"image drop refuses {extension}", SendDropEvent(DragDrop.DropEvent, transfer, dropPoint).DragEffects,
+                DragDropEffects.None);
+        }
+
+        using var multiple = new DataTransfer();
+        multiple.Add(DataTransferItem.CreateFile(DropFile(dropPath)));
+        multiple.Add(DataTransferItem.CreateFile(DropFile(dropPath)));
+        Check("image drop refuses multiple files",
+            SendDropEvent(DragDrop.DropEvent, multiple, dropPoint).DragEffects, DragDropEffects.None);
+        Check("image drop refuses move-only transfers",
+            SendDropEvent(DragDrop.DropEvent, imageTransfer, dropPoint, DragDropEffects.Move).DragEffects,
+            DragDropEffects.None);
+        Check("image drop refuses the ruler",
+            SendDropEvent(DragDrop.DropEvent, imageTransfer, new Point(100, 13)).DragEffects, DragDropEffects.None);
+        Check("image drop refuses the pasteboard",
+            SendDropEvent(DragDrop.DropEvent, imageTransfer, canvas.DotsToView(-5, 100)).DragEffects, DragDropEffects.None);
+        Pump(300);
+        Check("rejected drops leave the document unchanged", d.Document.Elements.Count, 0);
+
+        string brokenPath = Path.Combine(AppContext.BaseDirectory, "e2e-broken-image.png");
+        File.WriteAllText(brokenPath, "This is not a PNG");
+        using var broken = new DataTransfer();
+        broken.Add(DataTransferItem.CreateFile(DropFile(brokenPath)));
+        d.AddTextCommand.Execute(null);
+        SendDropEvent(DragDrop.DropEvent, broken, dropPoint);
+        Pump(500);
+        Check("invalid image reports a read failure", d.StatusText.Contains("Could not read"), true);
+        Check("invalid image preserves the armed tool", d.ArmedTool, "Text");
+        Check("invalid image inserts nothing", d.Document.Elements.Count, 0);
+
+        File.Delete(brokenPath);
+        SendDropEvent(DragDrop.DropEvent, broken, dropPoint);
+        Pump(500);
+        Check("missing image reports a read failure", d.StatusText.Contains("Could not read the image:"), true);
+        Check("missing image inserts nothing", d.Document.Elements.Count, 0);
+        Check("failed image drops add no undo step", d.CanUndo, false);
+        d.CancelInsert();
+    }
+
+
     // Crash recovery: the snapshot follows the edits, a real save clears it because the
     // work is safe elsewhere, and a snapshot left by a dead session is offered on start.
     d.NewDocumentCommand.Execute(null);
@@ -3094,6 +3256,15 @@ if (mode == "designer")
     }
 }
 
+if (mode == "designer")
+{
+    CanvasPaintChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
+    OutlineReorderChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
+    QuietZoneFrameChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
+    CanvasDisplayChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
+    MenuOptionChecks.Run(window, vm.Designer, settingsPath, (label, held) => Check(label, held, true));
+}
+
 Capture($"{mode}.png");
 
 // The grade. Every line above printed whether it held or not, exactly as it always has;
@@ -3125,6 +3296,9 @@ int Count(string haystack, string needle) =>
 /// otherwise the committed fixture, so the harness runs on a clean clone too.</summary>
 string FindGraphicSource()
 {
+    string fixture = Path.Combine(AppContext.BaseDirectory, "Fixtures", "designer-import.zpl");
+    if (args.Contains("synthetic")) return fixture;
+
     var dir = new DirectoryInfo(AppContext.BaseDirectory);
     while (dir is not null)
     {
@@ -3137,7 +3311,7 @@ string FindGraphicSource()
         dir = dir.Parent;
     }
 
-    return Path.Combine(AppContext.BaseDirectory, "Fixtures", "embedded-graphic-short-name.zpl");
+    return fixture;
 }
 
 /// <summary>
