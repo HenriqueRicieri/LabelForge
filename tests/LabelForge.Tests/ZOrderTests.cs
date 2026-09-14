@@ -148,6 +148,51 @@ public sealed class ZOrderTests
         Assert.Equal(before, LabelDocumentJson.Serialize(label));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AStepDoesNotRestackAnUnrelatedImportedGroup(bool forward)
+    {
+        var label = Label(1, 4, 20, 40, 90);
+        label.Elements[0].GroupId = label.Elements[2].GroupId = Guid.NewGuid();
+        var source = label.Elements[forward ? 3 : 4];
+
+        Assert.True(ZOrder.Step(label, [source], forward));
+
+        Assert.Equal(new[] { 1, 4, 20, 90, 40 }, label.Elements.Select(e => e.ZOrder));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AStepFromInsideAnImportedGroupPassesItsWholeSpan(bool forward)
+    {
+        var label = Label(1, 4, 20);
+        label.Elements[0].GroupId = label.Elements[2].GroupId = Guid.NewGuid();
+
+        Assert.True(ZOrder.Step(label, [label.Elements[1]], forward));
+
+        Assert.Equal(forward ? new[] { 1, 20, 4 } : new[] { 4, 1, 20 },
+            label.Elements.Select(e => e.ZOrder));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AnInterleavedSelectedGroupStepsAsAWhole(bool forward)
+    {
+        var label = Label(1, 4, 20, 40, 90);
+        var groupId = Guid.NewGuid();
+        label.Elements[1].GroupId = label.Elements[3].GroupId = groupId;
+
+        Assert.True(ZOrder.Step(label, [label.Elements[1]], forward));
+
+        Assert.Equal(forward ? new[] { 1, 40, 4, 90, 20 } : new[] { 20, 1, 40, 4, 90 },
+            label.Elements.Select(e => e.ZOrder));
+        Assert.Equal(groupId, label.Elements[1].GroupId);
+        Assert.Equal(groupId, label.Elements[3].GroupId);
+    }
+
     [Fact]
     public void ExtremeCommandsKeepTheirExistingValues()
     {

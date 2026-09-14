@@ -27,28 +27,26 @@ public static class ZOrder
         var selected = Groups.Expand(document, selection).ToHashSet();
         if (selected.Count == 0) return false;
         var order = document.Elements.OrderBy(e => e.ZOrder).ToList();
-        var units = new List<IReadOnlyList<Element>>();
+        var next = order.ToList();
         var seen = new HashSet<Element>();
-        foreach (var element in order)
+        IEnumerable<Element> steps = forward ? order.AsEnumerable().Reverse() : order;
+        foreach (var element in steps)
         {
-            if (seen.Contains(element)) continue;
+            if (!selected.Contains(element) || seen.Contains(element)) continue;
             var members = Groups.Members(document, element);
-            units.Add(members);
             seen.UnionWith(members);
+            int edge = forward ? next.FindLastIndex(members.Contains) : next.FindIndex(members.Contains);
+            int adjacent = forward ? edge + 1 : edge - 1;
+            if (adjacent < 0 || adjacent >= next.Count || selected.Contains(next[adjacent])) continue;
+            var targets = Groups.Members(document, next[adjacent]);
+            if (members.Any(a => targets.Any(b => a.ZOrder == b.ZOrder))) continue;
+
+            // Move only this selection; imported groups elsewhere may be interleaved.
+            next.RemoveAll(members.Contains);
+            int at = forward ? next.FindLastIndex(targets.Contains) + 1 : next.FindIndex(targets.Contains);
+            next.InsertRange(at, members);
         }
-        IEnumerable<int> steps = forward
-            ? Enumerable.Range(0, units.Count).Reverse() : Enumerable.Range(0, units.Count);
-        bool moved = false;
-        foreach (int i in steps)
-        {
-            int j = forward ? i + 1 : i - 1;
-            if (!selected.Contains(units[i][0]) || j < 0 || j >= units.Count ||
-                selected.Contains(units[j][0]) || units[i].Any(a => units[j].Any(b => a.ZOrder == b.ZOrder)))
-                continue;
-            (units[i], units[j]) = (units[j], units[i]);
-            moved = true;
-        }
-        return moved && Apply(document, order, units.SelectMany(u => u).ToList(), apply: true);
+        return Apply(document, order, next, apply: true);
     }
 
     public static bool CanMove(LabelDocument document, Element source, Element target, bool inFront) =>
