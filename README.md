@@ -139,6 +139,8 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   scan: it swallows the fields after it and returns the wrong value from a barcode that
   looks perfect. Element footprints understand the subset escapes, so a GS1 barcode's
   outline matches its ink instead of being nearly twice too wide.
+- View > Canvas performance optionally shows canvas drawing time and redraw rate. It stays
+  off by default and measures the canvas separately from ZPL rendering and display presentation.
 - Drag rows in the Elements inspector to change stacking order. Groups move together; a
   blue insertion line marks the destination, the list scrolls at its edges, and Escape
   cancels the drag. Reordering takes one undo step.

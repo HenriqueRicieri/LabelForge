@@ -385,6 +385,9 @@
                         <MenuItem Name="PrinterDotGridMenu" Header="Printer dot grid (800%+)" ToggleType="CheckBox"
                                   IsChecked="{Binding ShowPrinterDotGrid, Mode=TwoWay}"
                                   ToolTip.Tip="Show the boundaries between printer dots at high zoom" />
+                        <MenuItem Name="CanvasPerformanceMenu" Header="Canvas performance" ToggleType="CheckBox"
+                                  IsChecked="{Binding ShowCanvasPerformance, Mode=TwoWay}"
+                                  ToolTip.Tip="Canvas drawing time and redraw rate; excludes ZPL rendering and display presentation" />
                         <MenuItem Name="ElementOutlinesMenu" Header="Element outlines" ToggleType="CheckBox"
                                   IsChecked="{Binding ShowElementOutlines, Mode=TwoWay}"
                                   ToolTip.Tip="Show element bounds, including white and covered elements" />
@@ -585,6 +588,7 @@
                                      Underlay="{Binding Underlay}"
                                      UnderlayMarginDots="{Binding UnderlayMarginDots}"
                                      CanvasRevision="{Binding CanvasRevision}"
+                                     ShowCanvasPerformance="{Binding ShowCanvasPerformance}"
                                      ShowElementOutlines="{Binding ShowElementOutlines}"
                                      ShowPrinterDotGrid="{Binding ShowPrinterDotGrid}"
                                      Document="{Binding Document}"

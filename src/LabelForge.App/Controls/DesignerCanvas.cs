@@ -22,7 +22,7 @@ namespace LabelForge.App.Controls;
 /// toggles, dragging on empty space draws a marquee, and dragging a selected
 /// element moves the whole selection.
 /// </summary>
-public sealed class DesignerCanvas : Control
+public sealed partial class DesignerCanvas : Control
 {
     public static readonly StyledProperty<IImage?> UnderlayProperty =
         AvaloniaProperty.Register<DesignerCanvas, IImage?>(nameof(Underlay));
@@ -89,7 +89,7 @@ public sealed class DesignerCanvas : Control
     {
         AffectsRender<DesignerCanvas>(
             UnderlayProperty, DocumentProperty, SelectionProperty, UnderlayMarginDotsProperty,
-            CanvasRevisionProperty, ShowElementOutlinesProperty, ShowPrinterDotGridProperty);
+            CanvasRevisionProperty, ShowElementOutlinesProperty, ShowPrinterDotGridProperty, ShowCanvasPerformanceProperty);
     }
 
     private enum ResizeHandle
@@ -735,7 +735,7 @@ public sealed class DesignerCanvas : Control
         e.Handled = true;
     }
 
-    public override void Render(DrawingContext context)
+    private void RenderCanvas(DrawingContext context)
     {
         context.FillRectangle(SurfaceThemeBrush(), new Rect(Bounds.Size));
 
@@ -1164,9 +1164,7 @@ public sealed class DesignerCanvas : Control
 
         // Corner box with the unit, and hairlines separating the bands from the canvas.
         context.FillRectangle(band, new Rect(0, 0, RulerSize, RulerSize));
-        var unit = new FormattedText(
-            "mm", System.Globalization.CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight, Typeface.Default, 9, text);
+        var unit = RulerLabel(null, text);
         context.DrawText(unit, new Point(
             (RulerSize - unit.Width) / 2, (RulerSize - unit.Height) / 2));
 
@@ -1195,7 +1193,7 @@ public sealed class DesignerCanvas : Control
         return (major, minor);
     }
 
-    private static void DrawRulerAxis(
+    private void DrawRulerAxis(
         DrawingContext context, Pen tick, IBrush text,
         double major, double minor, double pxPerMm,
         double originPx, double limitPx, bool horizontal)
@@ -1228,10 +1226,7 @@ public sealed class DesignerCanvas : Control
 
             if (isMajor)
             {
-                var label = new FormattedText(
-                    Math.Round(mm).ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    FlowDirection.LeftToRight, Typeface.Default, 9, text);
+                var label = RulerLabel(mm, text);
                 context.DrawText(label, horizontal
                     ? new Point(px + 2, 1)
                     : new Point(2, px + 1));
@@ -1375,7 +1370,7 @@ public sealed class DesignerCanvas : Control
             EnsureExplicitTransform();
             _panning = true;
             _panLast = p;
-            Cursor = new Cursor(StandardCursorType.SizeAll);
+            Cursor = SharedCursor(StandardCursorType.SizeAll);
             e.Pointer.Capture(this);
             return;
         }
@@ -1483,7 +1478,7 @@ public sealed class DesignerCanvas : Control
                 _rotateGestureStart = FieldRotation.Get(primary);
                 _gestureBefore = ElementSnapshot.Capture([primary]);
                 _gestureAdded.Clear();
-                Cursor = new Cursor(StandardCursorType.Hand);
+                Cursor = SharedCursor(StandardCursorType.Hand);
                 e.Pointer.Capture(this);
                 InvalidateVisual();
                 return;
@@ -1527,7 +1522,7 @@ public sealed class DesignerCanvas : Control
                 ? doc.VerticalGuides[grabbed.Index]
                 : doc.HorizontalGuides[grabbed.Index];
             _dragGuideDelete = false;
-            Cursor = new Cursor(grabbed.Axis == GuideAxis.Vertical
+            Cursor = SharedCursor(grabbed.Axis == GuideAxis.Vertical
                 ? StandardCursorType.SizeWestEast
                 : StandardCursorType.SizeNorthSouth);
             e.Pointer.Capture(this);
@@ -2533,7 +2528,7 @@ public sealed class DesignerCanvas : Control
         if (IsPlacing)
         {
             _hover = null;
-            Cursor = new Cursor(StandardCursorType.Cross);
+            Cursor = SharedCursor(StandardCursorType.Cross);
             return;
         }
 
@@ -2543,7 +2538,7 @@ public sealed class DesignerCanvas : Control
                 FieldRotation.CanRotate(handlePrimary) &&
                 GrabRect(RotationHandleCenter(selRect)).Contains(p))
             {
-                Cursor = new Cursor(StandardCursorType.Hand);
+                Cursor = SharedCursor(StandardCursorType.Hand);
                 return;
             }
 
@@ -2553,7 +2548,7 @@ public sealed class DesignerCanvas : Control
                 {
                     if (GrabRect(center).Contains(p))
                     {
-                        Cursor = new Cursor(HandleCursor(kind));
+                        Cursor = SharedCursor(HandleCursor(kind));
                         return;
                     }
                 }
@@ -2565,7 +2560,7 @@ public sealed class DesignerCanvas : Control
             var (scale, origin) = GetTransform();
             if (FindGuideAt(doc, p, scale, origin) is { } guide)
             {
-                Cursor = new Cursor(guide.Axis == GuideAxis.Vertical
+                Cursor = SharedCursor(guide.Axis == GuideAxis.Vertical
                     ? StandardCursorType.SizeWestEast
                     : StandardCursorType.SizeNorthSouth);
                 return;
@@ -3115,7 +3110,7 @@ public sealed class DesignerCanvas : Control
             if (!_spaceHeld)
             {
                 _spaceHeld = true;
-                Cursor = new Cursor(StandardCursorType.SizeAll);
+                Cursor = SharedCursor(StandardCursorType.SizeAll);
             }
 
             e.Handled = true;

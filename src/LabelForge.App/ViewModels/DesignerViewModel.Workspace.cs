@@ -7,6 +7,7 @@ namespace LabelForge.App.ViewModels;
 
 public partial class DesignerViewModel
 {
+    [ObservableProperty] private bool _showCanvasPerformance;
     [ObservableProperty] private bool _showElementOutlines;
     [ObservableProperty] private bool _showPrinterDotGrid = true;
 
