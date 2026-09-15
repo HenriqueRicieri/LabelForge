@@ -37,6 +37,8 @@ public partial class DesignerView : UserControl
 
         Canvas.DocumentEdited += (_, _) => ViewModel?.NotifyDocumentEdited();
         Canvas.LiveEdited += (_, _) => ViewModel?.NotifyDocumentPreview();
+        Canvas.GestureStarted += (kind, elements, snapshot) => ViewModel?.BeginGesturePreview(kind, elements, snapshot);
+        Canvas.GestureEnded += committed => ViewModel?.EndGesturePreview(committed);
         Canvas.DeleteRequested += (_, _) => ViewModel?.DeleteSelectedCommand.Execute(null);
         Canvas.PointerDotsChanged += (x, y) => ViewModel?.ReportPointer(x, y);
         Canvas.PointerLeftLabel += (_, _) => ViewModel?.ReportPointerLeft();

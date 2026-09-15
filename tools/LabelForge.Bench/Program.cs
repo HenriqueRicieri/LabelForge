@@ -24,6 +24,12 @@ for (int i = 0; i < args.Length - 1; i++)
     }
 }
 
+if (args.Contains("--gesture"))
+{
+    GestureBench.Run();
+    return;
+}
+
 List<Scenario> scenarios = Scenarios.Build(corpusCount);
 var renderer = new BinaryKitsRenderer();
 var substitutor = new TemplateSubstitutor();
