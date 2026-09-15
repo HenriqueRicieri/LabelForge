@@ -43,6 +43,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   others. Adding to the selection happens as the button goes down, because a drag that follows
   should move everything picked; removing one waits for a release that never moved, since pressing
   on something already selected is the ordinary way to start dragging the whole group.
+- At 600 dpi, supported selections move using cached preview layers. Resize and rotation
+  redraw only the moving fields, and release refreshes the full label. Selections with
+  interleaved layers, reverse effects or unsupported text metrics keep the regular preview.
 - Escape puts a gesture back. Mid-drag, mid-resize or mid-rotate the elements return to the state
   they were in when the gesture began and nothing is recorded, so a drag that went wrong costs
   nothing and does not need an undo afterwards. It restores from a copy taken at the start rather
