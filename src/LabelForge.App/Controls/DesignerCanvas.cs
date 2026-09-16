@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
@@ -89,7 +89,8 @@ public sealed partial class DesignerCanvas : Control
     {
         AffectsRender<DesignerCanvas>(
             UnderlayProperty, DocumentProperty, SelectionProperty, UnderlayMarginDotsProperty,
-            CanvasRevisionProperty, ShowElementOutlinesProperty, ShowPrinterDotGridProperty, ShowCanvasPerformanceProperty);
+            CanvasRevisionProperty, ShowElementOutlinesProperty, ShowPrinterDotGridProperty, ShowCanvasPerformanceProperty,
+            GesturePreviewProperty, GestureOffsetProperty);
     }
 
     private enum ResizeHandle
@@ -476,6 +477,8 @@ public sealed partial class DesignerCanvas : Control
 
         if (change.Property == DocumentProperty)
         {
+            if (_gesturePreviewActive) EndGestureState();
+
             // A different document means a different size; go back to auto-fit.
             _userScale = null;
             ViewChanged?.Invoke(this, EventArgs.Empty);
@@ -763,9 +766,9 @@ public sealed partial class DesignerCanvas : Control
                 Avalonia.Threading.DispatcherPriority.Background);
         }
 
-        context.FillRectangle(Brushes.White, labelRect);
+        if (GesturePreview is null) context.FillRectangle(Brushes.White, labelRect);
 
-        if (Underlay is { } underlay)
+        if (!DrawGesturePreview(context, scale, origin, labelRect) && Underlay is { } underlay)
         {
             // A pasteboard-expanded underlay carries off-label content; draw it over
             // the full expanded area, then wash everything outside the label with a
@@ -1478,6 +1481,7 @@ public sealed partial class DesignerCanvas : Control
                 _rotateGestureStart = FieldRotation.Get(primary);
                 _gestureBefore = ElementSnapshot.Capture([primary]);
                 _gestureAdded.Clear();
+                StartGesturePreview(GestureKind.Rotate, [primary], _gestureBefore);
                 Cursor = SharedCursor(StandardCursorType.Hand);
                 e.Pointer.Capture(this);
                 InvalidateVisual();
@@ -1506,6 +1510,7 @@ public sealed partial class DesignerCanvas : Control
                 _gestureH = _resizeStartBounds.Height;
                 _gestureBefore = ElementSnapshot.Capture([primary]);
                 _gestureAdded.Clear();
+                StartGesturePreview(GestureKind.Resize, [primary], _gestureBefore);
                 e.Pointer.Capture(this);
                 InvalidateVisual();
                 return;
@@ -1705,6 +1710,7 @@ public sealed partial class DesignerCanvas : Control
         _dragStartBounds = new DotRect(minX, minY, maxX - minX, maxY - minY);
         _gestureBefore = ElementSnapshot.Capture(_dragItems.Select(i => i.Element));
         BuildSnapTargets(doc, _dragItems.Select(i => i.Element).ToHashSet());
+        StartGesturePreview(GestureKind.Move, _dragItems.Select(i => i.Element).ToArray(), _gestureBefore);
     }
 
     /// <summary>
@@ -1872,7 +1878,7 @@ public sealed partial class DesignerCanvas : Control
 
     /// <summary>Everything a gesture leaves behind, cleared in one place so a cancel and a
     /// release cannot forget different halves of it.</summary>
-    private void EndGestureState()
+    private void EndGestureState(bool committed = false)
     {
         StopAutoPan();
         _dragging = false;
@@ -1894,6 +1900,7 @@ public sealed partial class DesignerCanvas : Control
         _dragDy = 0;
         _snapX = null;
         _snapY = null;
+        EndGesturePreview(committed);
     }
 
     /// <summary>Collects the snap targets for a starting gesture: guides, label edges
@@ -2413,6 +2420,7 @@ public sealed partial class DesignerCanvas : Control
                 element.X = startX + _dragDx;
                 element.Y = startY + _dragDy;
             }
+            SetCurrentValue(GestureOffsetProperty, new Vector(_dragDx, _dragDy));
         }
 
         LiveEdited?.Invoke(this, EventArgs.Empty);
@@ -3014,10 +3022,10 @@ public sealed partial class DesignerCanvas : Control
         if (_rotating)
         {
             Cursor = Cursor.Default;
-            e.Pointer.Capture(null);
             bool turned = Selection?.Primary is { } rotated
                 && FieldRotation.Get(rotated) != _rotateGestureStart;
-            EndGestureState();
+            EndGestureState(turned);
+            e.Pointer.Capture(null);
             if (turned)
             {
                 DocumentEdited?.Invoke(this, EventArgs.Empty);
@@ -3051,7 +3059,6 @@ public sealed partial class DesignerCanvas : Control
         }
 
         bool wasResizing = _resizing;
-        e.Pointer.Capture(null);
 
         // The model was updated live during the gesture; the release only decides
         // whether an undo step should be recorded.
@@ -3063,7 +3070,8 @@ public sealed partial class DesignerCanvas : Control
               Selection?.Primary is { } r && (r.X != _resizeStartX || r.Y != _resizeStartY)
             : _duplicated || _dragDx != 0 || _dragDy != 0;
 
-        EndGestureState();
+        EndGestureState(changed);
+        e.Pointer.Capture(null);
 
         if (changed)
         {

@@ -587,6 +587,8 @@
             <controls:DesignerCanvas Name="Canvas"
                                      Underlay="{Binding Underlay}"
                                      UnderlayMarginDots="{Binding UnderlayMarginDots}"
+                                     GesturePreview="{Binding GesturePreview}"
+                                     GestureOffset="{Binding GestureOffset, Mode=TwoWay}"
                                      CanvasRevision="{Binding CanvasRevision}"
                                      ShowCanvasPerformance="{Binding ShowCanvasPerformance}"
                                      ShowElementOutlines="{Binding ShowElementOutlines}"

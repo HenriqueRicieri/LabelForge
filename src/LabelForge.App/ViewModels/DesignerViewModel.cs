@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -1027,7 +1027,12 @@ public partial class DesignerViewModel : ViewModelBase
 
     /// <summary>Ends the session cleanly, which is what stops the next start offering to
     /// recover work that was never lost.</summary>
-    public void ShutDown() => _recovery.Dispose();
+    public void ShutDown()
+    {
+        StopGesturePreview();
+        _renderCts?.Cancel();
+        _recovery.Dispose();
+    }
 
     /// <summary>Called continuously while the canvas drags or resizes: the model is
     /// already updated, so re-render and refresh the panel, but record no undo.
@@ -1049,7 +1054,7 @@ public partial class DesignerViewModel : ViewModelBase
             SelectionProperties?.Refresh();
         }
 
-        ScheduleRender(delayMs: 0, live: true);
+        if (!UpdateGesturePreview()) ScheduleRender(delayMs: 0, live: true);
     }
 
     /// <summary>The canvas says where the pointer is; this turns it into the readout.</summary>
@@ -3098,6 +3103,8 @@ public partial class DesignerViewModel : ViewModelBase
     /// edit is over, so a drag does not spend it sixty times a second.</param>
     private async void ScheduleRender(int delayMs = 150, bool live = false)
     {
+        if (!live && _gestureSession is not null) StopGesturePreview();
+        int previewEpoch = _previewEpoch;
         if (Document.IsContinuous)
         {
             SyncLabelLength();
@@ -3137,9 +3144,9 @@ public partial class DesignerViewModel : ViewModelBase
 
             // A render that DID run is shown, even though something newer may already be
             // queued behind it. That is the point of the queue: the picture on screen is
-            // never more than one render old. The only thing worth throwing away is a
-            // render of a document that is no longer open.
-            if (!ReferenceEquals(document, Document))
+            // never more than one render old. Document swaps and gesture transitions
+            // invalidate earlier renders so they cannot overwrite the current layers.
+            if (!ReferenceEquals(document, Document) || previewEpoch != _previewEpoch)
             {
                 // The bitmap holds unmanaged pixels, so it goes now rather than whenever
                 // a finalizer gets to it.
@@ -3184,6 +3191,8 @@ public partial class DesignerViewModel : ViewModelBase
                 previous?.Dispose();
                 _renderedFrom = renderKey;
             }
+
+            if (!live) ClearGestureImages();
 
             // Document-wide validation summary, shown near the canvas regardless of
             // what is selected.

@@ -27,7 +27,8 @@ public sealed class ZplGenerator : IElementVisitor
     /// <summary>Rasterized images keyed by everything that decides their bits, so a
     /// stamp placed twice is converted once and recognized as the same graphic.</summary>
     private readonly Dictionary<string, SharedGraphic> _graphics = new(StringComparer.Ordinal);
-    private int _offset;
+    private int _offsetX;
+    private int _offsetY;
 
     /// <summary>Extra X applied to every origin while a column other than the first is
     /// being emitted, and the copy index that column's counters read.</summary>
@@ -68,8 +69,19 @@ public sealed class ZplGenerator : IElementVisitor
     public string GeneratePreview(LabelDocument document, int offsetDots) =>
         Generate(document, new GenerationContext(), offsetDots, includeOffLabel: true);
 
+    /// <summary>Preview-only render of a subset into a dot-space viewport. The viewport
+    /// may lie outside the label; moving layers use their own complete surface before
+    /// the canvas clips the composite to the pasteboard.</summary>
+    public string GeneratePreviewLayer(
+        LabelDocument document, IReadOnlyList<Element> elements, DotRect viewport)
+    {
+        ArgumentNullException.ThrowIfNull(elements);
+        return Generate(document, new GenerationContext(), 0, includeOffLabel: true, elements, viewport);
+    }
+
     private string Generate(
-        LabelDocument document, GenerationContext context, int offsetDots, bool includeOffLabel)
+        LabelDocument document, GenerationContext context, int offsetDots, bool includeOffLabel,
+        IReadOnlyList<Element>? elements = null, DotRect? viewport = null)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(context);
@@ -79,7 +91,8 @@ public sealed class ZplGenerator : IElementVisitor
         _warnings.Clear();
         _seenWarnings.Clear();
         _graphics.Clear();
-        _offset = offsetDots;
+        _offsetX = viewport is { } area ? -area.X : offsetDots;
+        _offsetY = viewport is { } region ? -region.Y : offsetDots;
         _document = document;
         _context = context;
         _preview = includeOffLabel;
@@ -95,8 +108,8 @@ public sealed class ZplGenerator : IElementVisitor
         int printWidth = AcrossLayout.WebWidthDots(document, _columns);
         Line("^XA");
         Line("^CI28");
-        Line($"^PW{printWidth + 2 * offsetDots}");
-        Line($"^LL{document.HeightDots + 2 * offsetDots}");
+        Line($"^PW{viewport?.Width ?? printWidth + 2 * offsetDots}");
+        Line($"^LL{viewport?.Height ?? document.HeightDots + 2 * offsetDots}");
         Line("^LH0,0");
 
         // Label reverse is the one job setting that is ink rather than machine setup, so
@@ -166,13 +179,13 @@ public sealed class ZplGenerator : IElementVisitor
             }
         }
 
-        Element[] emitted = document.Elements
+        Element[] emitted = (elements?.AsEnumerable() ?? document.Elements)
             .Where(e => e.IsVisible)
             .OrderBy(e => e.ZOrder)
             .Where(e => includeOffLabel || ElementPlacement.IsPrintable(e, document))
 
             // Even the preview cannot express an origin left of / above the pasteboard.
-            .Where(e => e.X + offsetDots >= 0 && e.Y + offsetDots >= 0)
+            .Where(e => e.X + _offsetX >= 0 && e.Y + _offsetY >= 0)
             .ToArray();
 
         PlanSharedGraphics(emitted, _columns);
@@ -297,7 +310,7 @@ public sealed class ZplGenerator : IElementVisitor
     /// design time, which for a template field is a marker rather than the value.</summary>
     private string Fo(Element element) =>
         $"{(element.Anchor == FieldAnchor.Baseline ? "^FT" : "^FO")}"
-        + $"{element.X + _offset + _columnX},{element.Y + _offset}"
+        + $"{element.X + _offsetX + _columnX},{element.Y + _offsetY}"
         + (element.IsReversed ? "^FR" : string.Empty);
 
     /// <summary>Emits a field's data, resolving the document's counters and clocks. The
