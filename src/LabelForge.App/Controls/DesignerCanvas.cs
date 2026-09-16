@@ -268,6 +268,8 @@ public sealed partial class DesignerCanvas : Control
     private bool _marquee;
     private Point _marqueeStartDots;
     private Point _marqueeCurrent;
+    private IReadOnlyList<Element> _marqueeSelection = [];
+    private bool _marqueeAdditive;
 
     // Explicit view transform once the user zooms or pans; null means auto-fit.
     private double? _userScale;
@@ -478,6 +480,7 @@ public sealed partial class DesignerCanvas : Control
         if (change.Property == DocumentProperty)
         {
             if (_gesturePreviewActive) EndGestureState();
+            if (_marquee) EndMarquee(restoreSelection: false);
 
             // A different document means a different size; go back to auto-fit.
             _userScale = null;
@@ -1000,7 +1003,7 @@ public sealed partial class DesignerCanvas : Control
 
         if (_marquee)
         {
-            context.DrawRectangle(null, GhostPen, MarqueeRect());
+            context.DrawRectangle(null, CurrentMarquee().Crossing ? GhostPen : SelectionPen, MarqueeRect());
         }
 
         DrawGuides(context, doc, scale, origin);
@@ -1572,6 +1575,8 @@ public sealed partial class DesignerCanvas : Control
         if (hit is null)
         {
             // Empty space: start a marquee; plain click also clears the selection.
+            _marqueeSelection = selection.Items.ToArray();
+            _marqueeAdditive = additive;
             if (!additive)
             {
                 selection.Clear();
@@ -1722,6 +1727,12 @@ public sealed partial class DesignerCanvas : Control
     /// <returns>False when there was no gesture to cancel.</returns>
     private bool CancelGesture()
     {
+        if (_marquee)
+        {
+            EndMarquee(restoreSelection: true);
+            return true;
+        }
+
         if (_drawArmed || _drawing)
         {
             EndGestureState();
@@ -3011,6 +3022,7 @@ public sealed partial class DesignerCanvas : Control
 
         if (_marquee)
         {
+            _marqueeCurrent = e.GetPosition(this);
             _marquee = false;
             StopAutoPan();
             e.Pointer.Capture(null);
@@ -3081,30 +3093,31 @@ public sealed partial class DesignerCanvas : Control
         InvalidateVisual();
     }
 
+    private SelectionMarquee CurrentMarquee()
+    {
+        var (scale, origin) = GetTransform();
+        return new SelectionMarquee(_marqueeStartDots.X, _marqueeStartDots.Y,
+            (_marqueeCurrent.X - origin.X) / scale, (_marqueeCurrent.Y - origin.Y) / scale);
+    }
+
+    private void EndMarquee(bool restoreSelection)
+    {
+        _marquee = false;
+        StopAutoPan();
+        if (restoreSelection) Selection?.SetMany(_marqueeSelection);
+        _marqueeSelection = [];
+        _marqueeAdditive = false;
+        InvalidateVisual();
+    }
+
     private void CommitMarquee()
     {
-        if (Document is not { } doc || Selection is not { } selection)
+        if (Document is { } doc && Selection is { } selection)
         {
-            return;
+            IReadOnlyList<Element> hits = CurrentMarquee().Select(doc);
+            selection.SetMany(_marqueeAdditive ? _marqueeSelection.Concat(hits) : hits);
         }
-
-        var (scale, origin) = GetTransform();
-        Rect band = MarqueeRect();
-
-        int x = (int)Math.Floor((band.X - origin.X) / scale);
-        int y = (int)Math.Floor((band.Y - origin.Y) / scale);
-        int w = Math.Max((int)Math.Ceiling(band.Width / scale), 1);
-        int h = Math.Max((int)Math.Ceiling(band.Height / scale), 1);
-        var dotBand = new DotRect(x, y, w, h);
-
-        var hits = doc.Elements
-            .Where(el => el.IsVisible && _bounds.GetBounds(el).Intersects(dotBand))
-            .ToList();
-
-        if (hits.Count > 0)
-        {
-            selection.SetMany(Groups.Expand(doc, hits));
-        }
+        EndMarquee(restoreSelection: false);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
