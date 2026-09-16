@@ -28,6 +28,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   control below the canvas (50/100/200% presets, fit; 100% shows real printer dots).
   Ctrl and the plus or minus key zoom about the middle of the view, which is the half the wheel does not do, and holding Space
   and dragging pans for a mouse with no middle button.
+- Drag right on empty stock to select fields or whole groups enclosed by the area;
+  drag left to include those crossing it. The outline is solid for enclosure and dashed
+  for crossing. Ctrl or Shift adds to the current selection; Escape restores it.
 - Draw from one corner to the other in any direction. A click places the default size;
   dragging sizes the element, with Shift constraining shapes and image aspect, and Alt
   disabling snapping. Release records one undo step; Escape discards the unfinished element.

@@ -50,13 +50,13 @@ public sealed partial class DesignerCanvas
 
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
-        if (_gesturePreviewActive) CancelGesture();
+        if (_gesturePreviewActive || _marquee) CancelGesture();
         base.OnPointerCaptureLost(e);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        if (_gesturePreviewActive) CancelGesture();
+        if (_gesturePreviewActive || _marquee) CancelGesture();
         base.OnDetachedFromVisualTree(e);
     }
 
