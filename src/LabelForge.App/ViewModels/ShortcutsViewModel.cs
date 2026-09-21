@@ -37,7 +37,7 @@ public sealed class ShortcutsViewModel
             new("Ctrl + S", "Save (asks where the first time)"),
         ]),
 
-        new("Editing", string.Empty,
+        new("Editing", "Copy and cut share elements between LabelForge windows, including groups and images.",
         [
             new("Ctrl + Z", "Undo"),
             new("Ctrl + Y  /  Ctrl + Shift + Z", "Redo"),

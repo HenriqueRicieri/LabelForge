@@ -86,6 +86,10 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   from the last one, so there was no way to put a copy exactly where the original stood.
   Ctrl + Shift + V does that, and it deliberately does not clamp to the label, because an element
   parked on the pasteboard is outside it on purpose.
+- Copy and cut share elements between LabelForge windows through the system clipboard,
+  including groups and embedded images. Paste keeps stacking order and records one undo
+  step. Paste in Place and Paste Here work across windows too. If the clipboard is busy
+  or holds unrelated content, the designer uses its last internal copy.
 - Rotation handles support text, the four symbol types, straight lines and diagonal lines.
   Straight lines switch between horizontal and vertical; diagonals change lean and swap their
   width and height. Canvas rotation keeps the drawn centre fixed, with whole-dot rounding,

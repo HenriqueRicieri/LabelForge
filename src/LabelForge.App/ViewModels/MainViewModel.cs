@@ -16,22 +16,20 @@ public partial class MainViewModel : ViewModelBase
     /// <param name="fieldCatalogStore">Where the imported field catalogs live.</param>
     /// <param name="recoveryStore">Where crash snapshots live.</param>
     /// <param name="comparisonRenderer">What the viewer's compare mode measures against.</param>
-    /// <remarks>
-    /// All four are injectable for one reason: a harness run must not touch what belongs to
-    /// the person using the app. Three of them are per-machine files it would otherwise
-    /// overwrite; the fourth would otherwise send their label to a third party over the
-    /// internet. Leaving one out is not a smaller shortcut, it is the same mistake in one
-    /// place, which F2 already learned the hard way with the field catalog.
-    /// </remarks>
+    /// <param name="userSettingsStore">Where per-machine editing preferences live.</param>
+    /// <param name="clipboard">The platform element clipboard; null keeps copies within this designer.</param>
+    /// <remarks>Inject scratch stores and an offline comparison renderer in the harness.
+    /// Clipboard checks use Avalonia's headless clipboard, never the user's OS clipboard.</remarks>
     public MainViewModel(
         LabelForge.Core.Media.UserMediaStore? userMediaStore = null,
         LabelForge.Core.Fields.FieldCatalogStore? fieldCatalogStore = null,
         LabelForge.Core.Io.RecoveryStore? recoveryStore = null,
         Func<LabelForge.Core.Rendering.IZplRenderer>? comparisonRenderer = null,
-        LabelForge.Core.Settings.UserSettingsStore? userSettingsStore = null)
+        LabelForge.Core.Settings.UserSettingsStore? userSettingsStore = null,
+        Services.IElementClipboard? clipboard = null)
     {
         Designer = new DesignerViewModel(
-            userMediaStore, fieldCatalogStore, recoveryStore, userSettingsStore);
+            userMediaStore, fieldCatalogStore, recoveryStore, userSettingsStore, clipboard);
         Viewer = new ViewerViewModel(comparisonRenderer);
     }
 

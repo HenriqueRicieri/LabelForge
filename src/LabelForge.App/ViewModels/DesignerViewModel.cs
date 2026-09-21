@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -79,6 +79,10 @@ public partial class DesignerViewModel : ViewModelBase
     private long _lastRecordTicks;
     private string? _lastCoalesceKey;
     private string? _clipboardElement;
+    private readonly Services.IElementClipboard? _clipboard;
+    private string? _clipboardSource;
+    private int _clipboardRevision;
+    private Task _clipboardWrite = Task.CompletedTask;
 
     public IReadOnlyList<DensityOption> Densities => DensityOption.Standard;
 
@@ -892,8 +896,12 @@ public partial class DesignerViewModel : ViewModelBase
         Core.Media.UserMediaStore? userMediaStore = null,
         Core.Fields.FieldCatalogStore? fieldCatalogStore = null,
         RecoveryStore? recoveryStore = null,
-        UserSettingsStore? userSettingsStore = null)
+        UserSettingsStore? userSettingsStore = null,
+        Services.IElementClipboard? clipboard = null)
     {
+        _clipboard = clipboard;
+        // A different window can copy at any time; paste reads the clipboard on demand.
+        CanPaste = clipboard is not null;
         _renderQueue = new RenderQueue<RenderRequest, RenderPass>(Render);
         _userMediaStore = userMediaStore ?? new Core.Media.UserMediaStore();
         _fieldCatalogStore = fieldCatalogStore ?? new Core.Fields.FieldCatalogStore();
@@ -2091,41 +2099,61 @@ public partial class DesignerViewModel : ViewModelBase
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private void Copy()
+    private Task Copy()
     {
         if (Selection.Count > 0)
         {
             // Preserve draw order so a pasted group stacks like the original.
             _clipboardElement = LabelDocumentJson.SerializeElements(
                 Selection.Items.OrderBy(e => e.ZOrder));
+            _clipboardRevision++;
+            _clipboardSource = _clipboardElement;
             CanPaste = true;
+            _clipboardWrite = WriteClipboardAsync(_clipboardElement, _clipboardWrite);
         }
+        return _clipboardWrite;
+    }
+
+    private async Task WriteClipboardAsync(string json, Task previous)
+    {
+        await previous;
+        if (_clipboard is not null) await _clipboard.WriteAsync(json);
+    }
+
+    private async Task<List<Element>> ReadClipboardAsync(LabelDocument document)
+    {
+        int revision = _clipboardRevision;
+        await _clipboardWrite;
+        string? json = _clipboard is null ? null : await _clipboard.ReadAsync();
+        if (!ReferenceEquals(document, Document) || revision != _clipboardRevision) return [];
+        if (json is not null && json != _clipboardSource)
+        {
+            _clipboardSource = json;
+            _clipboardElement = json;
+        }
+        return _clipboardElement is null ? [] : LabelDocumentJson.DeserializeElements(_clipboardElement);
     }
 
     /// <summary>Copy and delete in one go. One undo step, because the copy records nothing
     /// (the clipboard is not part of the document) and the delete records the whole
     /// removal.</summary>
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private void Cut()
+    private async Task Cut()
     {
         if (Selection.Count == 0)
         {
             return;
         }
 
-        Copy();
+        Task copied = Copy();
         DeleteSelected();
+        await copied;
     }
 
     [RelayCommand(CanExecute = nameof(CanPaste))]
-    private void Paste()
+    private async Task Paste()
     {
-        if (_clipboardElement is null)
-        {
-            return;
-        }
-
-        List<Element> elements = LabelDocumentJson.DeserializeElements(_clipboardElement);
+        List<Element> elements = await ReadClipboardAsync(Document);
         if (PlaceClones(elements))
         {
             // Re-serialize the placed (offset, clamped) copies so repeated pastes
@@ -2142,14 +2170,9 @@ public partial class DesignerViewModel : ViewModelBase
     /// nothing about position. A right-click has said exactly where, so honouring it is
     /// the whole difference between the two.
     /// </summary>
-    public void PasteAt(int x, int y)
+    public async Task PasteAt(int x, int y)
     {
-        if (_clipboardElement is null)
-        {
-            return;
-        }
-
-        List<Element> clones = LabelDocumentJson.DeserializeElements(_clipboardElement);
+        List<Element> clones = await ReadClipboardAsync(Document);
         if (clones.Count == 0)
         {
             return;
@@ -2170,14 +2193,9 @@ public partial class DesignerViewModel : ViewModelBase
     /// second copy in the same place rather than walking away from it.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanPaste))]
-    private void PasteInPlace()
+    private async Task PasteInPlace()
     {
-        if (_clipboardElement is null)
-        {
-            return;
-        }
-
-        List<Element> clones = LabelDocumentJson.DeserializeElements(_clipboardElement);
+        List<Element> clones = await ReadClipboardAsync(Document);
         if (clones.Count == 0)
         {
             return;

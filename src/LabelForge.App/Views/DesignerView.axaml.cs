@@ -154,7 +154,7 @@ public partial class DesignerView : UserControl
             Header = "Paste Here",
             IsEnabled = vm.CanPaste,
         };
-        pasteHere.Click += (_, _) => vm.PasteAt(x, y);
+        pasteHere.Click += async (_, _) => await vm.PasteAt(x, y);
         menu.Items.Add(pasteHere);
         Add(menu, "Paste", vm.PasteCommand);
         Add(menu, "Paste in Place", vm.PasteInPlaceCommand);

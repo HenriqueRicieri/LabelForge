@@ -18,8 +18,10 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var main = new MainViewModel();
-            desktop.MainWindow = new MainWindow { DataContext = main };
+            var window = new MainWindow();
+            var main = new MainViewModel(clipboard: new Services.ElementClipboard(() => window.Clipboard));
+            window.DataContext = main;
+            desktop.MainWindow = window;
 
             // A path on the command line is how the shell opens a double-clicked label,
             // and how "Open with" and a file dropped on the executable arrive too. Done
