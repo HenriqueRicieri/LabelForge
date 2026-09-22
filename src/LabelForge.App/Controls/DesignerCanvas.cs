@@ -321,6 +321,8 @@ public sealed partial class DesignerCanvas : Control
     private int? _snapY;
     private readonly List<int> _snapTargetsX = [];
     private readonly List<int> _snapTargetsY = [];
+    private readonly List<DotRect> _spacingNeighbours = [];
+    private IReadOnlyList<SpacingGap> _spacingGaps = [];
 
     /// <summary>Screen distance within which a guide can be grabbed or snapped to.</summary>
     private const double GuideGrabPx = 5;
@@ -1030,6 +1032,7 @@ public sealed partial class DesignerCanvas : Control
         }
 
         DrawGuides(context, doc, scale, origin);
+        DrawSpacing(context, doc, scale, origin);
         DrawRulers(context, doc, scale, origin);
     }
 
@@ -1114,6 +1117,33 @@ public sealed partial class DesignerCanvas : Control
                 ? doc.VerticalGuides[_dragGuideIndex]
                 : doc.HorizontalGuides[_dragGuideIndex];
             DrawReadout(context, MmText(dots, doc), new Point(p.X + 12, p.Y + 12));
+        }
+    }
+
+    private void DrawSpacing(DrawingContext context, LabelDocument doc, double scale, Point origin)
+    {
+        foreach (SpacingGap gap in _spacingGaps)
+        {
+            Point a = gap.Horizontal
+                ? new Point(origin.X + gap.Start * scale, origin.Y + gap.Cross * scale)
+                : new Point(origin.X + gap.Cross * scale, origin.Y + gap.Start * scale);
+            Point b = gap.Horizontal
+                ? new Point(origin.X + gap.End * scale, a.Y)
+                : new Point(a.X, origin.Y + gap.End * scale);
+            Vector tick = gap.Horizontal ? new Vector(0, 3) : new Vector(3, 0);
+            context.DrawLine(SnapPen, a, b);
+            context.DrawLine(SnapPen, a - tick, a + tick);
+            context.DrawLine(SnapPen, b - tick, b + tick);
+            var text = new FormattedText(MmText(gap.Dots, doc),
+                System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                Typeface.Default, 12, SnapPen.Brush);
+            double x = gap.Horizontal ? (a.X + b.X - text.Width) / 2 : a.X + 6;
+            double y = gap.Horizontal ? a.Y - text.Height - 4 : (a.Y + b.Y - text.Height) / 2;
+            x = Math.Clamp(x, RulerSize + 4, Math.Max(RulerSize + 4, Bounds.Width - text.Width - 4));
+            y = Math.Clamp(y, RulerSize + 4, Math.Max(RulerSize + 4, Bounds.Height - text.Height - 4));
+            context.FillRectangle(IsDark ? DarkRulerBrush : Brushes.White,
+                new Rect(x - 2, y - 1, text.Width + 4, text.Height + 2));
+            context.DrawText(text, new Point(x, y));
         }
     }
 
@@ -1916,6 +1946,8 @@ public sealed partial class DesignerCanvas : Control
         StopAutoPan();
         _dragging = false;
         _resizing = false;
+        _spacingGaps = [];
+        _spacingNeighbours.Clear();
         _selectionScale = null;
         _rotating = false;
         _drawArmed = false;
@@ -1945,6 +1977,7 @@ public sealed partial class DesignerCanvas : Control
     {
         _snapTargetsX.Clear();
         _snapTargetsY.Clear();
+        _spacingNeighbours.Clear();
 
         // The label's own edges and centre are always in, whatever the toggles say: they
         // are the label rather than something laid over it, and turning off guides is not
@@ -1967,11 +2000,6 @@ public sealed partial class DesignerCanvas : Control
             _snapTargetsY.AddRange(DesignGrid.Lines(doc, doc.HeightDots));
         }
 
-        if (!SnapToObjects)
-        {
-            return;
-        }
-
         foreach (Element element in doc.Elements)
         {
             if (!element.IsVisible || excluded.Contains(element))
@@ -1980,8 +2008,12 @@ public sealed partial class DesignerCanvas : Control
             }
 
             DotRect b = _bounds.GetBounds(element);
-            _snapTargetsX.AddRange([b.X, b.X + b.Width / 2, b.X + b.Width]);
-            _snapTargetsY.AddRange([b.Y, b.Y + b.Height / 2, b.Y + b.Height]);
+            _spacingNeighbours.Add(b);
+            if (SnapToObjects)
+            {
+                _snapTargetsX.AddRange([b.X, b.X + b.Width / 2, b.X + b.Width]);
+                _snapTargetsY.AddRange([b.Y, b.Y + b.Height / 2, b.Y + b.Height]);
+            }
         }
     }
 
@@ -2451,11 +2483,54 @@ public sealed partial class DesignerCanvas : Control
                     _dragStartBounds.Y + _dragStartBounds.Height + dy,
                     _snapTargetsY,
                     threshold);
+                if (_axisLockY) { shiftX = 0; _snapX = null; }
+                if (_axisLockX) { shiftY = 0; _snapY = null; }
+                if (SnapToObjects)
+                {
+                    var moving = new DotRect(_dragStartBounds.X + dx, _dragStartBounds.Y + dy,
+                        _dragStartBounds.Width, _dragStartBounds.Height);
+                    var guideX = (Shift: shiftX, Target: _snapX);
+                    var guideY = (Shift: shiftY, Target: _snapY);
+                    bool spacedX = false, spacedY = false;
+                    if (!_axisLockY && SpacingGuides.Snap(moving, _spacingNeighbours, true, threshold) is { } spacingX &&
+                        (_snapX is null || Math.Abs(spacingX) < Math.Abs(shiftX)))
+                    {
+                        shiftX = spacingX;
+                        _snapX = null;
+                        spacedX = true;
+                    }
+                    if (!_axisLockX && SpacingGuides.Snap(moving, _spacingNeighbours, false, threshold) is { } spacingY &&
+                        (_snapY is null || Math.Abs(spacingY) < Math.Abs(shiftY)))
+                    {
+                        shiftY = spacingY;
+                        _snapY = null;
+                        spacedY = true;
+                    }
+                    // Reject spacing that loses its shared lane after the other axis snaps.
+                    // A fallback can affect the other axis, so allow one recheck per axis.
+                    for (int pass = 0; pass < 2; pass++)
+                    {
+                        var snapped = moving with { X = moving.X + shiftX, Y = moving.Y + shiftY };
+                        if (spacedX && SpacingGuides.Snap(snapped, _spacingNeighbours, true, 0) is null)
+                        {
+                            (shiftX, _snapX) = guideX;
+                            spacedX = false;
+                        }
+                        snapped = moving with { X = moving.X + shiftX, Y = moving.Y + shiftY };
+                        if (spacedY && SpacingGuides.Snap(snapped, _spacingNeighbours, false, 0) is null)
+                        {
+                            (shiftY, _snapY) = guideY;
+                            spacedY = false;
+                        }
+                    }
+                }
                 dx += shiftX;
                 dy += shiftY;
             }
 
             (_dragDx, _dragDy) = ClampGroupDelta(doc, dx, dy);
+            _spacingGaps = SpacingGuides.Measure(new DotRect(_dragStartBounds.X + _dragDx,
+                _dragStartBounds.Y + _dragDy, _dragStartBounds.Width, _dragStartBounds.Height), _spacingNeighbours);
 
             // Move the model live so the label content follows the pointer.
             foreach ((Element element, int startX, int startY) in _dragItems)

@@ -55,12 +55,12 @@ public sealed class ShortcutsViewModel
         new("Moving things",
             "A locked element sits every one of these out. Alt is this canvas's "
             + "no-snapping key, so the resize modifiers other tools put on Alt are on Ctrl "
-            + "and Shift here.",
+            + "and Shift here. Snap to objects also controls equal spacing.",
         [
             new("Arrow keys", "Nudge by a grid step, or one dot with grid snapping off"),
             new("Shift + arrows", "Nudge by ten steps"),
             new("Alt + arrows", "Nudge by one dot, or ten with Shift, even with grid snapping on"),
-            new("Drag", "Move the whole selection together"),
+            new("Drag", "Move the selection; show gaps in mm and snap to equal spacing"),
             new("Shift + drag", "Move along one axis only"),
             new("Ctrl + drag", "Leave a copy behind and move the copy"),
             new("Alt + drag", "Move without snapping to anything, whatever View has switched on"),

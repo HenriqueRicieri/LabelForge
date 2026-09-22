@@ -107,6 +107,10 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   parked. Off-label content stays visible, dimmed, with an amber outline and a clear warning; at
   print time content crossing the edge is clipped like the printer would, and elements whose origin
   is off the label are skipped from the generated ZPL.
+- While dragging, pink guides show the nearest gaps in millimeters. Snap between two
+  fields for equal gaps, or repeat their spacing at either end. This follows Snap to
+  objects; hold Alt during the drag to move freely while keeping the measurements.
+  Groups and multiple selections use their combined bounds.
 - Alignment guides: hold the mouse on a ruler for a transient guide with a live mm readout, double
   click (or right-click menu) for a permanent one. Guides drag to reposition, drop back on the
   ruler to delete, save with the document, and participate in undo.
