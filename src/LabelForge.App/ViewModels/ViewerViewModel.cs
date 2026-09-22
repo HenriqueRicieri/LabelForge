@@ -8,7 +8,6 @@ using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LabelForge.Core.Io;
-using LabelForge.Core.Printing;
 using LabelForge.Core.Rendering;
 using LabelForge.Core.Templating;
 using LabelForge.Core.Zpl;
@@ -78,37 +77,21 @@ public partial class ViewerViewModel : ViewModelBase
     [ObservableProperty]
     public partial string StatusText { get; set; } = string.Empty;
 
-    [ObservableProperty]
-    public partial string PrinterHost { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial decimal PrinterPort { get; set; } = RawNetworkPrinter.DefaultPort;
+    public NetworkPrinterViewModel NetworkPrinter { get; } = new();
 
     /// <summary>Sends what the preview shows: the current ZPL with sample data substituted.</summary>
     [RelayCommand]
     private async Task PrintAsync()
     {
-        string host = PrinterHost.Trim();
-        if (host.Length == 0)
-        {
-            StatusText = "Enter the printer address first";
-            return;
-        }
-
         try
         {
-            StatusText = $"Sending to {host}...";
-
-            // The connection phase is bounded inside SendAsync; a timeout surfaces as a
-            // TimeoutException whose message already names the unreachable endpoint.
-            await RawNetworkPrinter.SendAsync(
-                host, (int)PrinterPort, _substitutor.Substitute(ZplText ?? string.Empty));
-            StatusText = $"Sent to {host}:{(int)PrinterPort}";
+            await NetworkPrinter.SendAsync(_substitutor.Substitute(ZplText ?? string.Empty));
         }
         catch (Exception ex)
         {
-            StatusText = $"Print failed: {ex.Message}";
+            NetworkPrinter.StatusText = $"Print failed: {ex.Message}";
         }
+        StatusText = NetworkPrinter.StatusText;
     }
 
     /// <param name="comparisonRenderer">Makes the renderer the compare mode measures

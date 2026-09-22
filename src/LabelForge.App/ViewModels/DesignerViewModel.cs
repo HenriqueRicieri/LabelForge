@@ -844,11 +844,7 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial string? CurrentFilePath { get; set; }
 
-    [ObservableProperty]
-    public partial string PrinterHost { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial decimal PrinterPort { get; set; } = Core.Printing.RawNetworkPrinter.DefaultPort;
+    public NetworkPrinterViewModel NetworkPrinter { get; } = new();
 
     public IReadOnlyList<Core.Printers.PrinterProfile> Printers => Core.Printers.PrinterCatalog.All;
 
@@ -1313,27 +1309,16 @@ public partial class DesignerViewModel : ViewModelBase
     [RelayCommand]
     private async Task PrintAsync()
     {
-        string host = PrinterHost.Trim();
-        if (host.Length == 0)
-        {
-            StatusText = "Enter the printer address first";
-            return;
-        }
-
         try
         {
-            StatusText = $"Sending to {host}...";
             PrintJobResult job = BuildPrintJob();
-
-            // The connection phase is bounded inside SendAsync; a timeout surfaces as a
-            // TimeoutException whose message already names the unreachable endpoint.
-            await Core.Printing.RawNetworkPrinter.SendAsync(host, (int)PrinterPort, job.Zpl);
-            StatusText = $"Sent to {host}:{(int)PrinterPort}{DescribeRun(job)}";
+            await NetworkPrinter.SendAsync(job.Zpl, DescribeRun(job));
         }
         catch (Exception ex)
         {
-            StatusText = $"Print failed: {ex.Message}";
+            NetworkPrinter.StatusText = $"Print failed: {ex.Message}";
         }
+        StatusText = NetworkPrinter.StatusText;
     }
 
     private static IReadOnlyList<string> LoadWindowsPrinters()

@@ -254,6 +254,11 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   date stamped here is taken as the job is built. Both printing and this export go through
   one builder, so a file kept as evidence cannot drift from what the printer received.
 - Printing over the network (TCP 9100) and through the Windows spooler (RAW datatype, the USB path).
+  Network printing checks Zebra status before and after sending, and reports conditions such as
+  pause, paper-out and an open head. A fault or unavailable status before sending blocks the job;
+  printers without status readback can use the explicit unchecked option. Both print panels also offer
+  a status-only check. A completed send confirms the TCP write, not physical printing; interrupted
+  transfers or missing status after a send ask you to check the printer before resending.
 - Light and dark themes, a custom app icon, and Windows packaging via Velopack.
 
 ## Not yet built

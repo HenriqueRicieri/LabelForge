@@ -52,7 +52,7 @@ if (args.Contains("dark"))
 // Media presets, field catalogs and crash snapshots all live per machine. Point every
 // one of them at scratch locations, so a harness run never touches what the person using
 // the app has saved.
-string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "spacing"
+string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "spacing" or "printer-status"
     ? Path.Combine(AppContext.BaseDirectory, args[0] + "-scratch")
     : AppContext.BaseDirectory;
 Directory.CreateDirectory(scratchRoot);
@@ -91,6 +91,14 @@ if (args.FirstOrDefault() == "ui-layout")
 // over these two and a captured local has to be assigned at every place it is called from.
 int graded = 0;
 var disagreed = new List<string>();
+if (args.FirstOrDefault() == "printer-status")
+{
+    PrinterStatusChecks.Run(window, vm, (label, held) => Check(label, held, true));
+    Console.WriteLine($"{graded} printer status checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
 if (args.FirstOrDefault() == "spacing")
 {
     SpacingChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
@@ -3308,6 +3316,7 @@ if (mode == "designer")
     QuietZoneFrameChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
     CanvasDisplayChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
     MenuOptionChecks.Run(window, vm.Designer, settingsPath, (label, held) => Check(label, held, true));
+    PrinterStatusChecks.Run(window, vm, (label, held) => Check(label, held, true));
 }
 
 Capture($"{mode}.png");

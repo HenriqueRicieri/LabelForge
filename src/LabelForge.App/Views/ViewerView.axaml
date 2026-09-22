@@ -48,15 +48,27 @@
                 <Button Content="Print..." ToolTip.Tip="Send to a network printer (sample data is substituted, matching the preview)">
                     <Button.Flyout>
                         <Flyout Placement="Bottom">
-                            <StackPanel Spacing="6" Width="230">
-                                <TextBlock Text="Printer address (TCP 9100)" FontSize="12" Opacity="0.8" />
-                                <TextBox Text="{Binding PrinterHost}" PlaceholderText="192.168.0.50" />
-                                <TextBlock Text="Port" FontSize="12" Opacity="0.8" />
-                                <NumericUpDown Value="{Binding PrinterPort}" Minimum="1" Maximum="65535"
-                                               Increment="1" FormatString="0" />
-                                <Button Content="Send to printer" Command="{Binding PrintCommand}"
-                                        HorizontalAlignment="Stretch" />
-                            </StackPanel>
+                            <ScrollViewer MaxHeight="540" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Spacing="6" Width="260">
+                                    <TextBlock Text="Printer address (TCP 9100)" FontSize="12" Opacity="0.8" />
+                                    <TextBox Text="{Binding NetworkPrinter.Host}" IsEnabled="{Binding !NetworkPrinter.IsBusy}" PlaceholderText="192.168.0.50" />
+                                    <TextBlock Text="Port" FontSize="12" Opacity="0.8" />
+                                    <NumericUpDown Value="{Binding NetworkPrinter.Port}" IsEnabled="{Binding !NetworkPrinter.IsBusy}" Minimum="1" Maximum="65535"
+                                                   Increment="1" FormatString="0" />
+                                    <CheckBox IsChecked="{Binding NetworkPrinter.CheckBeforeSending}"
+                                              IsEnabled="{Binding !NetworkPrinter.IsBusy}">
+                                        <TextBlock Text="Check status before and after sending" TextWrapping="Wrap" FontSize="12" />
+                                    </CheckBox>
+                                    <TextBlock Text="If status is unavailable, check the printer yourself before turning this off."
+                                               FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
+                                    <Button Content="Check status" Command="{Binding NetworkPrinter.CheckStatusCommand}"
+                                            HorizontalAlignment="Stretch" />
+                                    <Button Content="Send to printer" Command="{Binding PrintCommand}"
+                                            IsEnabled="{Binding !NetworkPrinter.IsBusy}" HorizontalAlignment="Stretch" />
+                                    <TextBlock Text="{Binding NetworkPrinter.StatusText}" FontSize="12" TextWrapping="Wrap"
+                                               IsVisible="{Binding NetworkPrinter.StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                </StackPanel>
+                            </ScrollViewer>
                         </Flyout>
                     </Button.Flyout>
                 </Button>
