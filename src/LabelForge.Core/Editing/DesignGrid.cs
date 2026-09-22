@@ -32,6 +32,14 @@ public static class DesignGrid
         return document.GridPitchMm >= MinimumPitchMm;
     }
 
+    public static int NudgeStep(LabelDocument document, bool snapToGrid, bool fine, bool large)
+    {
+        int step = snapToGrid && !fine && IsEnabled(document)
+            ? Math.Max(Units.MmToDots(document.GridPitchMm, Math.Max(document.Dpmm, 1)), 1)
+            : 1;
+        return large ? step * 10 : step;
+    }
+
     /// <summary>Line positions in dots from 0 up to and including <paramref name="extentDots"/>
     /// when it lands on one. Empty when the grid is off.</summary>
     public static IEnumerable<int> Lines(LabelDocument document, int extentDots)

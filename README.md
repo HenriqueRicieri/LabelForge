@@ -46,6 +46,11 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   others. Adding to the selection happens as the button goes down, because a drag that follows
   should move everything picked; removing one waits for a release that never moved, since pressing
   on something already selected is the ordinary way to start dragging the whole group.
+- Resize several selected fields or a group with the outer selection handles. Corners
+  scale proportionally, Shift frees the axes, and Ctrl scales around the centre.
+  Barcode modules and other size limits can make the result differ from the dragged
+  bounds; the readout indicates this. A locked field or group disables selection
+  scaling. Escape cancels the whole gesture, and release records one undo step.
 - At 600 dpi, supported selections move using cached preview layers. Resize and rotation
   redraw only the moving fields, and release refreshes the full label. Selections with
   interleaved layers, reverse effects or unsupported text metrics keep the regular preview.
@@ -119,7 +124,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   barcode does.
 - An optional design grid (View > Grid) at 1, 2, 2.5, 5 or 10 mm. Drags and resizes snap to
   it alongside the guides, edges and other elements, by proximity rather than as a cage, and
-  Alt still drags free of everything. Saved with the label and never printed.
+  Alt still drags free of everything. With grid snapping enabled, arrow keys move by
+  one grid step and Shift by ten. Alt uses one dot, or ten with Shift. Saved with the
+  label and never printed.
 - Zoom to selection (Ctrl+Shift+0, or from either right-click menu), which frames the
   element you just picked instead of leaving you to find it on a fitted view.
 - Help > Keyboard and Mouse: every key and gesture the designer answers to, including the

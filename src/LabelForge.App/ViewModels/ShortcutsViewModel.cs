@@ -57,13 +57,15 @@ public sealed class ShortcutsViewModel
             + "no-snapping key, so the resize modifiers other tools put on Alt are on Ctrl "
             + "and Shift here.",
         [
-            new("Arrow keys", "Nudge by one dot"),
-            new("Shift + arrows", "Nudge by ten dots"),
+            new("Arrow keys", "Nudge by a grid step, or one dot with grid snapping off"),
+            new("Shift + arrows", "Nudge by ten steps"),
+            new("Alt + arrows", "Nudge by one dot, or ten with Shift, even with grid snapping on"),
             new("Drag", "Move the whole selection together"),
             new("Shift + drag", "Move along one axis only"),
             new("Ctrl + drag", "Leave a copy behind and move the copy"),
             new("Alt + drag", "Move without snapping to anything, whatever View has switched on"),
             new("Drag a handle", "Resize; barcodes step in whole modules"),
+            new("Drag multi-selection handles", "Scale selected fields together; sizes follow each field's limits"),
             new("Ctrl + drag a handle", "Resize from the middle, both sides at once"),
             new("Shift + drag a corner", "Resize the two sides independently"),
             new("Drag the round handle", "Rotate, snapping to 0, 90, 180 and 270"),

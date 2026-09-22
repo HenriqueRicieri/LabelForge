@@ -234,9 +234,9 @@ public sealed partial class DesignerCanvas : Control
     private int _dragDx;
     private int _dragDy;
 
-    // Resize (single selection only). The gesture rect follows the pointer exactly
-    // (anchored on the opposite side); the model snaps underneath it.
+    // The gesture rect follows the pointer; fields retain their printable size steps.
     private bool _resizing;
+    private SelectionScale? _selectionScale;
     private ResizeHandle _activeHandle;
     private DotRect _resizeStartBounds;
     private int _resizeStartX;
@@ -500,7 +500,15 @@ public sealed partial class DesignerCanvas : Control
         }
     }
 
-    private void OnSelectionChanged(object? sender, EventArgs e) => InvalidateVisual();
+    private void OnSelectionChanged(object? sender, EventArgs e)
+    {
+        if (_selectionScale is { } scaling &&
+            (Selection is null || !scaling.Elements.SequenceEqual(Selection.Items)))
+        {
+            CancelGesture();
+        }
+        InvalidateVisual();
+    }
 
     /// <summary>Auto-fit pins the label to the top-left corner, tight against the
     /// rulers, so the 0mm marks always line up with the label origin (Label Matrix
@@ -999,6 +1007,21 @@ public sealed partial class DesignerCanvas : Control
                     }
                 }
             }
+
+            if (selection.Count > 1 && SelectionScreenRect() is { } combined)
+            {
+                if (_resizing)
+                {
+                    combined = new Rect(origin.X + _gestureX * scale, origin.Y + _gestureY * scale,
+                        Math.Max(_gestureW * scale, 4), Math.Max(_gestureH * scale, 4));
+                    string note = _selectionScale?.Constrained > 0 ? " (some sizes constrained)" : string.Empty;
+                    DrawReadout(context, $"{_candidateWidth} x {_candidateHeight}{note}",
+                        new Point(combined.Right + 8, combined.Bottom + 8));
+                }
+                context.DrawRectangle(null, SelectionPen, combined);
+                if (!_dragging && (HandlesFit(combined) || _resizing))
+                    foreach ((_, Point center) in HandleCenters(combined)) DrawHandle(context, center);
+            }
         }
 
         if (_marquee)
@@ -1274,18 +1297,15 @@ public sealed partial class DesignerCanvas : Control
             Math.Abs(_marqueeCurrent.Y - startY));
     }
 
-    /// <summary>The selection rectangle in screen space, only for a single unlocked selection.</summary>
     private Rect? SelectionScreenRect()
     {
-        if (Selection is not { Count: 1 } selection ||
-            selection.Primary is not { IsLocked: false } selected ||
-            Document is not { } doc || !doc.Elements.Contains(selected))
-        {
+        if (Selection is not { Count: > 0 } selection || Document is not { } doc ||
+            selection.Items.Any(e => !doc.Elements.Contains(e))) return null;
+        if (selection.Count == 1 ? selection.Primary!.IsLocked : !SelectionScale.CanStart(doc, selection.Items))
             return null;
-        }
 
         var (scale, origin) = GetTransform();
-        DotRect bounds = _bounds.GetBounds(selected);
+        DotRect bounds = SelectionScale.GetBounds(selection.Items);
         return new Rect(
             origin.X + bounds.X * scale,
             origin.Y + bounds.Y * scale,
@@ -1470,7 +1490,7 @@ public sealed partial class DesignerCanvas : Control
         // small element would just re-select it.
         if (SelectionScreenRect() is { } selRect && selection.Primary is { } primary)
         {
-            if (FieldRotation.CanRotate(primary) &&
+            if (selection.Count == 1 && FieldRotation.CanRotate(primary) &&
                 GrabRect(RotationHandleCenter(selRect)).Contains(p))
             {
                 DotRect b = _bounds.GetBounds(primary);
@@ -1501,19 +1521,21 @@ public sealed partial class DesignerCanvas : Control
                 _resizing = true;
                 _activeHandle = kind;
                 _dragStartDots = new Point(dotX, dotY);
-                _resizeStartBounds = _bounds.GetBounds(primary);
+                _selectionScale = SelectionScale.Start(doc, selection.Items);
+                IReadOnlyList<Element> resizing = _selectionScale?.Elements ?? [primary];
+                _resizeStartBounds = _selectionScale?.StartBounds ?? _bounds.GetBounds(primary);
                 _resizeStartX = primary.X;
                 _resizeStartY = primary.Y;
-                BuildSnapTargets(doc, [primary]);
+                BuildSnapTargets(doc, resizing.ToHashSet());
                 _candidateWidth = _resizeStartBounds.Width;
                 _candidateHeight = _resizeStartBounds.Height;
                 _gestureX = _resizeStartBounds.X;
                 _gestureY = _resizeStartBounds.Y;
                 _gestureW = _resizeStartBounds.Width;
                 _gestureH = _resizeStartBounds.Height;
-                _gestureBefore = ElementSnapshot.Capture([primary]);
+                _gestureBefore = _selectionScale?.Snapshot ?? ElementSnapshot.Capture([primary]);
                 _gestureAdded.Clear();
-                StartGesturePreview(GestureKind.Resize, [primary], _gestureBefore);
+                StartGesturePreview(GestureKind.Resize, resizing, _gestureBefore);
                 e.Pointer.Capture(this);
                 InvalidateVisual();
                 return;
@@ -1894,6 +1916,7 @@ public sealed partial class DesignerCanvas : Control
         StopAutoPan();
         _dragging = false;
         _resizing = false;
+        _selectionScale = null;
         _rotating = false;
         _drawArmed = false;
         _drawing = false;
@@ -2354,12 +2377,21 @@ public sealed partial class DesignerCanvas : Control
             _snapY = null;
             if (!modifiers.HasFlag(KeyModifiers.Alt))
             {
-                SnapResizeGesture(scale);
+                if (_selectionScale is { } scaling)
+                {
+                    ScaleFrame snapped = scaling.Snap(new ScaleFrame(_gestureX, _gestureY, _gestureW, _gestureH),
+                        ResizeDirectionX, ResizeDirectionY, modifiers.HasFlag(KeyModifiers.Control),
+                        !modifiers.HasFlag(KeyModifiers.Shift), _snapTargetsX, _snapTargetsY,
+                        Math.Max((int)Math.Round(SnapPx / scale), 1));
+                    (_gestureX, _gestureY, _gestureW, _gestureH) = (snapped.X, snapped.Y, snapped.Width, snapped.Height);
+                    (_snapX, _snapY) = (snapped.SnapX, snapped.SnapY);
+                }
+                else SnapResizeGesture(scale);
             }
 
             _candidateWidth = Math.Max((int)Math.Round(_gestureW), 4);
             _candidateHeight = Math.Max((int)Math.Round(_gestureH), 4);
-            ApplyCandidateResize();
+            ApplyCandidateResize(modifiers.HasFlag(KeyModifiers.Control));
         }
         else
         {
@@ -2553,7 +2585,7 @@ public sealed partial class DesignerCanvas : Control
 
         if (SelectionScreenRect() is { } selRect)
         {
-            if (Selection?.Primary is { } handlePrimary &&
+            if (Selection is { Count: 1, Primary: { } handlePrimary } &&
                 FieldRotation.CanRotate(handlePrimary) &&
                 GrabRect(RotationHandleCenter(selRect)).Contains(p))
             {
@@ -2601,6 +2633,11 @@ public sealed partial class DesignerCanvas : Control
     /// default. Edge handles are one axis already and ignore it.</param>
     private void ComputeGestureRect(double dotX, double dotY, bool aboutCenter, bool freeCorner)
     {
+        if (_selectionScale is not null)
+        {
+            (_gestureX, _gestureY, _gestureW, _gestureH) =
+                (_resizeStartBounds.X, _resizeStartBounds.Y, _resizeStartBounds.Width, _resizeStartBounds.Height);
+        }
         double startX = _resizeStartBounds.X;
         double startY = _resizeStartBounds.Y;
         double startW = Math.Max(_resizeStartBounds.Width, 1);
@@ -2891,10 +2928,30 @@ public sealed partial class DesignerCanvas : Control
         };
     }
 
+    private int ResizeDirectionX => _activeHandle switch
+    {
+        ResizeHandle.TopLeft or ResizeHandle.Left or ResizeHandle.BottomLeft => -1,
+        ResizeHandle.TopRight or ResizeHandle.Right or ResizeHandle.BottomRight => 1,
+        _ => 0,
+    };
+
+    private int ResizeDirectionY => _activeHandle switch
+    {
+        ResizeHandle.TopLeft or ResizeHandle.Top or ResizeHandle.TopRight => -1,
+        ResizeHandle.BottomLeft or ResizeHandle.Bottom or ResizeHandle.BottomRight => 1,
+        _ => 0,
+    };
+
     /// <summary>Applies the resize gesture to the model. Targets derive from the start
     /// bounds plus the pointer delta, so repeated application is idempotent.</summary>
-    private void ApplyCandidateResize()
+    private void ApplyCandidateResize(bool aboutCenter)
     {
+        if (_selectionScale is { } scaling)
+        {
+            scaling.Apply(new ScaleFrame(_gestureX, _gestureY, _gestureW, _gestureH),
+                ResizeDirectionX, ResizeDirectionY, aboutCenter);
+            return;
+        }
         if (Selection?.Primary is not { } primary)
         {
             return;
@@ -3077,9 +3134,9 @@ public sealed partial class DesignerCanvas : Control
         // A duplicating drag changed the document the moment it made the copies, so it
         // records a step whether or not the pointer ended up anywhere new.
         bool changed = wasResizing
-            ? _candidateWidth != _resizeStartBounds.Width ||
+            ? _selectionScale?.HasChanged ?? (_candidateWidth != _resizeStartBounds.Width ||
               _candidateHeight != _resizeStartBounds.Height ||
-              Selection?.Primary is { } r && (r.X != _resizeStartX || r.Y != _resizeStartY)
+              Selection?.Primary is { } r && (r.X != _resizeStartX || r.Y != _resizeStartY))
             : _duplicated || _dragDx != 0 || _dragDy != 0;
 
         EndGestureState(changed);
@@ -3216,7 +3273,8 @@ public sealed partial class DesignerCanvas : Control
             return;
         }
 
-        int step = e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 10 : 1;
+        int step = DesignGrid.NudgeStep(doc, SnapToGrid,
+            e.KeyModifiers.HasFlag(KeyModifiers.Alt), e.KeyModifiers.HasFlag(KeyModifiers.Shift));
         (int dx, int dy) = e.Key switch
         {
             Key.Left => (-step, 0),

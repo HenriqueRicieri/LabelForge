@@ -59,15 +59,20 @@ public static class ElementSnapshot
                 continue;
             }
 
-            foreach (PropertyInfo property in SettableProperties(element.GetType()))
-            {
-                property.SetValue(element, property.GetValue(was));
-            }
+            CopyProperties(was, element);
 
             restored++;
         }
 
         return restored;
+    }
+
+    internal static void CopyProperties(Element source, Element target)
+    {
+        foreach (PropertyInfo property in SettableProperties(source.GetType()))
+        {
+            property.SetValue(target, property.GetValue(source));
+        }
     }
 
     private static PropertyInfo[] SettableProperties(Type type)
