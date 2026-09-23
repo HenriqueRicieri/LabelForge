@@ -12,6 +12,7 @@ using Avalonia.VisualTree;
 using LabelForge.App.Services;
 using LabelForge.App.ViewModels;
 using LabelForge.Core.Io;
+using LabelForge.Core.Model;
 
 namespace LabelForge.App.Views;
 
@@ -44,9 +45,25 @@ public partial class DesignerView : UserControl
         Canvas.PointerLeftLabel += (_, _) => ViewModel?.ReportPointerLeft();
         Canvas.EditRequested += (_, _) => FocusContentField();
         Canvas.ContextMenuRequested += OnCanvasContextMenu;
-        Canvas.PlaceRequested += (x, y) => ViewModel?.PlaceAt(x, y);
+        Canvas.PlaceRequested += (x, y) =>
+        {
+            if (ViewModel is not { } vm)
+            {
+                return;
+            }
+            Element? previous = vm.SelectedElement;
+            vm.PlaceAt(x, y);
+            if (!ReferenceEquals(previous, vm.SelectedElement))
+            {
+                FocusPlacedContent();
+            }
+        };
         Canvas.BeginDrawRequested += (x, y) => ViewModel?.BeginDrawAt(x, y);
-        Canvas.DrawCommitted += (_, _) => ViewModel?.CommitDraw();
+        Canvas.DrawCommitted += (_, _) =>
+        {
+            ViewModel?.CommitDraw();
+            FocusPlacedContent();
+        };
         Canvas.DrawCancelled += (_, _) => ViewModel?.CancelDraw();
         Canvas.CancelRequested += (_, _) => ViewModel?.CancelInsert();
 
@@ -191,7 +208,7 @@ public partial class DesignerView : UserControl
         return menu;
     }
 
-    private static void InsertItem(
+    private void InsertItem(
         MenuItem parent,
         string header,
         DesignerViewModel vm,
@@ -200,7 +217,15 @@ public partial class DesignerView : UserControl
         int y)
     {
         var item = new MenuItem { Header = header };
-        item.Click += (_, _) => vm.InsertAt(arm, x, y);
+        item.Click += (_, _) =>
+        {
+            Element? previous = vm.SelectedElement;
+            vm.InsertAt(arm, x, y);
+            if (!ReferenceEquals(previous, vm.SelectedElement))
+            {
+                FocusPlacedContent();
+            }
+        };
         parent.Items.Add(item);
     }
 
@@ -483,19 +508,16 @@ public partial class DesignerView : UserControl
         }
     }
 
-    /// <summary>Pulls the logos and stamps out of an existing label. The file is read
-    /// through ZplTextFile, not a plain reader, so a legacy CP1252 label does not lose
-    /// its accents on the way in even though only the graphics are used here.</summary>
-    /// <summary>
-    /// Turns a data box into a marker-completing one.
-    ///
-    /// The default AutoCompleteBox behaviour replaces the whole box with the chosen
-    /// item, which is wrong here: real fields read "MA,##CODIGO_BARRAS##" or "Lote
-    /// ##LOTE## / ##SERIE##", and completing one marker must not delete the rest of the
-    /// field. So both halves are marker-aware. The filter only offers anything while the
-    /// caret is inside an unterminated marker, and the selector splices the chosen field
-    /// into that marker and leaves everything around it alone.
-    /// </summary>
+    /// <summary>Content fields become ready to type after placement; shapes stay on the canvas.</summary>
+    private void FocusPlacedContent()
+    {
+        if (ViewModel?.SelectedElement is TextElement or BarcodeElement or QrCodeElement
+            or DataMatrixElement or Pdf417Element)
+        {
+            FocusContentField();
+        }
+    }
+
     /// <summary>
     /// Puts the caret in the field holding the selected element's content, with the text
     /// selected so typing replaces it. The cheap form of editing in place: the canvas draws
@@ -509,11 +531,23 @@ public partial class DesignerView : UserControl
     /// </summary>
     private void FocusContentField()
     {
+        Element? selected = ViewModel?.SelectedElement;
+        if (selected is null)
+        {
+            return;
+        }
+
         RevealInspector();
         InspectorTabs.SelectedIndex = 0;
         ContentSection.IsExpanded = true;
         Dispatcher.UIThread.Post(() =>
         {
+            if (!ReferenceEquals(ViewModel?.SelectedElement, selected) ||
+                !InspectorPanel.IsEffectivelyVisible)
+            {
+                return;
+            }
+
             if (PropertiesContent.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault() is not { } box)
                 return;
 
@@ -524,6 +558,16 @@ public partial class DesignerView : UserControl
         }, DispatcherPriority.Background);
     }
 
+    /// <summary>
+    /// Turns a data box into a marker-completing one.
+    ///
+    /// The default AutoCompleteBox behaviour replaces the whole box with the chosen
+    /// item, which is wrong here: real fields read "MA,##CODIGO_BARRAS##" or "Lote
+    /// ##LOTE## / ##SERIE##", and completing one marker must not delete the rest of the
+    /// field. So both halves are marker-aware. The filter only offers anything while the
+    /// caret is inside an unterminated marker, and the selector splices the chosen field
+    /// into that marker and leaves everything around it alone.
+    /// </summary>
     private void OnFieldBoxAttached(object? sender, VisualTreeAttachmentEventArgs e)
     {
         if (sender is not AutoCompleteBox box)
@@ -619,6 +663,9 @@ public partial class DesignerView : UserControl
         }
     }
 
+    /// <summary>Pulls the logos and stamps out of an existing label. The file is read
+    /// through ZplTextFile, not a plain reader, so a legacy CP1252 label does not lose
+    /// its accents on the way in even though only the graphics are used here.</summary>
     private async void OnImportGraphics(object? sender, RoutedEventArgs e)
     {
         if (await PickZplFile("Import graphics from a ZPL file") is not { } picked)

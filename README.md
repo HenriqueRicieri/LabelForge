@@ -35,7 +35,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   dragging sizes the element, with Shift constraining shapes and image aspect, and Alt
   disabling snapping. Release records one undo step; Escape discards the unfinished element.
   Box, Ellipse and Diagonal line share a Shapes button that remembers the last choice for
-  the session. Line keeps its own button.
+  the session. Line keeps its own button. After placing text or a barcode or 2D symbol,
+  Properties opens with the starter content selected so typing can replace it immediately.
+  Placing a shape leaves the inspector as it was.
 - Canvas gestures answer to the modifiers the tools people already know use. A press does not
   become a drag until the pointer has travelled four screen pixels, so an unsteady click stays a
   click instead of shifting an element by a few dots and recording an undo step for the accident.

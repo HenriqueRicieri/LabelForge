@@ -700,7 +700,7 @@
                     <TabItem Header="Properties">
                         <ScrollViewer Name="PropertiesScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Spacing="12" Margin="12">
-                                <TextBlock Text="Select an element to edit its properties." IsVisible="{Binding !HasSelection}"
+                                <TextBlock Text="Choose a tool on the left, then click or drag on the label. Select a field to edit it here." IsVisible="{Binding !HasSelection}"
                                            TextWrapping="Wrap" Opacity="0.65" />
                                 <TextBlock Text="{Binding SelectionCount, StringFormat='{}{0} elements selected. Use Arrange for alignment, sizing and grouping.'}"
                                            IsVisible="{Binding HasMultiSelection}" TextWrapping="Wrap" />

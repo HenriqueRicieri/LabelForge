@@ -159,16 +159,43 @@ internal static class UiLayoutChecks
             window.Height = 760;
             Pump(100);
             d.NewDocumentCommand.Execute(null);
+            var inspector = view.FindControl<Border>("InspectorPanel")!;
+            var inspectorTabs = view.FindControl<TabControl>("InspectorTabs")!;
+            var canvas = view.FindControl<DesignerCanvas>("Canvas")!;
+            inspectorTabs.SelectedIndex = 1;
+            view.FindControl<Button>("HideInspectorButton")!.RaiseEvent(
+                new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            d.AddTextCommand.Execute(null);
+            Pump(100);
+            Point placement = canvas.TranslatePoint(canvas.DotsToView(150, 140), window)!.Value;
+            window.MouseDown(placement, MouseButton.Left);
+            window.MouseUp(placement, MouseButton.Left);
+            Pump(400);
+            Check("placing text creates a selected field",
+                d.Document.Elements.Count == 1 && d.SelectedElement is TextElement);
+            Check("placing text reveals Properties", inspector.IsVisible && inspectorTabs.SelectedIndex == 0);
+            var contentBox = view.FindControl<ContentControl>("PropertiesContent")!
+                .GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault();
+            Check("placing text focuses content", contentBox?.IsKeyboardFocusWithin == true);
+            var textInput = contentBox?.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+            Check("placing text selects starter content",
+                textInput is not null && textInput.SelectionStart == 0 &&
+                textInput.SelectionEnd == textInput.Text?.Length);
+            window.KeyTextInput("a");
+            Pump(100);
+            Check("typing replaces starter text", ((TextElement)d.SelectedElement!).Text == "a");
+            using (var placementFrame = window.CaptureRenderedFrame())
+                placementFrame?.Save(Path.Combine(output, "place-and-type.png"), PngBitmapEncoderOptions.Default);
+
+            d.NewDocumentCommand.Execute(null);
             var text = new TextElement { X = 150, Y = 140, Text = "Focus this text", FontHeightDots = 40 };
             d.Document.Elements.Add(text);
             d.NotifyDocumentEdited();
             Pump(400);
-            var inspector = view.FindControl<Border>("InspectorPanel")!;
-            var inspectorTabs = view.FindControl<TabControl>("InspectorTabs")!;
+
             inspectorTabs.SelectedIndex = 2;
             view.FindControl<Button>("HideInspectorButton")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
             Pump(100);
-            var canvas = view.FindControl<DesignerCanvas>("Canvas")!;
             Point at = canvas.TranslatePoint(canvas.DotsToView(190, 155), window)!.Value;
             window.MouseDown(at, MouseButton.Left);
             window.MouseUp(at, MouseButton.Left);
@@ -209,6 +236,58 @@ internal static class UiLayoutChecks
             Pump(150);
             Check("leaving compact mode restores the session width", Math.Abs(inspector.Bounds.Width - resizedWidth) < 1);
             Check("resizing preserves document and undo", d.SerializeDocument() == original && d.CanUndo == undo);
+
+            d.NewDocumentCommand.Execute(null);
+            inspectorTabs.SelectedIndex = 1;
+            view.FindControl<Button>("HideInspectorButton")!.RaiseEvent(
+                new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            d.AddBoxCommand.Execute(null);
+            Pump(100);
+            Point boxPoint = canvas.TranslatePoint(canvas.DotsToView(100, 100), window)!.Value;
+            window.MouseDown(boxPoint, MouseButton.Left);
+            window.MouseUp(boxPoint, MouseButton.Left);
+            Pump(150);
+            Check("placing a shape keeps the canvas wide", !inspector.IsVisible && inspectorTabs.SelectedIndex == 1);
+
+            d.AddBarcodeCommand.Execute(null);
+            Pump(100);
+            Point barcodeStart = canvas.TranslatePoint(canvas.DotsToView(400, 300), window)!.Value;
+            Point barcodeEnd = canvas.TranslatePoint(canvas.DotsToView(650, 400), window)!.Value;
+            window.MouseDown(barcodeStart, MouseButton.Left, RawInputModifiers.Alt);
+            window.MouseMove(barcodeEnd, RawInputModifiers.Alt);
+            window.MouseUp(barcodeEnd, MouseButton.Left, RawInputModifiers.Alt);
+            Pump(400);
+            Check("drawing a barcode creates a selected field", d.SelectedElement is BarcodeElement);
+            Check("drawing a barcode reveals Properties", inspector.IsVisible && inspectorTabs.SelectedIndex == 0);
+            var barcodeBox = view.FindControl<ContentControl>("PropertiesContent")!
+                .GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault();
+            Check("drawing a barcode focuses data", barcodeBox?.IsKeyboardFocusWithin == true);
+            window.KeyTextInput("987");
+            Pump(500);
+            Check("typing replaces starter barcode data",
+                (d.SelectedElement as BarcodeElement)?.Data == "987" &&
+                d.GeneratedZpl.Contains("^FD987", StringComparison.Ordinal));
+            using (var barcodeFrame = window.CaptureRenderedFrame())
+                barcodeFrame?.Save(Path.Combine(output, "barcode-place-and-edit.png"), PngBitmapEncoderOptions.Default);
+
+            d.NewDocumentCommand.Execute(null);
+            window.Width = 700;
+            window.Height = 480;
+            inspectorTabs.SelectedIndex = 1;
+            Pump(150);
+            d.AddTextCommand.Execute(null);
+            Pump(100);
+            Point compactPoint = canvas.TranslatePoint(canvas.DotsToView(100, 100), window)!.Value;
+            window.MouseDown(compactPoint, MouseButton.Left);
+            window.MouseUp(compactPoint, MouseButton.Left);
+            Pump(400);
+            Check("compact placement opens Properties", inspector.IsVisible && inspectorTabs.SelectedIndex == 0);
+            Check("compact placement focuses content",
+                view.FindControl<ContentControl>("PropertiesContent")!
+                    .GetVisualDescendants().OfType<AutoCompleteBox>()
+                    .Any(box => box.IsKeyboardFocusWithin));
+            using (var compactPlacementFrame = window.CaptureRenderedFrame())
+                compactPlacementFrame?.Save(Path.Combine(output, "compact-place-and-type.png"), PngBitmapEncoderOptions.Default);
         }
         d.ShutDown();
         window.Close();
