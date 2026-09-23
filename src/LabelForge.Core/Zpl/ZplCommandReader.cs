@@ -38,6 +38,7 @@ public readonly record struct ZplCommand(char Prefix, string Code, string Parame
 /// Two details of the format drive the implementation. A command's parameters run until
 /// the next command, because ZPL has no terminator; and field data (^FD) ends only at a
 /// '^', since a tilde inside human text is ordinary punctuation rather than a command.
+/// A bare tilde can also be a command parameter, such as the ^BX escape character.
 /// </summary>
 public static class ZplCommandReader
 {
@@ -52,7 +53,8 @@ public static class ZplCommandReader
         while (i < zpl.Length)
         {
             char prefix = zpl[i];
-            if (prefix is not ('^' or '~'))
+            if (prefix is not ('^' or '~') ||
+                prefix == '~' && !IsControlCommand(zpl, i))
             {
                 // Text outside any command: comment lines and driver preamble. Skipped
                 // here; the viewer is what reports those.
@@ -71,11 +73,7 @@ public static class ZplCommandReader
             int paramStart = codeStart + codeLength;
 
             // ^FD holds arbitrary text, where '~' is punctuation and not a command.
-            int end = code == "FD"
-                ? zpl.IndexOf('^', paramStart)
-                : zpl.AsSpan(paramStart).IndexOfAny('^', '~') is var offset && offset >= 0
-                    ? paramStart + offset
-                    : -1;
+            int end = NextCommand(zpl, paramStart, code == "FD");
 
             if (end < 0)
             {
@@ -86,4 +84,34 @@ public static class ZplCommandReader
             i = end;
         }
     }
+
+    private static int NextCommand(string zpl, int start, bool fieldData)
+    {
+        ReadOnlySpan<char> span = zpl.AsSpan();
+        while (start < span.Length)
+        {
+            int offset = fieldData
+                ? span[start..].IndexOf('^')
+                : span[start..].IndexOfAny('^', '~');
+            if (offset < 0)
+            {
+                return -1;
+            }
+
+            int candidate = start + offset;
+            if (span[candidate] == '^' || IsControlCommand(zpl, candidate))
+            {
+                return candidate;
+            }
+
+            start = candidate + 1;
+        }
+
+        return -1;
+    }
+
+    private static bool IsControlCommand(string zpl, int index) =>
+        index + 2 < zpl.Length &&
+        char.IsAsciiLetterOrDigit(zpl[index + 1]) &&
+        char.IsAsciiLetterOrDigit(zpl[index + 2]);
 }
