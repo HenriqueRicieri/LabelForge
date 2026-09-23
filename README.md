@@ -20,6 +20,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   Elements heading, Edit > Edit selected field, the element right-click menu, or F2
   to open Properties with its content selected. Shapes and images select their Name
   instead. This navigation leaves the label and undo history alone until you type.
+  The Elements tab also shows a compact Content box for a selected text, barcode or
+  2D field, so you can change values and pick the next field without switching tabs.
+  It offers the same field-marker completion as Properties and uses the same undo steps.
   Hide the inspector for more canvas space; narrow windows open it over the canvas.
   Label setup holds media, dimensions, stock layout and printer settings in a scrollable
   dialog. Changes apply as you edit. Generated ZPL and diagnostic details have their own

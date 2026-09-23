@@ -154,6 +154,9 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial ElementPropertiesViewModel? SelectionProperties { get; set; }
 
+    public bool HasQuickContent => IsSingleSelection && SelectedElement is
+        TextElement or BarcodeElement or QrCodeElement or DataMatrixElement or Pdf417Element;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewMediaSizeText))]
     public partial decimal WidthMm { get; set; } = 100m;
@@ -1223,6 +1226,7 @@ public partial class DesignerViewModel : ViewModelBase
         SelectionProperties = Selection.Count == 1
             ? CreatePropertiesEditor(Selection.Primary)
             : null;
+        OnPropertyChanged(nameof(HasQuickContent));
 
         // Selecting on the canvas highlights the row, guarded so the row's own setter
         // does not bounce the selection straight back.

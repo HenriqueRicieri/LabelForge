@@ -646,6 +646,132 @@ internal static class UiLayoutChecks
                     new ShortcutsViewModel().Groups.SelectMany(g => g.Entries)
                         .Any(entry => entry.Keys == "F2"));
             }
+            var quickEditor = view.FindControl<ContentControl>("QuickContentEditor");
+            Check("Elements has a quick content editor", quickEditor is not null);
+            if (quickEditor is not null && findBox is not null)
+            {
+                window.Width = 1200;
+                window.Height = 760;
+                d.NewDocumentCommand.Execute(null);
+                var job = new TextElement { X = 100, Y = 100, Text = "Old job", Name = "Job" };
+                var sku = new BarcodeElement { X = 100, Y = 180, Data = "ABC123", Name = "SKU" };
+                d.Document.Elements.Add(job);
+                d.Document.Elements.Add(sku);
+                d.NotifyDocumentEdited();
+                Pump(250);
+                inspectorTabs.SelectedIndex = 1;
+                if (!inspector.IsVisible)
+                {
+                    view.FindControl<Button>("ShowInspectorButton")!.RaiseEvent(
+                        new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                }
+                string beforeQuickNavigation = d.SerializeDocument();
+                bool undoBeforeQuickNavigation = d.CanUndo;
+                findBox.Text = "Job";
+                Pump(350);
+                var jobBox = quickEditor.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault();
+                Check("text selection shows quick content while Elements stays open",
+                    quickEditor.IsEffectivelyVisible && jobBox?.Text == "Old job" &&
+                    inspectorTabs.SelectedIndex == 1 && ReferenceEquals(d.SelectedElement, job));
+                Check("quick editor navigation leaves document and undo alone",
+                    d.SerializeDocument() == beforeQuickNavigation && d.CanUndo == undoBeforeQuickNavigation);
+                Check("quick editor filters marker suggestions",
+                    jobBox?.FilterMode == AutoCompleteFilterMode.Custom &&
+                    jobBox.ItemFilter?.Invoke("##CO", "##CODIGO##") == true &&
+                    jobBox.ItemFilter?.Invoke("plain", "##CODIGO##") == false);
+                jobBox?.Focus();
+                var jobInner = jobBox?.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+                jobInner?.SelectAll();
+                window.KeyTextInput("PACKED");
+                Pump(450);
+                Check("quick text edit writes ZPL without leaving Elements",
+                    job.Text == "PACKED" && d.GeneratedZpl.Contains("^FDPACKED", StringComparison.Ordinal) &&
+                    inspectorTabs.SelectedIndex == 1 && jobBox?.IsKeyboardFocusWithin == true);
+                Check("quick edit changes the document",
+                    d.SerializeDocument() != beforeQuickNavigation);
+
+                findBox.Text = "SKU";
+                Pump(350);
+                var skuBox = quickEditor.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault();
+                Check("finding another field updates quick content",
+                    ReferenceEquals(d.SelectedElement, sku) && quickEditor.IsVisible &&
+                    skuBox?.Text == "ABC123" && inspectorTabs.SelectedIndex == 1 &&
+                    job.Text == "PACKED");
+                skuBox?.Focus();
+                skuBox?.GetVisualDescendants().OfType<TextBox>().FirstOrDefault()?.SelectAll();
+                window.KeyTextInput("ZX900");
+                Pump(450);
+                Check("quick barcode edit writes data without changing the chosen row",
+                    sku.Data == "ZX900" && d.GeneratedZpl.Contains("^FDZX900", StringComparison.Ordinal) &&
+                    ReferenceEquals(d.SelectedElement, sku) && inspectorTabs.SelectedIndex == 1);
+                d.UndoCommand.Execute(null);
+                Pump(350);
+                Check("undo restores quick barcode data",
+                    d.Document.Elements.OfType<BarcodeElement>().FirstOrDefault(e => e.Name == "SKU")?.Data == "ABC123" &&
+                    d.Document.Elements.OfType<TextElement>().FirstOrDefault(e => e.Name == "Job")?.Text == "PACKED");
+                d.RedoCommand.Execute(null);
+                Pump(350);
+                Check("redo restores quick barcode data",
+                    d.Document.Elements.OfType<BarcodeElement>().FirstOrDefault(e => e.Name == "SKU")?.Data == "ZX900");
+                job = d.Document.Elements.OfType<TextElement>().FirstOrDefault(e => e.Name == "Job") ?? job;
+                var unnamed = new TextElement { X = 100, Y = 250, Text = "Draft" };
+                d.Document.Elements.Add(unnamed);
+                d.NotifyDocumentEdited();
+                Pump(250);
+                d.Selection.Set(unnamed);
+                Pump(250);
+                var unnamedBox = quickEditor.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault();
+                unnamedBox?.Focus();
+                unnamedBox?.GetVisualDescendants().OfType<TextBox>().FirstOrDefault()?.SelectAll();
+                window.KeyTextInput("Ready");
+                Pump(450);
+                Check("editing an unnamed field keeps its row and focus",
+                    unnamed.Text == "Ready" && ReferenceEquals(d.SelectedElement, unnamed) &&
+                    unnamedBox?.IsKeyboardFocusWithin == true &&
+                    d.SelectedOutlineRow?.Display.Contains("Ready", StringComparison.Ordinal) == true);
+
+                var qr = new QrCodeElement { X = 250, Y = 180, Data = "OLD2D", Name = "Route" };
+                d.Document.Elements.Add(qr);
+                d.NotifyDocumentEdited();
+                Pump(250);
+                d.Selection.Set(qr);
+                Pump(250);
+                var qrBox = quickEditor.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault();
+                qrBox?.Focus();
+                qrBox?.GetVisualDescendants().OfType<TextBox>().FirstOrDefault()?.SelectAll();
+                window.KeyTextInput("NEW2D");
+                Pump(450);
+                Check("quick editor writes 2D data",
+                    qrBox?.IsKeyboardFocusWithin == true && qr.Data == "NEW2D" &&
+                    d.GeneratedZpl.Contains("NEW2D", StringComparison.Ordinal));
+
+                var frame = new BoxElement { X = 250, Y = 80, Name = "Frame" };
+                d.Document.Elements.Add(frame);
+                d.NotifyDocumentEdited();
+                d.Selection.Set(frame);
+                Pump(250);
+                Check("shape selection hides quick content", !d.HasQuickContent && !quickEditor.IsEffectivelyVisible);
+                d.Selection.SetMany(new Element[] { unnamed, qr });
+                Pump(150);
+                Check("multi-selection hides quick content", !d.HasQuickContent && !quickEditor.IsEffectivelyVisible);
+                d.Selection.Clear();
+                Pump(150);
+                Check("empty selection hides quick content", !d.HasQuickContent && !quickEditor.IsEffectivelyVisible);
+
+                d.Selection.Set(job);
+                window.Width = 700;
+                window.Height = 480;
+                Pump(150);
+                view.FindControl<Button>("ShowInspectorButton")!.RaiseEvent(
+                    new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(350);
+                Check("quick content fits the compact inspector",
+                    inspector.IsEffectivelyVisible && quickEditor.IsEffectivelyVisible &&
+                    Within(quickEditor, window) && inspectorTabs.SelectedIndex == 1 &&
+                    quickEditor.GetVisualDescendants().OfType<AutoCompleteBox>().Any());
+                using (var quickFrame = window.CaptureRenderedFrame())
+                    quickFrame?.Save(Path.Combine(output, "compact-quick-content.png"), PngBitmapEncoderOptions.Default);
+            }
         }
         d.ShutDown();
         window.Close();

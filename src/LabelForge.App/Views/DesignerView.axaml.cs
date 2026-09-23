@@ -639,12 +639,21 @@ public partial class DesignerView : UserControl
             return;
         }
 
+        // A hidden editor can receive property changes before it is attached. Set the
+        // predicates before enabling Custom, or that notification can throw.
+        box.ItemFilter = (search, item) =>
+        {
+            string? fragment = OpenFragment(search);
+            return fragment is not null && item is string marker &&
+                   marker.Contains(fragment, StringComparison.OrdinalIgnoreCase);
+        };
         box.TextFilter = (search, item) =>
         {
             string? fragment = OpenFragment(search);
             return fragment is not null && item is not null &&
                    item.Contains(fragment, StringComparison.OrdinalIgnoreCase);
         };
+        box.FilterMode = AutoCompleteFilterMode.Custom;
 
         box.ItemSelector = (search, item) =>
         {
