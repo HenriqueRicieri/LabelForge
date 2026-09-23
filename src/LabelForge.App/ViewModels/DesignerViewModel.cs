@@ -1229,6 +1229,8 @@ public partial class DesignerViewModel : ViewModelBase
     /// <summary>Replaces the document (new file or opened .lfl) and resets history.</summary>
     public void LoadDocument(LabelDocument document, string? path)
     {
+        _drawingElement = null;
+        CancelInsert();
         _restoring = true;
         try
         {
@@ -1469,6 +1471,22 @@ public partial class DesignerViewModel : ViewModelBase
     /// <summary>True while an insert is armed; the next canvas click places it.</summary>
     [ObservableProperty]
     public partial bool IsPlacing { get; set; }
+
+    /// <summary>Session-only mode that keeps the chosen creation tool after placement.</summary>
+    [ObservableProperty]
+    public partial bool RepeatInsert { get; set; }
+
+    partial void OnRepeatInsertChanged(bool value)
+    {
+        if (IsPlacing)
+        {
+            StatusText = InsertHint;
+        }
+    }
+
+    private string InsertHint => RepeatInsert
+        ? "Click or drag to place more fields (Esc stops)"
+        : "Click to place it, or drag to draw it at the size you want (Esc cancels)";
 
     /// <summary>Name of the armed insert tool ("Text", "Box", ...), null when none.
     /// Drives the highlighted state of the tool buttons in the sidebar.</summary>
@@ -1778,14 +1796,14 @@ public partial class DesignerViewModel : ViewModelBase
         _pendingFactory = factory;
         IsPlacing = true;
         ArmedTool = tool;
-        StatusText = "Click to place it, or drag to draw it at the size you want (Esc cancels)";
+        StatusText = InsertHint;
     }
 
-    /// <summary>Called by the canvas with the clicked position in dots.</summary>
-    public void PlaceAt(int x, int y)
+    /// <summary>Places an armed tool in dots. Insert Here forces a single placement.</summary>
+    public void PlaceAt(int x, int y, bool oneShot = false)
     {
         if (AddPendingAt(Math.Clamp(x, 0, Math.Max(Document.WidthDots - 1, 0)),
-            Math.Clamp(y, 0, Math.Max(Document.HeightDots - 1, 0))) is null)
+            Math.Clamp(y, 0, Math.Max(Document.HeightDots - 1, 0)), oneShot) is null)
         {
             return;
         }
@@ -1823,11 +1841,11 @@ public partial class DesignerViewModel : ViewModelBase
         CancelInsert();
     }
 
-    private Element? AddPendingAt(int x, int y)
+    private Element? AddPendingAt(int x, int y, bool oneShot = false)
     {
         if (_pendingFactory is null)
         {
-            IsPlacing = false;
+            CancelInsert();
             return null;
         }
 
@@ -1840,10 +1858,10 @@ public partial class DesignerViewModel : ViewModelBase
         Document.Elements.Add(element);
         Selection.Set(element);
 
-        _pendingFactory = null;
-        IsPlacing = false;
-        ArmedTool = null;
-        StatusText = string.Empty;
+        if (oneShot || !RepeatInsert)
+        {
+            CancelInsert();
+        }
         return element;
     }
 
@@ -2234,7 +2252,7 @@ public partial class DesignerViewModel : ViewModelBase
     {
         ArgumentNullException.ThrowIfNull(armCommand);
         armCommand.Execute(null);
-        PlaceAt(x, y);
+        PlaceAt(x, y, oneShot: true);
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]

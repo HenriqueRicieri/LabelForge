@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
 using LabelForge.App.Controls;
@@ -288,6 +289,143 @@ internal static class UiLayoutChecks
                     .Any(box => box.IsKeyboardFocusWithin));
             using (var compactPlacementFrame = window.CaptureRenderedFrame())
                 compactPlacementFrame?.Save(Path.Combine(output, "compact-place-and-type.png"), PngBitmapEncoderOptions.Default);
+
+            var repeatButton = view.FindControl<ToggleButton>("RepeatToolButton");
+            Check("repeat placement control is available", repeatButton is not null);
+            if (repeatButton is not null)
+            {
+                window.Width = 1200;
+                window.Height = 760;
+                d.NewDocumentCommand.Execute(null);
+                Pump(150);
+                Check("repeat placement starts off", !d.RepeatInsert && repeatButton.IsChecked != true);
+                string beforeRepeat = d.SerializeDocument();
+                bool undoBeforeRepeat = d.CanUndo;
+                Point toggle = repeatButton.TranslatePoint(
+                    new Point(repeatButton.Bounds.Width / 2, repeatButton.Bounds.Height / 2), window)!.Value;
+                window.MouseDown(toggle, MouseButton.Left);
+                window.MouseUp(toggle, MouseButton.Left);
+                Pump(100);
+                Check("repeat button turns on session mode", d.RepeatInsert && repeatButton.IsChecked == true);
+                Check("repeat button leaves label and undo alone",
+                    d.SerializeDocument() == beforeRepeat && d.CanUndo == undoBeforeRepeat);
+                var insertMenu = view.FindControl<MenuItem>("InsertOptionsMenu")!;
+                var repeatMenu = view.FindControl<MenuItem>("RepeatPlacementMenu")!;
+                Check("Insert menu reflects repeat button", repeatMenu.IsChecked);
+                insertMenu.Open();
+                Pump(100);
+                repeatMenu.Focus();
+                window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, "\r");
+                Pump(100);
+                insertMenu.Close();
+                Check("Insert menu turns repeat off", !d.RepeatInsert && repeatButton.IsChecked != true);
+                insertMenu.Open();
+                Pump(100);
+                repeatMenu.Focus();
+                window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, "\r");
+                Pump(100);
+                insertMenu.Close();
+                Check("Insert menu turns repeat back on", d.RepeatInsert && repeatButton.IsChecked == true);
+                Check("Insert menu leaves label and undo alone",
+                    d.SerializeDocument() == beforeRepeat && d.CanUndo == undoBeforeRepeat);
+
+                d.AddBoxCommand.Execute(null);
+                Point firstBox = canvas.TranslatePoint(canvas.DotsToView(100, 100), window)!.Value;
+                window.MouseDown(firstBox, MouseButton.Left);
+                window.MouseUp(firstBox, MouseButton.Left);
+                Pump(150);
+                Check("repeat keeps box tool after first click",
+                    d.Document.Elements.Count == 1 && d.IsPlacing && d.ArmedTool == "Box");
+                Point secondBox = canvas.TranslatePoint(canvas.DotsToView(400, 300), window)!.Value;
+                window.MouseDown(secondBox, MouseButton.Left);
+                window.MouseUp(secondBox, MouseButton.Left);
+                Pump(150);
+                Check("repeat places another box with same tool",
+                    d.Document.Elements.Count == 2 && d.Document.Elements.All(e => e is BoxElement) &&
+                    d.IsPlacing && d.ArmedTool == "Box");
+                window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+                Pump(100);
+                Check("Escape stops tool but keeps repeat preference", !d.IsPlacing && d.RepeatInsert);
+                d.UndoCommand.Execute(null);
+                Check("first undo removes only second placement", d.Document.Elements.Count == 1);
+                d.UndoCommand.Execute(null);
+                Check("second undo removes first placement", d.Document.Elements.Count == 0);
+
+                d.AddTextCommand.Execute(null);
+                Point firstText = canvas.TranslatePoint(canvas.DotsToView(100, 100), window)!.Value;
+                window.MouseDown(firstText, MouseButton.Left);
+                window.MouseUp(firstText, MouseButton.Left);
+                Pump(400);
+                window.KeyTextInput("First");
+                Pump(150);
+                Point secondText = canvas.TranslatePoint(canvas.DotsToView(450, 300), window)!.Value;
+                window.MouseDown(secondText, MouseButton.Left);
+                window.MouseUp(secondText, MouseButton.Left);
+                Pump(400);
+                window.KeyTextInput("Second");
+                Pump(500);
+                Check("repeat text can be typed after each placement",
+                    d.Document.Elements.OfType<TextElement>().Select(e => e.Text)
+                        .SequenceEqual(new[] { "First", "Second" }) && d.IsPlacing);
+                using (var repeatFrame = window.CaptureRenderedFrame())
+                    repeatFrame?.Save(Path.Combine(output, "repeat-place-and-type.png"), PngBitmapEncoderOptions.Default);
+
+                window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+                d.InsertAt(d.AddBoxCommand, 600, 350);
+                Pump(150);
+                Check("Insert Here remains one-shot in repeat mode",
+                    d.Document.Elements.Count == 3 && d.Document.Elements[^1] is BoxElement &&
+                    !d.IsPlacing && d.RepeatInsert);
+
+                d.NewDocumentCommand.Execute(null);
+                d.AddBoxCommand.Execute(null);
+                Point drawStart = canvas.TranslatePoint(canvas.DotsToView(120, 120), window)!.Value;
+                Point drawEnd = canvas.TranslatePoint(canvas.DotsToView(330, 230), window)!.Value;
+                window.MouseDown(drawStart, MouseButton.Left);
+                window.MouseMove(drawEnd);
+                window.MouseUp(drawEnd, MouseButton.Left);
+                Pump(150);
+                Check("repeat keeps tool after drawing",
+                    d.Document.Elements.Count == 1 && d.Document.Elements[0] is BoxElement &&
+                    d.IsPlacing && d.ArmedTool == "Box");
+                window.MouseDown(drawStart, MouseButton.Left);
+                window.MouseMove(drawEnd);
+                window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+                window.MouseUp(drawEnd, MouseButton.Left);
+                Pump(150);
+                Check("Escape discards unfinished repeat draw",
+                    d.Document.Elements.Count == 1 && !d.IsPlacing && d.RepeatInsert);
+                window.Width = 700;
+                window.Height = 480;
+                d.NewDocumentCommand.Execute(null);
+                Pump(150);
+                d.AddBoxCommand.Execute(null);
+                Point compactFirst = canvas.TranslatePoint(canvas.DotsToView(80, 80), window)!.Value;
+                window.MouseDown(compactFirst, MouseButton.Left);
+                window.MouseUp(compactFirst, MouseButton.Left);
+                Pump(150);
+                Point compactSecond = canvas.TranslatePoint(canvas.DotsToView(420, 250), window)!.Value;
+                window.MouseDown(compactSecond, MouseButton.Left);
+                window.MouseUp(compactSecond, MouseButton.Left);
+                Pump(150);
+                Check("repeat placement works in compact window",
+                    Within(repeatButton, view.FindControl<Border>("CreationRail")!) &&
+                    d.Document.Elements.Count == 2 && d.IsPlacing);
+                using (var compactRepeatFrame = window.CaptureRenderedFrame())
+                    compactRepeatFrame?.Save(Path.Combine(output, "compact-repeat.png"), PngBitmapEncoderOptions.Default);
+                d.NewDocumentCommand.Execute(null);
+                Check("new label cancels armed tool but keeps repeat preference",
+                    !d.IsPlacing && d.Document.Elements.Count == 0 && d.RepeatInsert);
+                d.AddBoxCommand.Execute(null);
+                repeatButton.IsChecked = false;
+                Pump(100);
+                Point oneShot = canvas.TranslatePoint(canvas.DotsToView(200, 150), window)!.Value;
+                window.MouseDown(oneShot, MouseButton.Left);
+                window.MouseUp(oneShot, MouseButton.Left);
+                Pump(150);
+                Check("turning repeat off makes armed tool one-shot",
+                    !d.RepeatInsert && !d.IsPlacing && d.Document.Elements.Count == 1);
+            }
         }
         d.ShutDown();
         window.Close();

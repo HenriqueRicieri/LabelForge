@@ -404,7 +404,10 @@
                         <MenuItem Header="Theme: _Light" Click="OnThemeLight" />
                         <MenuItem Header="Theme: _Dark" Click="OnThemeDark" />
                     </MenuItem>
-                    <MenuItem Header="_Insert">
+                    <MenuItem Name="InsertOptionsMenu" Header="_Insert">
+                        <MenuItem Name="RepeatPlacementMenu" Header="_Repeat placement" ToggleType="CheckBox"
+                                  IsChecked="{Binding RepeatInsert, Mode=TwoWay}" />
+                        <Separator />
                         <MenuItem Header="_Text" Command="{Binding AddTextCommand}" />
                         <MenuItem Header="_Box" Command="{Binding AddBoxCommand}" />
                         <MenuItem Header="_Line" Command="{Binding AddLineCommand}" />
@@ -550,6 +553,12 @@
         <Border Name="CreationRail" Grid.Column="0" Background="{DynamicResource AppToolbarBackground}" Width="64" Padding="4,10">
             <ScrollViewer Name="CreationScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Spacing="4" HorizontalAlignment="Center">
+                <ToggleButton Name="RepeatToolButton" Width="48" Height="32" Padding="0"
+                              Content="Repeat" FontSize="11"
+                              IsChecked="{Binding RepeatInsert, Mode=TwoWay}"
+                              ToolTip.Tip="Keep the current creation tool active after each field. Escape stops it."
+                              AutomationProperties.Name="Repeat placement" />
+                <Border Height="1" Margin="4,4" Background="{DynamicResource AppSeparator}" />
                 <Button Classes="tool" Classes.armed="{Binding IsTextArmed}"
                         Command="{Binding AddTextCommand}" ToolTip.Tip="Add text" AutomationProperties.Name="text">
                     <PathIcon Data="M2,2 L14,2 L14,5 L9.4,5 L9.4,14 L6.6,14 L6.6,5 L2,5 Z" />
