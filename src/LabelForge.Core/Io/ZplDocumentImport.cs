@@ -115,7 +115,7 @@ public static class ZplDocumentImport
         // Downloaded graphics are defined outside the block that recalls them, so they
         // are collected up front by the same scanner the viewer and the graphic import
         // use rather than by a second pass written here.
-        state.Graphics = ZplGraphicScanner.Scan(zpl);
+        state.SetGraphics(ZplGraphicScanner.Scan(zpl));
 
         // A ^SN counter needs a marker name of its own, and the only names it must not
         // take are the ones the file already writes. Collected up front because a field
@@ -251,7 +251,20 @@ public static class ZplDocumentImport
         private int _blockIndent;
         private TextJustification _justification = TextJustification.Left;
 
-        public ZplGraphicScan Graphics { get; set; } = new([], [], []);
+        private Dictionary<string, Queue<ZplGraphicDefinition?>> _graphicRecalls =
+            new(StringComparer.Ordinal);
+
+        public void SetGraphics(ZplGraphicScan scan)
+        {
+            _graphicRecalls = scan.Placements
+                .Where(placement => placement.Name is not null)
+                .GroupBy(placement => placement.Name!, StringComparer.Ordinal)
+                .ToDictionary(
+                    group => group.Key,
+                    group => new Queue<ZplGraphicDefinition?>(
+                        group.Select(placement => placement.Recalled)),
+                    StringComparer.Ordinal);
+        }
 
         /// <summary>Marker names the file already writes, which a recovered ^SN counter
         /// must not take for itself.</summary>
@@ -1097,13 +1110,15 @@ public static class ZplDocumentImport
         private void RecalledImage(ZplCommand command)
         {
             string name = ZplGraphicScanner.NormalizeName(command.Arg(0));
-            ZplGraphicDefinition? definition = Graphics.Definitions
-                .FirstOrDefault(d => string.Equals(d.Name, name, StringComparison.Ordinal));
+            ZplGraphicDefinition? definition =
+                _graphicRecalls.TryGetValue(name, out var recalls) && recalls.Count > 0
+                    ? recalls.Dequeue()
+                    : null;
 
             if (definition is null)
             {
-                Warn($"Graphic {name} is recalled but never downloaded in this file, "
-                     + "so it lives in the printer's memory and could not be imported.");
+                Warn($"Graphic {name} has no download before this recall, "
+                     + "so its pixels may live in the printer's memory and could not be imported.");
                 ResetField();
                 return;
             }

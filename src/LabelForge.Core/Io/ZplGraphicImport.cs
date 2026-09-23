@@ -46,7 +46,7 @@ public static class ZplGraphicImport
         foreach (ZplGraphicDefinition definition in scan.Definitions)
         {
             ZplGraphicPlacement[] uses = scan.Placements
-                .Where(p => string.Equals(p.Name, definition.Name, StringComparison.Ordinal))
+                .Where(p => p.Recalled == definition)
                 .ToArray();
 
             if (Build(definition, uses.FirstOrDefault()) is not { } element)
@@ -77,11 +77,11 @@ public static class ZplGraphicImport
 
         if (scan.UnresolvedNames.Count > 0)
         {
-            // The bitmap lives in the printer's memory from an earlier download, so it
-            // is genuinely not in this file. Naming them beats a count.
+            // A recall before a download may depend on a previous print job. Naming
+            // the missing bitmap beats silently borrowing a later definition.
             warnings.Add(
-                $"{Describe(scan.UnresolvedNames.Count, "graphic")} recalled by name but never "
-                + $"downloaded in this file, so the image is not here: "
+                $"{Describe(scan.UnresolvedNames.Count, "graphic")} recalled before a "
+                + $"matching download in this file, so the image is not here: "
                 + $"{string.Join(", ", scan.UnresolvedNames)}.");
         }
 

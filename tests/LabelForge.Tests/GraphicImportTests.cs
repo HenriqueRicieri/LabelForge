@@ -470,6 +470,98 @@ public sealed class GraphicImportTests
         Assert.Equal(0, BlackPixels(second.Png));
     }
 
+    [Fact]
+    public void Import_UsesTheDownloadInForceForEachRecall()
+    {
+        const string zpl = "~DGLOGO,1,1,80^XA^FO10,10^XGLOGO,1,1^FS^XZ"
+            + "~DGLOGO,1,1,01^XA^FO20,20^XGLOGO,1,1^FS^XZ";
+
+        ZplGraphicScan scan = ZplGraphicScanner.Scan(zpl);
+        Assert.Equal(2, scan.Definitions.Count);
+        Assert.Equal(2, scan.Placements.Count);
+        Assert.Equal("80", scan.Placements[0].Recalled?.Data);
+        Assert.Equal("01", scan.Placements[1].Recalled?.Data);
+
+        var first = ZplDocumentImport.FromZpl(zpl, labelIndex: 0);
+        var second = ZplDocumentImport.FromZpl(zpl, labelIndex: 1);
+        Assert.Equal(new[] { true, false, false, false, false, false, false, false },
+            Bits(Assert.IsType<ImageElement>(Assert.Single(first.Document.Elements))));
+        Assert.Equal(new[] { false, false, false, false, false, false, false, true },
+            Bits(Assert.IsType<ImageElement>(Assert.Single(second.Document.Elements))));
+
+        ZplGraphicImportResult graphics = ZplGraphicImport.FromZpl(zpl);
+        Assert.Equal(2, graphics.Graphics.Count);
+        Assert.All(graphics.Graphics, graphic => Assert.Equal(1, graphic.Placements));
+        Assert.Equal(10, graphics.Graphics[0].Element.X);
+        Assert.Equal(20, graphics.Graphics[1].Element.X);
+        Assert.Equal(new[] { true, false, false, false, false, false, false, false },
+            Bits(graphics.Graphics[0].Element));
+        Assert.Equal(new[] { false, false, false, false, false, false, false, true },
+            Bits(graphics.Graphics[1].Element));
+    }
+
+    [Fact]
+    public void Scan_DeduplicatesIdenticalDownloadsAcrossBlocks()
+    {
+        const string zpl = "~DGLOGO,1,1,80^XA^FO10,10^XGLOGO,1,1^FS^XZ"
+            + "~DGLOGO,1,1,80^XA^FO20,20^XGLOGO,1,1^FS^XZ";
+
+        ZplGraphicScan scan = ZplGraphicScanner.Scan(zpl);
+        Assert.Single(scan.Definitions);
+        Assert.All(scan.Placements, placement =>
+            Assert.Same(scan.Definitions[0], placement.Recalled));
+        Assert.Empty(scan.UnresolvedNames);
+
+        ImportedGraphic imported = Assert.Single(ZplGraphicImport.FromZpl(zpl).Graphics);
+        Assert.Equal(2, imported.Placements);
+    }
+
+    [Fact]
+    public void Import_FollowsARedefinitionWithinOneLabel()
+    {
+        const string zpl = "~DGLOGO,1,1,80^XA"
+            + "^FO10,10^XGLOGO,1,1^FS"
+            + "~DGLOGO,1,1,01^FO20,20^XGLOGO,1,1^FS^XZ";
+
+        var imported = ZplDocumentImport.FromZpl(zpl);
+        Assert.Equal(2, imported.Document.Elements.Count);
+        Assert.Equal(new[] { true, false, false, false, false, false, false, false },
+            Bits(Assert.IsType<ImageElement>(imported.Document.Elements[0])));
+        Assert.Equal(new[] { false, false, false, false, false, false, false, true },
+            Bits(Assert.IsType<ImageElement>(imported.Document.Elements[1])));
+    }
+
+    [Fact]
+    public void Import_DoesNotBorrowADownloadFromAfterTheRecall()
+    {
+        const string zpl = "^XA^FO10,10^XGLOGO,1,1^FS^XZ"
+            + "~DGLOGO,1,1,80^XA^FO20,20^XGLOGO,1,1^FS^XZ";
+
+        ZplGraphicScan scan = ZplGraphicScanner.Scan(zpl);
+        Assert.Equal("LOGO", Assert.Single(scan.UnresolvedNames));
+        Assert.Null(scan.Placements[0].Recalled);
+        Assert.NotNull(scan.Placements[1].Recalled);
+
+        var first = ZplDocumentImport.FromZpl(zpl, labelIndex: 0);
+        Assert.Empty(first.Document.Elements);
+        Assert.Contains(first.Warnings, warning => warning.Contains("printer's memory", StringComparison.Ordinal));
+
+        var second = ZplDocumentImport.FromZpl(zpl, labelIndex: 1);
+        Assert.Single(second.Document.Elements);
+
+        ZplGraphicImportResult graphics = ZplGraphicImport.FromZpl(zpl);
+        Assert.Equal(1, Assert.Single(graphics.Graphics).Placements);
+        Assert.Contains("LOGO", Assert.Single(graphics.Warnings), StringComparison.Ordinal);
+    }
+
+    private static bool[] Bits(ImageElement element)
+    {
+        byte[] gray = ImageRasterizer.ToGrayscale(
+            element.ImageData, element.SourcePixelWidth, element.SourcePixelHeight)!;
+        return ImageDitherer.Dither(
+            gray, element.SourcePixelWidth, element.SourcePixelHeight, DitherMode.Threshold);
+    }
+
     private static bool IsBlack(SKBitmap bitmap, int x, int y) =>
         bitmap.GetPixel(x, y).Red < 128;
 

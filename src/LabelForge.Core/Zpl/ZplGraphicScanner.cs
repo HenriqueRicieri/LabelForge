@@ -19,6 +19,7 @@ public sealed record ZplGraphicDefinition(string Name, int TotalBytes, int Bytes
 /// <param name="MagnificationY">^XG vertical magnification, 1 for an inline field.</param>
 /// <param name="Inline">The bitmap carried by a ^GF field, or null for a recall.</param>
 /// <param name="LabelIndex">Which ^XA block the placement sits in, counting from zero.</param>
+/// <param name="Recalled">The download active at this ^XG, or null if none preceded it.</param>
 public sealed record ZplGraphicPlacement(
     string? Name,
     int X,
@@ -26,14 +27,15 @@ public sealed record ZplGraphicPlacement(
     int MagnificationX,
     int MagnificationY,
     ZplGraphicDefinition? Inline,
-    int LabelIndex);
+    int LabelIndex,
+    ZplGraphicDefinition? Recalled = null);
 
 /// <summary>What a ZPL stream says about graphics.</summary>
-/// <param name="Definitions">Every distinct ~DG download, in the order first seen.</param>
+/// <param name="Definitions">Every distinct ~DG name and payload, in the order first seen.</param>
 /// <param name="Placements">Every ^XG recall and ^GF field, in document order.</param>
-/// <param name="UnresolvedNames">Names recalled by ^XG that the stream never downloads.
-/// These live in the printer's memory from an earlier job, so the bitmap simply is not
-/// in the file; a reader has to say so rather than pretend the label is complete.</param>
+/// <param name="UnresolvedNames">Names recalled before a matching ~DG download.
+/// Their bitmap may live in printer memory from an earlier job; a reader cannot
+/// borrow a later definition and pretend the label is complete.</param>
 public sealed record ZplGraphicScan(
     IReadOnlyList<ZplGraphicDefinition> Definitions,
     IReadOnlyList<ZplGraphicPlacement> Placements,
@@ -51,46 +53,20 @@ public sealed record ZplGraphicScan(
 /// </summary>
 public static partial class ZplGraphicScanner
 {
-    /// <summary>~DG name, total bytes, bytes per row. The payload runs from the end of
-    /// this header to the next command, since graphic data contains no ^ or ~.</summary>
-    [GeneratedRegex(@"~DG(?<name>[^,\^~\r\n]{1,128}),\s*(?<total>\d+)\s*,\s*(?<row>\d+)\s*,",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex DownloadHeader();
-
-    /// <summary>The commands that decide where a graphic lands, in document order.</summary>
+    /// <summary>Download headers and commands that place graphics, in source order.</summary>
     [GeneratedRegex(
-        @"\^F(?<origin>[OT])(?<ox>-?\d+),(?<oy>-?\d+)"
+        @"~DG(?<download>[^,\^~\r\n]{1,128}),\s*(?<total>\d+)\s*,\s*(?<row>\d+)\s*,"
+        + @"|\^F(?<origin>[OT])(?<ox>-?\d+),(?<oy>-?\d+)"
         + @"|\^LH(?<lx>-?\d+),(?<ly>-?\d+)"
         + @"|\^XG(?<recall>[^,\^~\r\n]{0,128})(?:,(?<mx>\d+))?(?:,(?<my>\d+))?"
         + @"|\^GF(?<fmt>[ABC]?),(?<gtotal>\d+),(?<gbin>\d+),(?<grow>\d+),"
         + @"|(?<fs>\^FS)"
         + @"|(?<xa>\^XA)",
         RegexOptions.IgnoreCase)]
-    private static partial Regex PlacementCommands();
+    private static partial Regex GraphicCommands();
 
-    public static ZplGraphicScan Scan(string zpl)
-    {
-        if (string.IsNullOrEmpty(zpl))
-        {
-            return new ZplGraphicScan([], [], []);
-        }
-
-        List<ZplGraphicDefinition> definitions = ReadDownloads(zpl);
-        List<ZplGraphicPlacement> placements = ReadPlacements(zpl);
-
-        var known = new HashSet<string>(definitions.Select(d => d.Name), StringComparer.Ordinal);
-        var unresolved = new List<string>();
-        var seenUnresolved = new HashSet<string>(StringComparer.Ordinal);
-        foreach (ZplGraphicPlacement placement in placements)
-        {
-            if (placement.Name is { } name && !known.Contains(name) && seenUnresolved.Add(name))
-            {
-                unresolved.Add(name);
-            }
-        }
-
-        return new ZplGraphicScan(definitions, placements, unresolved);
-    }
+    public static ZplGraphicScan Scan(string zpl) =>
+        string.IsNullOrEmpty(zpl) ? new ZplGraphicScan([], [], []) : ReadGraphics(zpl);
 
     /// <summary>
     /// Rewrites every ~DG and ^XG name to the fully qualified R:NAME.GRF form.
@@ -241,43 +217,14 @@ public static partial class ZplGraphicScanner
         return trimmed.ToUpperInvariant();
     }
 
-    private static List<ZplGraphicDefinition> ReadDownloads(string zpl)
+    private static ZplGraphicScan ReadGraphics(string zpl)
     {
         var definitions = new List<ZplGraphicDefinition>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (Match match in DownloadHeader().Matches(zpl))
-        {
-            if (!TryInt(match.Groups["total"].Value, out int total) ||
-                !TryInt(match.Groups["row"].Value, out int bytesPerRow) ||
-                total <= 0 || bytesPerRow <= 0)
-            {
-                continue;
-            }
-
-            string name = NormalizeName(match.Groups["name"].Value);
-            if (name.Length == 0)
-            {
-                continue;
-            }
-
-            // A file that repeats its downloads once per label block (the Atak corpus
-            // does) describes one graphic, not several.
-            if (!seen.Add(name))
-            {
-                continue;
-            }
-
-            definitions.Add(new ZplGraphicDefinition(
-                name, total, bytesPerRow, ReadPayload(zpl, match.Index + match.Length)));
-        }
-
-        return definitions;
-    }
-
-    private static List<ZplGraphicPlacement> ReadPlacements(string zpl)
-    {
+        var seenDefinitions = new HashSet<ZplGraphicDefinition>();
+        var active = new Dictionary<string, ZplGraphicDefinition>(StringComparer.Ordinal);
         var placements = new List<ZplGraphicPlacement>();
+        var unresolved = new List<string>();
+        var seenUnresolved = new HashSet<string>(StringComparer.Ordinal);
         int x = 0;
         int y = 0;
         int homeX = 0;
@@ -285,8 +232,37 @@ public static partial class ZplGraphicScanner
         int labelIndex = -1;
         int inlineCount = 0;
 
-        foreach (Match match in PlacementCommands().Matches(zpl))
+        foreach (Match match in GraphicCommands().Matches(zpl))
         {
+            if (match.Groups["download"].Success)
+            {
+                if (TryInt(match.Groups["total"].Value, out int total) &&
+                    TryInt(match.Groups["row"].Value, out int bytesPerRow) &&
+                    total > 0 && bytesPerRow > 0)
+                {
+                    string name = NormalizeName(match.Groups["download"].Value);
+                    if (name.Length > 0)
+                    {
+                        var definition = new ZplGraphicDefinition(
+                            name, total, bytesPerRow,
+                            ReadPayload(zpl, match.Index + match.Length));
+                        if (seenDefinitions.TryGetValue(definition, out var existing))
+                        {
+                            definition = existing;
+                        }
+                        else
+                        {
+                            seenDefinitions.Add(definition);
+                            definitions.Add(definition);
+                        }
+
+                        active[name] = definition;
+                    }
+                }
+
+                continue;
+            }
+
             if (match.Groups["xa"].Success)
             {
                 labelIndex++;
@@ -299,7 +275,6 @@ public static partial class ZplGraphicScanner
 
             if (match.Groups["fs"].Success)
             {
-                // The origin belongs to the field that just ended.
                 x = 0;
                 y = 0;
                 continue;
@@ -320,7 +295,6 @@ public static partial class ZplGraphicScanner
             }
 
             int block = Math.Max(labelIndex, 0);
-
             if (match.Groups["recall"].Success)
             {
                 string name = NormalizeName(match.Groups["recall"].Value);
@@ -329,31 +303,34 @@ public static partial class ZplGraphicScanner
                     continue;
                 }
 
+                active.TryGetValue(name, out ZplGraphicDefinition? definition);
+                if (definition is null && seenUnresolved.Add(name))
+                {
+                    unresolved.Add(name);
+                }
+
                 placements.Add(new ZplGraphicPlacement(
-                    name,
-                    homeX + x,
-                    homeY + y,
+                    name, homeX + x, homeY + y,
                     Magnification(match.Groups["mx"].Value),
                     Magnification(match.Groups["my"].Value),
-                    Inline: null,
-                    block));
+                    Inline: null, block, definition));
                 continue;
             }
 
             if (match.Groups["gtotal"].Success &&
-                TryInt(match.Groups["gtotal"].Value, out int total) &&
-                TryInt(match.Groups["grow"].Value, out int bytesPerRow) &&
-                total > 0 && bytesPerRow > 0)
+                TryInt(match.Groups["gtotal"].Value, out int graphicTotal) &&
+                TryInt(match.Groups["grow"].Value, out int graphicRow) &&
+                graphicTotal > 0 && graphicRow > 0)
             {
                 var inline = new ZplGraphicDefinition(
-                    $"GF{++inlineCount}", total, bytesPerRow,
+                    $"GF{++inlineCount}", graphicTotal, graphicRow,
                     ReadPayload(zpl, match.Index + match.Length));
                 placements.Add(new ZplGraphicPlacement(
                     Name: null, homeX + x, homeY + y, 1, 1, inline, block));
             }
         }
 
-        return placements;
+        return new ZplGraphicScan(definitions, placements, unresolved);
     }
 
     /// <summary>Graphic data runs to the next command. Hex, the compression scheme and
