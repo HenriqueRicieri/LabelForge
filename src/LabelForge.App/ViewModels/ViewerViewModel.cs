@@ -26,6 +26,7 @@ public partial class ViewerViewModel : ViewModelBase
     private CancellationTokenSource? _renderCts;
     private bool _suppressSizeRender;
     private bool _suppressLabelRender;
+    private int _comparisonRevision;
 
     public System.Collections.Generic.IReadOnlyList<DensityOption> Densities => DensityOption.Standard;
 
@@ -156,7 +157,11 @@ public partial class ViewerViewModel : ViewModelBase
         }
     }
 
-    partial void OnZplTextChanged(string value) => ScheduleRender();
+    partial void OnZplTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(OutboundDescription));
+        ScheduleRender();
+    }
 
     partial void OnAutoSizeChanged(bool value) => ScheduleRender();
 
@@ -188,6 +193,7 @@ public partial class ViewerViewModel : ViewModelBase
 
     private async void ScheduleRender()
     {
+        InvalidateComparison();
         _renderCts?.Cancel();
         var cts = new CancellationTokenSource();
         _renderCts = cts;
@@ -328,9 +334,9 @@ public partial class ViewerViewModel : ViewModelBase
     /// Shown next to the button rather than in a help page, because the moment of
     /// deciding is the only moment it is any use.</summary>
     public string OutboundDescription =>
-        $"This sends the {ZplTextFile.ToBytes(ZplText ?? string.Empty).Length:N0} bytes in the "
-        + "editor to labelary.com over the internet, and renders them there. Do not send a "
-        + "label whose contents are confidential.";
+        $"This sends {ZplTextFile.ToBytes(_substitutor.Substitute(ZplText ?? string.Empty)).Length:N0} "
+        + "bytes derived from the editor to labelary.com over the internet, with template "
+        + "markers replaced by sample values. Do not send a label whose contents are confidential.";
 
     /// <summary>
     /// Renders the same ZPL at Labelary and reports how the two differ.
@@ -350,12 +356,16 @@ public partial class ViewerViewModel : ViewModelBase
         }
 
         IsComparing = true;
+        InvalidateComparison();
+        int revision = _comparisonRevision;
         try
         {
-            string zpl = _substitutor.Substitute(ZplText ?? string.Empty);
+            string source = ZplText ?? string.Empty;
+            int dpmm = SelectedDensity?.Dpmm ?? 8;
+            ApplyAutoSize(source, dpmm);
+            string zpl = _substitutor.Substitute(source);
             double widthMm = (double)WidthMm;
             double heightMm = (double)HeightMm;
-            int dpmm = SelectedDensity?.Dpmm ?? 8;
             int labelIndex = SelectedLabelIndex;
 
             // Both sides rendered from the same string in the same pass. Reusing whatever
@@ -366,9 +376,9 @@ public partial class ViewerViewModel : ViewModelBase
                 IZplRenderer online = _comparisonRenderer();
                 try
                 {
-                    return (
-                        _renderer.Render(zpl, widthMm, heightMm, dpmm, labelIndex),
-                        online.Render(zpl, widthMm, heightMm, dpmm, labelIndex));
+                    RenderResult ours = _renderer.Render(zpl, widthMm, heightMm, dpmm, labelIndex);
+                    int effectiveIndex = Math.Clamp(labelIndex, 0, Math.Max(ours.LabelCount - 1, 0));
+                    return (ours, online.Render(zpl, widthMm, heightMm, dpmm, effectiveIndex));
                 }
                 finally
                 {
@@ -376,9 +386,12 @@ public partial class ViewerViewModel : ViewModelBase
                 }
             });
 
-            Bitmap? previous = ComparisonImage;
-            ComparisonImage = null;
-            previous?.Dispose();
+            if (revision != _comparisonRevision)
+            {
+                return;
+            }
+
+            Apply(ours);
 
             if (theirs.Errors.Count > 0)
             {
@@ -397,8 +410,11 @@ public partial class ViewerViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ComparisonSummary = $"The comparison could not be made: {ex.Message}";
-            HasComparison = true;
+            if (revision == _comparisonRevision)
+            {
+                ComparisonSummary = $"The comparison could not be made: {ex.Message}";
+                HasComparison = true;
+            }
         }
         finally
         {
@@ -407,8 +423,11 @@ public partial class ViewerViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ClearComparison()
+    private void ClearComparison() => InvalidateComparison();
+
+    private void InvalidateComparison()
     {
+        _comparisonRevision++;
         Bitmap? previous = ComparisonImage;
         ComparisonImage = null;
         previous?.Dispose();

@@ -52,7 +52,7 @@ if (args.Contains("dark"))
 // Media presets, field catalogs and crash snapshots all live per machine. Point every
 // one of them at scratch locations, so a harness run never touches what the person using
 // the app has saved.
-string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "spacing" or "printer-status" or "viewer-size"
+string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare"
     ? Path.Combine(AppContext.BaseDirectory, args[0] + "-scratch")
     : AppContext.BaseDirectory;
 Directory.CreateDirectory(scratchRoot);
@@ -91,6 +91,85 @@ if (args.FirstOrDefault() == "ui-layout")
 // over these two and a captured local has to be assigned at every place it is called from.
 int graded = 0;
 var disagreed = new List<string>();
+if (args.FirstOrDefault() == "viewer-compare")
+{
+    var viewer = vm.Viewer;
+    viewer.AutoSize = false;
+    viewer.WidthMm = 10m;
+    viewer.HeightMm = 20m;
+    viewer.AutoSize = true;
+    viewer.SelectedDensity = viewer.Densities.First(option => option.Dpmm == 24);
+    viewer.LoadZpl("^PW241^LL481^XA^FO0,0^GB20,20,1^FS^XZ");
+    viewer.CompareCommand.Execute(null);
+    Pump(1500);
+    Check("compare uses current ZPL width before preview debounce",
+        viewer.ComparisonImage?.PixelSize.Width, 241);
+    Check("compare uses current ZPL height before preview debounce",
+        viewer.ComparisonImage?.PixelSize.Height, 481);
+    Check("offline side shows the compared label", viewer.PreviewImage?.PixelSize.Width, 241);
+    Check("comparison appears", viewer.HasComparison, true);
+
+    bool outboundDescriptionNotified = false;
+    viewer.PropertyChanged += (_, e) =>
+    {
+        if (e.PropertyName == nameof(ViewerViewModel.OutboundDescription))
+        {
+            outboundDescriptionNotified = true;
+        }
+    };
+    viewer.ZplText = "^PW250^LL480^XA^FO0,0^GB20,20,1^FS^XZ";
+    Check("editing updates the outgoing byte description", outboundDescriptionNotified, true);
+    Check("editing clears the old comparison", viewer.HasComparison, false);
+    Check("editing releases the old comparison image", viewer.ComparisonImage is null, true);
+    Pump(700);
+    Check("old comparison stays closed after preview updates", viewer.HasComparison, false);
+
+    viewer.LoadZpl("^PW240^LL480^XA^FO0,0^GB20,20,1^FS^XZ"
+        + "^XA^FO10,10^GB20,20,1^FS^XZ");
+    Pump(700);
+    viewer.CompareCommand.Execute(null);
+    Pump(1200);
+    Check("multi-label comparison appears", viewer.HasComparison, true);
+    viewer.SelectedLabelIndex = 1;
+    Check("switching labels clears the old comparison", viewer.HasComparison, false);
+
+    const string markedZpl = "^XA^FO0,0^A0N,30^FD##X##^FS^XZ";
+    viewer.ZplText = markedZpl;
+    string sentZpl = new LabelForge.Core.Templating.TemplateSubstitutor().Substitute(markedZpl);
+    int sentBytes = LabelForge.Core.Io.ZplTextFile.ToBytes(sentZpl).Length;
+    Check("outbound description counts the substituted bytes",
+        viewer.OutboundDescription.Contains($"{sentBytes:N0} bytes", StringComparison.Ordinal), true);
+    Check("outbound description explains sample values",
+        viewer.OutboundDescription.Contains("sample values", StringComparison.OrdinalIgnoreCase), true);
+
+    var slow = new ViewerViewModel(() => new DelayedComparisonRenderer());
+    slow.LoadZpl("^XA^FO0,0^GB20,20,1^FS^XZ");
+    slow.CompareCommand.Execute(null);
+    slow.ZplText = "^XA^FO10,10^GB20,20,1^FS^XZ";
+    Pump(1500);
+    Check("edit during compare discards the stale response", slow.HasComparison, false);
+    Check("stale response has no comparison image", slow.ComparisonImage is null, true);
+
+    var recording = new DelayedComparisonRenderer(delayMs: 0);
+    var shrinking = new ViewerViewModel(() => recording);
+    shrinking.LoadZpl("^XA^FO0,0^GB20,20,1^FS^XZ"
+        + "^XA^FO10,10^GB20,20,1^FS^XZ"
+        + "^XA^FO20,20^GB20,20,1^FS^XZ");
+    Pump(700);
+    shrinking.SelectedLabelIndex = 2;
+    Pump(700);
+    shrinking.ZplText = "^XA^FO0,0^GB20,20,1^FS^XZ"
+        + "^XA^FO10,10^GB20,20,1^FS^XZ";
+    shrinking.CompareCommand.Execute(null);
+    Pump(1200);
+    Check("compare sends the rendered label index after blocks shrink",
+        recording.LastLabelIndex, 1);
+
+    Console.WriteLine($"{graded} viewer compare checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
 if (args.FirstOrDefault() == "viewer-size")
 {
     const string sizedLabels = "^PW800^LL1200^XA^FO0,0^GB20,20,1^FS^XZ"
