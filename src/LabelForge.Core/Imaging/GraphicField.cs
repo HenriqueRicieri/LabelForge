@@ -104,6 +104,41 @@ public static class GraphicField
         return new GraphicBitmap(black, width, height);
     }
 
+    /// <summary>Replicates each printer dot for ^XG magnification without resampling.</summary>
+    public static GraphicBitmap Magnify(GraphicBitmap bitmap, int magX, int magY)
+    {
+        ArgumentNullException.ThrowIfNull(bitmap);
+        if (magX < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(magX), "Magnification must be positive.");
+        }
+
+        if (magY < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(magY), "Magnification must be positive.");
+        }
+
+        if (magX == 1 && magY == 1)
+        {
+            return bitmap;
+        }
+
+        int width = checked(bitmap.Width * magX);
+        int height = checked(bitmap.Height * magY);
+        var black = new bool[checked(width * height)];
+        for (int y = 0; y < height; y++)
+        {
+            int sourceRow = y / magY * bitmap.Width;
+            int targetRow = y * width;
+            for (int x = 0; x < width; x++)
+            {
+                black[targetRow + x] = bitmap.Black[sourceRow + x / magX];
+            }
+        }
+
+        return new GraphicBitmap(black, width, height);
+    }
+
     private static void PackRow(bool[] black, int width, int y, byte[] row)
     {
         Array.Clear(row);

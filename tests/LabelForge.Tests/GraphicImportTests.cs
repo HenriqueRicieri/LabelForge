@@ -331,9 +331,7 @@ public sealed class GraphicImportTests
     /// and get back exactly the dots the source label prints. Magnification is in the
     /// fixture because that is where a resample would show up as softened edges.
     ///
-    /// The comparison is against the bits, not against rendering the source: BinaryKits
-    /// draws ^XG at its stored size and ignores the magnification, so the source render
-    /// is not a usable oracle here (see <see cref="Renderer_IgnoresXgMagnification"/>).
+    /// Compare the recovered bits directly, independent of either renderer path.
     /// </summary>
     [Fact]
     public void ImportedGraphic_RegeneratesTheSameDots()
@@ -367,24 +365,113 @@ public sealed class GraphicImportTests
     }
 
     /// <summary>
-    /// A limitation of the offline renderer, pinned so it is a known quantity rather
-    /// than a surprise: BinaryKits draws a recalled graphic at its stored size whatever
-    /// magnification ^XG asks for. It costs us nothing on our own output, which always
-    /// recalls at 1,1, and nothing on the corpus, which never magnifies either. It does
-    /// mean the viewer under-draws a foreign label that magnifies a stamp.
+    /// BinaryKits ignores ^XG magnification. The preview must expand the downloaded
+    /// bits before the engine sees them, while leaving the source ZPL untouched.
     /// </summary>
-    [Fact]
-    public void Renderer_IgnoresXgMagnification()
+    [Theory]
+    [InlineData(1, 1, 64)]
+    [InlineData(2, 3, 384)]
+    [InlineData(4, 4, 1024)]
+    public void Renderer_DrawsMagnifiedXgAtPrinterSize(int magnificationX, int magnificationY, int expectedBlack)
     {
         const string graphic = "~DGLOGO,8,1,FFFFFFFFFFFFFFFF\n^XA\n^FO0,0^XGLOGO,";
         var renderer = new BinaryKitsRenderer();
+        string zpl = $"{graphic}{magnificationX},{magnificationY}^FS\n^XZ";
 
-        int atOne = BlackPixels(renderer.Render($"{graphic}1,1^FS\n^XZ", 20, 12, 8).Png);
-        int atFour = BlackPixels(renderer.Render($"{graphic}4,4^FS\n^XZ", 20, 12, 8).Png);
+        RenderResult result = renderer.Render(zpl, 20, 12, 8);
 
-        Assert.Equal(64, atOne);
-        Assert.Equal(atOne, atFour);
+        Assert.Empty(result.Errors);
+        Assert.Equal(expectedBlack, BlackPixels(result.Png));
     }
+
+    [Fact]
+    public void Renderer_PreservesTheDotsInAMagnifiedFixture()
+    {
+        string zpl = File.ReadAllText(
+            Path.Combine(TestCorpus.FixturesDirectory(), "embedded-graphic.zpl"));
+
+        RenderResult result = new BinaryKitsRenderer().Render(zpl, 50, 37.5, 8);
+        using SKBitmap? bitmap = SKBitmap.Decode(result.Png);
+
+        Assert.Empty(result.Errors);
+        Assert.NotNull(bitmap);
+        Assert.True(IsBlack(bitmap, 40, 120));
+        Assert.True(IsBlack(bitmap, 43, 123));
+        Assert.False(IsBlack(bitmap, 44, 124));
+        Assert.True(IsBlack(bitmap, 68, 148));
+        Assert.False(IsBlack(bitmap, 72, 152));
+    }
+
+    [Fact]
+    public void Renderer_ReusesOneDownloadAtDifferentMagnifications()
+    {
+        const string zpl = "~DGLOGO,8,1,FFFFFFFFFFFFFFFF\n^XA"
+            + "^FO0,0^XGLOGO,2,3^FS"
+            + "^FO32,0^XGLOGO,4,1^FS"
+            + "^FO32,20^XGLOGO,2,3^FS^XZ";
+
+        RenderResult result = new BinaryKitsRenderer().Render(zpl, 20, 12, 8);
+        using SKBitmap? bitmap = SKBitmap.Decode(result.Png);
+
+        Assert.Empty(result.Errors);
+        Assert.NotNull(bitmap);
+        Assert.Equal(1024, BlackPixels(result.Png));
+        Assert.True(IsBlack(bitmap, 15, 23));
+        Assert.False(IsBlack(bitmap, 16, 23));
+        Assert.True(IsBlack(bitmap, 63, 7));
+        Assert.False(IsBlack(bitmap, 64, 7));
+        Assert.True(IsBlack(bitmap, 47, 43));
+    }
+
+    [Fact]
+    public void Renderer_ExpandsCompressedGraphicDots()
+    {
+        string zpl = $"{Download("LOGO")}\n^XA^FO10,10^XGLOGO,2,3^FS^XZ";
+
+        RenderResult result = new BinaryKitsRenderer().Render(zpl, 20, 12, 8);
+        using SKBitmap? bitmap = SKBitmap.Decode(result.Png);
+
+        Assert.Empty(result.Errors);
+        Assert.NotNull(bitmap);
+        Assert.Equal(384, BlackPixels(result.Png));
+        Assert.True(IsBlack(bitmap, 10, 10));
+        Assert.False(IsBlack(bitmap, 18, 10));
+    }
+
+    [Fact]
+    public void Renderer_DerivedDownloadDoesNotReplaceAnExistingName()
+    {
+        const string zpl = "~DGLFV00000,8,1,FFFFFFFFFFFFFFFF\n"
+            + "~DGLOGO,8,1,0000000000000000\n"
+            + "^XA^FO0,0^XGLFV00000,1,1^FS"
+            + "^FO20,0^XGLOGO,2,2^FS^XZ";
+
+        RenderResult result = new BinaryKitsRenderer().Render(zpl, 20, 12, 8);
+
+        Assert.Empty(result.Errors);
+        Assert.Equal(64, BlackPixels(result.Png));
+    }
+
+    [Fact]
+    public void Renderer_UsesTheDownloadInForceForEachLabel()
+    {
+        const string zpl = "~DGLOGO,8,1,FFFFFFFFFFFFFFFF\n"
+            + "^XA^FO0,0^XGLOGO,2,2^FS^XZ\n"
+            + "~DGLOGO,8,1,0000000000000000\n"
+            + "^XA^FO0,0^XGLOGO,2,2^FS^XZ";
+        var renderer = new BinaryKitsRenderer();
+
+        RenderResult first = renderer.Render(zpl, 20, 12, 8, labelIndex: 0);
+        RenderResult second = renderer.Render(zpl, 20, 12, 8, labelIndex: 1);
+
+        Assert.Empty(first.Errors);
+        Assert.Empty(second.Errors);
+        Assert.Equal(256, BlackPixels(first.Png));
+        Assert.Equal(0, BlackPixels(second.Png));
+    }
+
+    private static bool IsBlack(SKBitmap bitmap, int x, int y) =>
+        bitmap.GetPixel(x, y).Red < 128;
 
     private static bool[] Magnified(GraphicBitmap bitmap, int factor)
     {

@@ -116,8 +116,11 @@ public static class ZplGraphicImport
         // printed size here. Storing the small bitmap and letting the generator scale it
         // back up would go through Skia's smooth resampling and come out a slightly
         // different label than the one being imported; replication keeps it identical.
-        (bool[] black, int width, int height) = Magnify(
+        GraphicBitmap magnified = GraphicField.Magnify(
             bitmap, placement?.MagnificationX ?? 1, placement?.MagnificationY ?? 1);
+        bool[] black = magnified.Black;
+        int width = magnified.Width;
+        int height = magnified.Height;
 
         return new ImageElement
         {
@@ -139,32 +142,6 @@ public static class ZplGraphicImport
             X = Math.Max(placement?.X ?? 0, 0),
             Y = Math.Max(placement?.Y ?? 0, 0),
         };
-    }
-
-    /// <summary>Nearest-neighbour expansion, which is what the printer does for ^XG
-    /// magnification: every dot becomes a magX by magY block, no new greys invented.</summary>
-    private static (bool[] Black, int Width, int Height) Magnify(
-        GraphicBitmap bitmap, int magX, int magY)
-    {
-        if (magX <= 1 && magY <= 1)
-        {
-            return (bitmap.Black, bitmap.Width, bitmap.Height);
-        }
-
-        int width = bitmap.Width * magX;
-        int height = bitmap.Height * magY;
-        var black = new bool[width * height];
-        for (int y = 0; y < height; y++)
-        {
-            int sourceRow = y / magY * bitmap.Width;
-            int targetRow = y * width;
-            for (int x = 0; x < width; x++)
-            {
-                black[targetRow + x] = bitmap.Black[sourceRow + x / magX];
-            }
-        }
-
-        return (black, width, height);
     }
 
     private static string Describe(int count, string noun) =>

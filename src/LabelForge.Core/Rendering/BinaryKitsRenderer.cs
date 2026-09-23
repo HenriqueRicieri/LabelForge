@@ -96,19 +96,18 @@ public sealed class BinaryKitsRenderer : IZplRenderer
         var storage = new PrinterStorage();
         var analyzer = new ZplAnalyzer(storage);
 
-        // Two render-time repairs to the graphic commands, both for the same reason: the
-        // engine loses a logo silently where a printer draws it. It stores and recalls
-        // downloaded graphics by the literal name, so the short form a printer accepts
-        // ("~DGLOGO" then "^XGLOGO") renders with no logo at all; and it throws on the
-        // framing a file writes around a payload, a trailing tab or a "//" comment being
-        // enough to discard the whole download.
-        // Both rewrite only the copy handed to the engine; the caller's ZPL is untouched.
-        AnalyzeInfo info = analyzer.Analyze(
-            ZplGraphicScanner.QualifyGraphicNames(
-                ZplGraphicScanner.CompactGraphicData(zpl)));
+        // Repair graphic commands only in the preview copy. BinaryKits requires fully
+        // qualified names, rejects framing after download data, and ignores ^XG
+        // magnification. None of these repairs changes saved or printed ZPL.
+        var graphicWarnings = new List<string>();
+        string previewZpl = ZplGraphicScanner.QualifyGraphicNames(
+            ZplGraphicScanner.CompactGraphicData(zpl));
+        previewZpl = ZplGraphicMagnification.Expand(previewZpl, graphicWarnings);
+        AnalyzeInfo info = analyzer.Analyze(previewZpl);
 
         var unknownCommands = info.UnknownCommands ?? Array.Empty<string>();
         var errors = new List<string>(info.Errors ?? Array.Empty<string>());
+        errors.AddRange(graphicWarnings);
 
         // Render the requested label block. A file can hold several (^XA..^XZ); the
         // viewer enumerates them and lets the user pick one. Clamp to a valid index.

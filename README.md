@@ -212,7 +212,8 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   is what used to blank the canvas in the middle of a drag.
 - ZPL viewer: an editable ZPL pane with syntax highlighting, a live preview, auto-sizing from
   `^PW`/`^LL`, a selector for files with multiple `^XA` blocks, and a diagnostics strip for
-  unsupported commands and engine errors. It tolerates non-ZPL template markers and comment lines.
+  unsupported commands and engine errors. It tolerates non-ZPL template markers and comment lines,
+  and renders downloaded graphics at the horizontal and vertical magnification requested by `^XG`.
 - Accented text is handled deliberately end to end. Generated labels declare `^CI28` and are written
   and sent as UTF-8 without a byte order mark. Opening a file honours its byte order mark, then
   tries UTF-8, and only then falls back to Latin-1, saying so, so a legacy CP1252 label keeps its
