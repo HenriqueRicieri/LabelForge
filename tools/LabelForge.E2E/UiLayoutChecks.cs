@@ -426,6 +426,116 @@ internal static class UiLayoutChecks
                 Check("turning repeat off makes armed tool one-shot",
                     !d.RepeatInsert && !d.IsPlacing && d.Document.Elements.Count == 1);
             }
+            var findBox = view.FindControl<TextBox>("OutlineFindBox");
+            Check("Elements has a field finder", findBox is not null);
+            if (findBox is not null)
+            {
+                d.NewDocumentCommand.Execute(null);
+                window.Width = 1200;
+                window.Height = 760;
+                Pump(150);
+                TextElement? firstMatch = null, secondMatch = null;
+                for (int i = 0; i < 30; i++)
+                {
+                    var field = new TextElement
+                    {
+                        X = 20, Y = 10 + i * 15, FontHeightDots = 12, ZOrder = 30 - i,
+                        Name = i == 4 ? "Shipping field" : i == 22 ? "Backup field" : $"Item {i}",
+                        Text = i == 4 ? "ZX-410" : i == 22 ? "ZX-410\nspare" : $"Value {i}",
+                    };
+                    d.Document.Elements.Add(field);
+                    if (i == 4) firstMatch = field;
+                    if (i == 22) secondMatch = field;
+                }
+                var namedBarcode = new BarcodeElement
+                {
+                    X = 300, Y = 30, ZOrder = 0, Name = "Tracking code", Data = "INV-999",
+                };
+                d.Document.Elements.Add(namedBarcode);
+                d.NotifyDocumentEdited();
+                inspectorTabs.SelectedIndex = 1;
+                if (!inspector.IsVisible)
+                {
+                    view.FindControl<Button>("ShowInspectorButton")!.RaiseEvent(
+                        new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                }
+                Pump(400);
+                string beforeFind = d.SerializeDocument();
+                string zplBeforeFind = d.GeneratedZpl;
+                bool undoBeforeFind = d.CanUndo;
+                int rowsBeforeFind = d.Outline.Count;
+                findBox.Focus();
+                window.KeyTextInput("ZX-410");
+                Pump(250);
+                Check("finder searches full content behind names",
+                    ReferenceEquals(d.SelectedElement, firstMatch) && d.OutlineFindStatus == "1/2");
+                window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, "\r");
+                Pump(300);
+                Check("Enter advances to the next matching field",
+                    ReferenceEquals(d.SelectedElement, secondMatch) && d.OutlineFindStatus == "2/2");
+                var outline = view.FindControl<ListBox>("ElementsList")!;
+                Check("finder scrolls the matching row into view",
+                    outline.GetVisualDescendants().OfType<ListBoxItem>().Any(item =>
+                        ReferenceEquals(item.DataContext, d.SelectedOutlineRow) && Within(item, outline)));
+                window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, "\r");
+                Pump(150);
+                Check("finder wraps after the last match",
+                    ReferenceEquals(d.SelectedElement, firstMatch) && d.OutlineFindStatus == "1/2");
+                findBox.Text = "shipping";
+                Pump(150);
+                Check("finder matches user names", ReferenceEquals(d.SelectedElement, firstMatch) &&
+                    d.OutlineFindStatus == "1/1");
+                findBox.Text = "410 spare";
+                Pump(150);
+                Check("finder matches across content line breaks",
+                    ReferenceEquals(d.SelectedElement, secondMatch) && d.OutlineFindStatus == "1/1");
+                findBox.Text = "shipping";
+                Pump(100);
+                findBox.Text = "zzmissing";
+                Pump(150);
+                Check("missing query keeps the selected field", d.OutlineFindStatus == "No matches" &&
+                    ReferenceEquals(d.SelectedElement, firstMatch));
+                window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+                Pump(150);
+                Check("Escape clears find without dropping selection",
+                    findBox.Text == string.Empty && d.OutlineFindStatus == string.Empty &&
+                    ReferenceEquals(d.SelectedElement, firstMatch));
+                Check("finding keeps all stacking rows", d.Outline.Count == rowsBeforeFind);
+                Check("finding leaves label, ZPL and undo alone",
+                    d.SerializeDocument() == beforeFind && d.GeneratedZpl == zplBeforeFind &&
+                    d.CanUndo == undoBeforeFind);
+                findBox.Text = "INV-999";
+                Pump(150);
+                Check("finder searches barcode data behind its name",
+                    ReferenceEquals(d.SelectedElement, namedBarcode) && d.OutlineFindStatus == "1/1");
+
+                window.Width = 700;
+                window.Height = 480;
+                Pump(150);
+                if (!inspector.IsVisible)
+                {
+                    view.FindControl<Button>("ShowInspectorButton")!.RaiseEvent(
+                        new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                    Pump(100);
+                }
+                findBox.Text = "Backup";
+                Pump(200);
+                Check("compact finder stays visible and selects the field",
+                    inspector.IsVisible && Within(findBox, inspector) &&
+                    ReferenceEquals(d.SelectedElement, secondMatch));
+                using (var findFrame = window.CaptureRenderedFrame())
+                    findFrame?.Save(Path.Combine(output, "compact-elements-find.png"), PngBitmapEncoderOptions.Default);
+                view.FindControl<Button>("OutlineFindClearButton")!.RaiseEvent(
+                    new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(100);
+                Check("Clear button returns focus to empty search", d.OutlineFindText == string.Empty &&
+                    findBox.IsKeyboardFocusWithin);
+                findBox.Text = "Backup";
+                d.NewDocumentCommand.Execute(null);
+                Pump(150);
+                Check("new label clears finder", findBox.Text == string.Empty &&
+                    d.OutlineFindStatus == string.Empty);
+            }
         }
         d.ShutDown();
         window.Close();

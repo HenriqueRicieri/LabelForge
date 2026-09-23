@@ -778,9 +778,19 @@
                         </ScrollViewer>
                     </TabItem>
                     <TabItem Header="Elements">
-                        <Grid RowDefinitions="Auto,*" Margin="8">
+                        <Grid RowDefinitions="Auto,Auto,*" Margin="8">
                             <TextBlock Text="{Binding OutlineHeader}" Opacity="0.65" Margin="4,8" />
-                            <Grid Grid.Row="1" ClipToBounds="True">
+                            <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" Margin="0,0,0,6">
+                                <TextBox Name="OutlineFindBox" Text="{Binding OutlineFindText, Mode=TwoWay}"
+                                         PlaceholderText="Find name or content" FontSize="12"
+                                         TextChanged="OnOutlineFindTextChanged" KeyDown="OnOutlineFindKeyDown"
+                                         AutomationProperties.Name="Find element" />
+                                <TextBlock Grid.Column="1" Text="{Binding OutlineFindStatus}"
+                                           VerticalAlignment="Center" FontSize="11" Opacity="0.65" />
+                                <Button Name="OutlineFindClearButton" Grid.Column="2" Content="Clear" Padding="5,2" FontSize="11"
+                                        Click="OnClearOutlineFind" />
+                            </Grid>
+                            <Grid Grid.Row="2" ClipToBounds="True">
                             <ListBox Name="ElementsList" ItemsSource="{Binding Outline}"
                                      SelectedItem="{Binding SelectedOutlineRow}"
                                      ToolTip.Tip="Drag a row to change stacking order. Groups move together. Escape cancels."

@@ -14,6 +14,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 
 - The designer has a scrollable creation rail and a resizable inspector with Properties,
   Elements and Data tabs. Arrange holds alignment, distribution, sizing and grouping.
+  In Elements, find a field by name or its full text/barcode content; Enter moves to
+  the next match and wraps, while Escape or Clear empties the search. The field is
+  selected on the canvas without filtering the stacking list.
   Hide the inspector for more canvas space; narrow windows open it over the canvas.
   Label setup holds media, dimensions, stock layout and printer settings in a scrollable
   dialog. Changes apply as you edit. Generated ZPL and diagnostic details have their own

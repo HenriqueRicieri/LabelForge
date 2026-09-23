@@ -220,6 +220,80 @@ public partial class DesignerViewModel : ViewModelBase
         ? "Elements (1)"
         : $"Elements ({Outline.Count})";
 
+    [ObservableProperty]
+    public partial string OutlineFindText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string OutlineFindStatus { get; set; } = string.Empty;
+
+    partial void OnOutlineFindTextChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            OutlineFindStatus = string.Empty;
+            return;
+        }
+
+        FindOutline(next: false);
+    }
+
+    public void FindNextOutline() => FindOutline(next: true);
+
+    private void FindOutline(bool next)
+    {
+        string query = OutlineFindText.Trim();
+        if (query.Length == 0)
+        {
+            OutlineFindStatus = string.Empty;
+            return;
+        }
+
+        ElementOutlineViewModel[] matches = Outline
+            .Where(row => !row.IsGroupHeader && OutlineMatches(row, query))
+            .ToArray();
+        if (matches.Length == 0)
+        {
+            OutlineFindStatus = "No matches";
+            return;
+        }
+
+        int current = Array.IndexOf(matches, SelectedOutlineRow);
+        int index = next && current >= 0 ? (current + 1) % matches.Length : 0;
+        SelectedOutlineRow = matches[index];
+        OutlineFindStatus = $"{index + 1}/{matches.Length}";
+    }
+
+    private void UpdateOutlineFindStatus()
+    {
+        string query = OutlineFindText.Trim();
+        if (query.Length == 0)
+        {
+            OutlineFindStatus = string.Empty;
+            return;
+        }
+
+        ElementOutlineViewModel[] matches = Outline
+            .Where(row => !row.IsGroupHeader && OutlineMatches(row, query))
+            .ToArray();
+        int current = Array.IndexOf(matches, SelectedOutlineRow);
+        OutlineFindStatus = matches.Length == 0
+            ? "No matches"
+            : current >= 0 ? $"{current + 1}/{matches.Length}" : $"{matches.Length} matches";
+    }
+
+    private static bool OutlineMatches(ElementOutlineViewModel row, string query)
+    {
+        Element element = row.Element;
+        if (row.Display.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            DisplayName(element).Contains(query, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return OutlineContent(element).ReplaceLineEndings(" ")
+            .Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>The row for the current selection, so picking in the list and picking on
     /// the canvas are the same act seen from two places.</summary>
     [ObservableProperty]
@@ -229,6 +303,7 @@ public partial class DesignerViewModel : ViewModelBase
 
     partial void OnSelectedOutlineRowChanged(ElementOutlineViewModel? value)
     {
+        UpdateOutlineFindStatus();
         if (_syncingOutline || value is null)
         {
             return;
@@ -1247,6 +1322,7 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         CurrentFilePath = path;
+        OutlineFindText = string.Empty;
         NotifyPrintSettingsChanged();
         RefreshVariables();
         RefreshOutline();
@@ -2743,6 +2819,7 @@ public partial class DesignerViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(HasOutline));
         OnPropertyChanged(nameof(OutlineHeader));
+        UpdateOutlineFindStatus();
     }
 
     private string? _outlineSignature;
@@ -2756,17 +2833,7 @@ public partial class DesignerViewModel : ViewModelBase
             return element.Name;
         }
 
-        string content = element switch
-        {
-            TextElement text => text.Text,
-            BarcodeElement barcode => barcode.Data,
-            QrCodeElement qr => qr.Data,
-            DataMatrixElement dm => dm.Data,
-            Pdf417Element pdf => pdf.Data,
-            _ => string.Empty,
-        };
-
-        content = content.ReplaceLineEndings(" ").Trim();
+        string content = OutlineContent(element).ReplaceLineEndings(" ").Trim();
         if (content.Length > 28)
         {
             content = content[..28] + "...";
@@ -2774,6 +2841,16 @@ public partial class DesignerViewModel : ViewModelBase
 
         return content.Length > 0 ? $"{DisplayName(element)}: {content}" : DisplayName(element);
     }
+
+    private static string OutlineContent(Element element) => element switch
+    {
+        TextElement text => text.Text,
+        BarcodeElement barcode => barcode.Data,
+        QrCodeElement qr => qr.Data,
+        DataMatrixElement dm => dm.Data,
+        Pdf417Element pdf => pdf.Data,
+        _ => string.Empty,
+    };
 
     private void OnOutlineEdited(Element element, string key)
     {

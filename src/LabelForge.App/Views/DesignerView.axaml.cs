@@ -354,6 +354,58 @@ public partial class DesignerView : UserControl
 
     private DesignerViewModel? ViewModel => DataContext as DesignerViewModel;
 
+    private void OnOutlineFindTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (sender is TextBox box && ViewModel is { } vm)
+        {
+            vm.OutlineFindText = box.Text ?? string.Empty;
+            ScrollToFoundOutline();
+        }
+    }
+
+    private void OnOutlineFindKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Enter)
+        {
+            vm.FindNextOutline();
+            ScrollToFoundOutline();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            vm.OutlineFindText = string.Empty;
+            e.Handled = true;
+        }
+    }
+
+    private void OnClearOutlineFind(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            vm.OutlineFindText = string.Empty;
+            OutlineFindBox.Focus();
+        }
+    }
+
+    private void ScrollToFoundOutline()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (ElementsList.IsEffectivelyVisible &&
+                ViewModel is { SelectedOutlineRow: { } row } vm &&
+                !string.IsNullOrWhiteSpace(vm.OutlineFindText) &&
+                vm.OutlineFindStatus != "No matches")
+            {
+                ElementsList.ScrollIntoView(row);
+            }
+        }, DispatcherPriority.Background);
+    }
+
     private void WireRecentFiles()
     {
         if (ViewModel is not { } vm)
