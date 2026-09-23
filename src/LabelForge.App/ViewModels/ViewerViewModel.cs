@@ -231,18 +231,19 @@ public partial class ViewerViewModel : ViewModelBase
             return;
         }
 
-        int? printWidth = ZplSizeScanner.PrintWidthDots(zpl);
-        int? labelLength = ZplSizeScanner.LabelLengthDots(zpl);
+        ZplLabelSize size = ZplSizeScanner.ForLabel(zpl, SelectedLabelIndex);
+        int? printWidth = size.PrintWidthDots;
+        int? labelLength = size.LabelLengthDots;
 
         _suppressSizeRender = true;
         if (printWidth is int pw && pw > 0)
         {
-            WidthMm = Math.Round((decimal)pw / dpmm, 1);
+            WidthMm = (decimal)pw / dpmm;
         }
 
         if (labelLength is int ll && ll > 0)
         {
-            HeightMm = Math.Round((decimal)ll / dpmm, 1);
+            HeightMm = (decimal)ll / dpmm;
         }
 
         _suppressSizeRender = false;
@@ -301,7 +302,7 @@ public partial class ViewerViewModel : ViewModelBase
 
         if (SelectedLabelIndex < 0 || SelectedLabelIndex >= count)
         {
-            SelectedLabelIndex = 0;
+            SelectedLabelIndex = Math.Clamp(SelectedLabelIndex, 0, count - 1);
         }
 
         _suppressLabelRender = false;

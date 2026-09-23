@@ -52,7 +52,7 @@ if (args.Contains("dark"))
 // Media presets, field catalogs and crash snapshots all live per machine. Point every
 // one of them at scratch locations, so a harness run never touches what the person using
 // the app has saved.
-string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "spacing" or "printer-status"
+string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "spacing" or "printer-status" or "viewer-size"
     ? Path.Combine(AppContext.BaseDirectory, args[0] + "-scratch")
     : AppContext.BaseDirectory;
 Directory.CreateDirectory(scratchRoot);
@@ -91,6 +91,55 @@ if (args.FirstOrDefault() == "ui-layout")
 // over these two and a captured local has to be assigned at every place it is called from.
 int graded = 0;
 var disagreed = new List<string>();
+if (args.FirstOrDefault() == "viewer-size")
+{
+    const string sizedLabels = "^PW800^LL1200^XA^FO0,0^GB20,20,1^FS^XZ"
+        + "^XA^PW400^FO0,0^GB20,20,1^FS^XZ"
+        + "^LL600^XA^FO0,0^GB20,20,1^FS^XZ";
+    var viewer = vm.Viewer;
+    viewer.LoadZpl(sizedLabels);
+    Pump(700);
+    Check("viewer finds three labels", viewer.LabelCount, 3);
+    Check("first label width", viewer.WidthMm, 100m);
+    Check("first label height", viewer.HeightMm, 150m);
+
+    viewer.SelectedLabelIndex = 1;
+    Pump(700);
+    Check("second label width", viewer.WidthMm, 50m);
+    Check("second label inherits height", viewer.HeightMm, 150m);
+    Check("second preview pixel size", viewer.StatusText, "400 x 1200 dots");
+
+    viewer.SelectedLabelIndex = 2;
+    Pump(700);
+    Check("third label inherits width", viewer.WidthMm, 50m);
+    Check("third label height", viewer.HeightMm, 75m);
+    Check("third preview pixel size", viewer.StatusText, "400 x 600 dots");
+
+    viewer.ZplText = "^PW800^LL1200^XA^FO0,0^GB20,20,1^FS^XZ"
+        + "^XA^PW400^LL600^FO0,0^GB20,20,1^FS^XZ";
+    Pump(700);
+    Check("removed label selects rendered last label", viewer.SelectedLabelIndex, 1);
+    Check("removed label preview pixel size", viewer.StatusText, "400 x 600 dots");
+
+    viewer.AutoSize = false;
+    viewer.WidthMm = 90m;
+    viewer.HeightMm = 80m;
+    viewer.SelectedLabelIndex = 0;
+    Pump(700);
+    Check("manual width survives label switch", viewer.WidthMm, 90m);
+    Check("manual height survives label switch", viewer.HeightMm, 80m);
+
+    viewer.AutoSize = true;
+    viewer.SelectedDensity = viewer.Densities.First(option => option.Dpmm == 24);
+    viewer.LoadZpl("^PW241^LL481^XA^FO0,0^GB20,20,1^FS^XZ");
+    Pump(700);
+    Check("24 dpmm preview keeps declared dot size", viewer.StatusText, "241 x 481 dots");
+
+    Console.WriteLine($"{graded} viewer size checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
 if (args.FirstOrDefault() == "printer-status")
 {
     PrinterStatusChecks.Run(window, vm, (label, held) => Check(label, held, true));

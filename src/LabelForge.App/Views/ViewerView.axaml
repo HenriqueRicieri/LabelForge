@@ -36,11 +36,11 @@
                           ToolTip.Tip="Read the label size from ^PW / ^LL in the ZPL" />
                 <TextBlock Text="Width (mm)" VerticalAlignment="Center" />
                 <NumericUpDown Value="{Binding WidthMm}" Minimum="5" Maximum="600"
-                               Increment="1" FormatString="0.#" Width="110"
+                               Increment="1" FormatString="0.###" Width="110"
                                IsEnabled="{Binding !AutoSize}" />
                 <TextBlock Text="Height (mm)" VerticalAlignment="Center" />
                 <NumericUpDown Value="{Binding HeightMm}" Minimum="5" Maximum="1000"
-                               Increment="1" FormatString="0.#" Width="110"
+                               Increment="1" FormatString="0.###" Width="110"
                                IsEnabled="{Binding !AutoSize}" />
                 <TextBlock Text="Density" VerticalAlignment="Center" />
                 <ComboBox ItemsSource="{Binding Densities}"

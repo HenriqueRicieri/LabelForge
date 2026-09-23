@@ -22,6 +22,29 @@ public sealed class ZplSizeAndMultiLabelTests
     }
 
     [Fact]
+    public void SizeScanner_DoesNotBorrowDimensionsFromALaterLabel()
+    {
+        const string zpl = "^XA^FO0,0^GB20,20,1^FS^XZ"
+            + "^PW400^LL600^XA^FO0,0^GB20,20,1^FS^XZ";
+
+        Assert.Null(ZplSizeScanner.PrintWidthDots(zpl));
+        Assert.Null(ZplSizeScanner.LabelLengthDots(zpl));
+    }
+
+    [Fact]
+    public void SizeScanner_TracksDimensionsThroughSetupBlocksAndPartialChanges()
+    {
+        const string zpl = "^PW800^LL1200^XA^FO0,0^GB20,20,1^FS^XZ"
+            + "^XA^PW400^FO0,0^GB20,20,1^FS^XZ"
+            + "^LL600^XA^FO0,0^GB20,20,1^FS^XZ";
+
+        Assert.Equal(new ZplLabelSize(800, 1200), ZplSizeScanner.ForLabel(zpl, 0));
+        Assert.Equal(new ZplLabelSize(400, 1200), ZplSizeScanner.ForLabel(zpl, 1));
+        Assert.Equal(new ZplLabelSize(400, 600), ZplSizeScanner.ForLabel(zpl, 2));
+        Assert.Equal(new ZplLabelSize(400, 600), ZplSizeScanner.ForLabel(zpl, 9));
+    }
+
+    [Fact]
     public void Renderer_ReportsLabelCount_ForMultipleBlocks()
     {
         const string zpl =
