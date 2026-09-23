@@ -342,6 +342,8 @@
                         <MenuItem Header="Paste in Pl_ace" Command="{Binding PasteInPlaceCommand}"
                                   InputGesture="Ctrl+Shift+V" />
                         <MenuItem Header="D_uplicate" Command="{Binding DuplicateCommand}" InputGesture="Ctrl+D" />
+                        <MenuItem Name="EditSelectedMenu" Header="Edit selected _field" Click="OnEditSelectedField"
+                                  InputGesture="F2" IsEnabled="{Binding IsSingleSelection}" />
                         <Separator />
                         <MenuItem Name="AlignEditMenu" Header="Align to _label"
                                   ToggleType="CheckBox" IsChecked="{Binding AlignToLabel, Mode=TwoWay}"
@@ -717,7 +719,7 @@
                         <TextBlock Text="{Binding SelectionProperties.TypeName, FallbackValue=''}"
                                    FontWeight="SemiBold" Opacity="0.8" />
                         <TextBlock Classes="propLabel" Text="Name" />
-                        <TextBox Text="{Binding SelectionProperties.Name, FallbackValue=''}"
+                        <TextBox Name="ElementNameInput" Text="{Binding SelectionProperties.Name, FallbackValue=''}"
                                  PlaceholderText="{Binding SelectionProperties.TypeName, FallbackValue=''}" />
                                     <Expander Name="ContentSection" Header="Content" IsExpanded="True" HorizontalAlignment="Stretch">
                                         <ContentControl Name="PropertiesContent" Content="{Binding SelectionProperties}" />
@@ -779,10 +781,17 @@
                     </TabItem>
                     <TabItem Header="Elements">
                         <Grid RowDefinitions="Auto,Auto,*" Margin="8">
-                            <TextBlock Text="{Binding OutlineHeader}" Opacity="0.65" Margin="4,8" />
+                            <DockPanel Margin="4,4,0,4">
+                                <Button Name="EditSelectedButton" DockPanel.Dock="Right" Content="Edit"
+                                        Padding="8,2" FontSize="11" IsEnabled="{Binding IsSingleSelection}"
+                                        Click="OnEditSelectedField" ToolTip.Tip="Edit selected field (F2)" />
+                                <TextBlock Text="{Binding OutlineHeader}" Opacity="0.65"
+                                           VerticalAlignment="Center" />
+                            </DockPanel>
                             <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" Margin="0,0,0,6">
                                 <TextBox Name="OutlineFindBox" Text="{Binding OutlineFindText, Mode=TwoWay}"
                                          PlaceholderText="Find name or content" FontSize="12"
+                                         ToolTip.Tip="Enter finds the next match. F2 edits the selected field."
                                          TextChanged="OnOutlineFindTextChanged" KeyDown="OnOutlineFindKeyDown"
                                          AutomationProperties.Name="Find element" />
                                 <TextBlock Grid.Column="1" Text="{Binding OutlineFindStatus}"

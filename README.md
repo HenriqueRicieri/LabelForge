@@ -16,11 +16,14 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   Elements and Data tabs. Arrange holds alignment, distribution, sizing and grouping.
   In Elements, find a field by name or its full text/barcode content; Enter moves to
   the next match and wraps, while Escape or Clear empties the search. The field is
-  selected on the canvas without filtering the stacking list.
+  selected on the canvas without filtering the stacking list. Use Edit beside the
+  Elements heading, Edit > Edit selected field, the element right-click menu, or F2
+  to open Properties with its content selected. Shapes and images select their Name
+  instead. This navigation leaves the label and undo history alone until you type.
   Hide the inspector for more canvas space; narrow windows open it over the canvas.
   Label setup holds media, dimensions, stock layout and printer settings in a scrollable
   dialog. Changes apply as you edit. Generated ZPL and diagnostic details have their own
-  bounded areas, and double-clicking an element reveals its content editor.
+  bounded areas, and double-clicking an element opens the same selected-field editor.
 - View > Element outlines reveals the bounds of white, covered and locked elements.
   Hidden elements stay hidden. View > Printer dot grid shows individual printer-dot
   boundaries at 800% zoom and above; it can be disabled independently of the design grid.
@@ -145,7 +148,7 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   ones that were previously invisible, like Alt to drag without snapping and middle-drag
   to pan.
 - Right-click menus on the canvas, different depending on what is under the pointer: on an
-  element, copy, duplicate, delete, front and back, and the lock and do-not-print switches,
+  element, Edit, copy, duplicate, delete, front and back, and the lock and do-not-print switches,
   plus align and distribute once several are selected; on bare stock, paste at the pointer,
   select all, and an insert submenu that places the new element where you clicked instead of
   asking for a second click. Right-clicking a ruler still offers guides.

@@ -43,7 +43,7 @@ public partial class DesignerView : UserControl
         Canvas.DeleteRequested += (_, _) => ViewModel?.DeleteSelectedCommand.Execute(null);
         Canvas.PointerDotsChanged += (x, y) => ViewModel?.ReportPointer(x, y);
         Canvas.PointerLeftLabel += (_, _) => ViewModel?.ReportPointerLeft();
-        Canvas.EditRequested += (_, _) => FocusContentField();
+        Canvas.EditRequested += (_, _) => FocusSelectedField();
         Canvas.ContextMenuRequested += OnCanvasContextMenu;
         Canvas.PlaceRequested += (x, y) =>
         {
@@ -104,6 +104,10 @@ public partial class DesignerView : UserControl
     private MenuFlyout ElementMenu(DesignerViewModel vm, LabelForge.Core.Model.Element element)
     {
         var menu = new MenuFlyout();
+        var edit = new MenuItem { Header = "Edit", IsEnabled = vm.IsSingleSelection };
+        edit.Click += OnEditSelectedField;
+        menu.Items.Add(edit);
+        menu.Items.Add(new Separator());
         Add(menu, "Cut", vm.CutCommand);
         Add(menu, "Copy", vm.CopyCommand);
         Add(menu, "Duplicate", vm.DuplicateCommand);
@@ -563,35 +567,33 @@ public partial class DesignerView : UserControl
     /// <summary>Content fields become ready to type after placement; shapes stay on the canvas.</summary>
     private void FocusPlacedContent()
     {
-        if (ViewModel?.SelectedElement is TextElement or BarcodeElement or QrCodeElement
-            or DataMatrixElement or Pdf417Element)
+        if (HasEditableContent(ViewModel?.SelectedElement))
         {
-            FocusContentField();
+            FocusSelectedField();
         }
     }
 
-    /// <summary>
-    /// Puts the caret in the field holding the selected element's content, with the text
-    /// selected so typing replaces it. The cheap form of editing in place: the canvas draws
-    /// the renderer's bitmap and must never draw text itself, so the editing happens in the
-    /// panel and the canvas shows the result.
-    ///
-    /// Posted rather than done straight away, because the double-click may be what selected
-    /// the element and the panel's editor for it does not exist until the layout pass that
-    /// follows. Elements with nothing to type (a box, a line) have no such field and this
-    /// does nothing, which is the right amount to do.
-    /// </summary>
-    private void FocusContentField()
+    private static bool HasEditableContent(Element? element) => element is
+        TextElement or BarcodeElement or QrCodeElement or DataMatrixElement or Pdf417Element;
+
+    private void OnEditSelectedField(object? sender, RoutedEventArgs e) => FocusSelectedField();
+
+    /// <summary>Reveals Properties and selects the selected field's content or name.</summary>
+    private void FocusSelectedField()
     {
-        Element? selected = ViewModel?.SelectedElement;
-        if (selected is null)
+        if (ViewModel is not { IsSingleSelection: true, SelectedElement: { } selected })
         {
             return;
         }
 
+        bool hasContent = HasEditableContent(selected);
         RevealInspector();
         InspectorTabs.SelectedIndex = 0;
-        ContentSection.IsExpanded = true;
+        if (hasContent)
+        {
+            ContentSection.IsExpanded = true;
+        }
+
         Dispatcher.UIThread.Post(() =>
         {
             if (!ReferenceEquals(ViewModel?.SelectedElement, selected) ||
@@ -600,13 +602,23 @@ public partial class DesignerView : UserControl
                 return;
             }
 
-            if (PropertiesContent.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault() is not { } box)
-                return;
+            if (hasContent)
+            {
+                if (PropertiesContent.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault() is not { } box)
+                {
+                    return;
+                }
 
-            box.BringIntoView();
-            box.Focus();
-            if (box.GetVisualDescendants().OfType<TextBox>().FirstOrDefault() is { } inner)
-                inner.SelectAll();
+                box.BringIntoView();
+                box.Focus();
+                box.GetVisualDescendants().OfType<TextBox>().FirstOrDefault()?.SelectAll();
+            }
+            else
+            {
+                ElementNameInput.BringIntoView();
+                ElementNameInput.Focus();
+                ElementNameInput.SelectAll();
+            }
         }, DispatcherPriority.Background);
     }
 
@@ -1012,7 +1024,17 @@ public partial class DesignerView : UserControl
 
         if (e.Key == Key.Escape && vm.IsPlacing)
         {
-            vm.CancelInsert();
+            if (!Canvas.CancelPendingDraw())
+            {
+                vm.CancelInsert();
+            }
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.F2 && e.KeyModifiers == KeyModifiers.None && vm.IsSingleSelection)
+        {
+            FocusSelectedField();
             e.Handled = true;
             return;
         }

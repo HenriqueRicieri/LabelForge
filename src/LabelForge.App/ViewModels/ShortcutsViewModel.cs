@@ -46,6 +46,7 @@ public sealed class ShortcutsViewModel
             new("Ctrl + V", "Paste, cascaded from the last one"),
             new("Ctrl + Shift + V", "Paste where it was copied from"),
             new("Ctrl + D", "Duplicate the selection"),
+            new("F2", "Edit the selected field in Properties"),
             new("Ctrl + ]  /  Ctrl + [", "One step forward or back in the stacking order"),
             new("Ctrl + Shift + Up / Down", "The same, where a bracket is not a key of its own"),
             new("Delete", "Delete the selection"),

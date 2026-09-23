@@ -1770,6 +1770,9 @@ public sealed partial class DesignerCanvas : Control
         StartGesturePreview(GestureKind.Move, _dragItems.Select(i => i.Element).ToArray(), _gestureBefore);
     }
 
+    /// <summary>Stops an unfinished draw when Escape is handled outside the canvas.</summary>
+    public bool CancelPendingDraw() => (_drawArmed || _drawing) && CancelGesture();
+
     /// <summary>
     /// Escape mid-gesture: put the elements back the way they were when it started, take
     /// out anything it created, and record nothing. The gesture is over either way, so the

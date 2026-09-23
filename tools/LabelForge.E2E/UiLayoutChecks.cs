@@ -536,6 +536,116 @@ internal static class UiLayoutChecks
                 Check("new label clears finder", findBox.Text == string.Empty &&
                     d.OutlineFindStatus == string.Empty);
             }
+            var editButton = view.FindControl<Button>("EditSelectedButton");
+            Check("Elements has an Edit action", editButton is not null);
+            if (editButton is not null && findBox is not null)
+            {
+                var editMenu = view.FindControl<MenuItem>("EditSelectedMenu")!;
+                Check("Edit is disabled with no selection", !editButton.IsEnabled && !editMenu.IsEnabled);
+                int tabWithoutSelection = inspectorTabs.SelectedIndex;
+                window.KeyPress(Key.F2, RawInputModifiers.None, PhysicalKey.F2, null);
+                Pump(100);
+                Check("F2 without selection leaves the inspector alone",
+                    inspectorTabs.SelectedIndex == tabWithoutSelection && !d.HasSelection);
+
+                window.Width = 1200;
+                window.Height = 760;
+                d.NewDocumentCommand.Execute(null);
+                var parcel = new TextElement { X = 120, Y = 100, Text = "Old value", Name = "Parcel ID" };
+                d.Document.Elements.Add(parcel);
+                d.NotifyDocumentEdited();
+                inspectorTabs.SelectedIndex = 1;
+                if (!inspector.IsVisible)
+                {
+                    view.FindControl<Button>("ShowInspectorButton")!.RaiseEvent(
+                        new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                }
+                Pump(350);
+                findBox.Text = "Parcel ID";
+                findBox.Focus();
+                Pump(150);
+                Check("finder selection enables Edit", editButton.IsEnabled && editMenu.IsEnabled &&
+                    ReferenceEquals(d.SelectedElement, parcel));
+                string beforeEdit = d.SerializeDocument();
+                bool undoBeforeEdit = d.CanUndo;
+                window.KeyPress(Key.F2, RawInputModifiers.None, PhysicalKey.F2, null);
+                Pump(400);
+                var contentEditor = view.FindControl<ContentControl>("PropertiesContent")!
+                    .GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault();
+                var innerEditor = contentEditor?.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+                Check("F2 opens Properties from finder and focuses content",
+                    inspector.IsVisible && inspectorTabs.SelectedIndex == 0 &&
+                    contentEditor?.IsKeyboardFocusWithin == true);
+                Check("F2 selects existing content without editing it",
+                    innerEditor is not null && innerEditor.SelectionStart == 0 &&
+                    innerEditor.SelectionEnd == innerEditor.Text?.Length &&
+                    d.SerializeDocument() == beforeEdit && d.CanUndo == undoBeforeEdit);
+                window.KeyTextInput("SHIP");
+                Pump(500);
+                Check("typing after F2 replaces the selected field's content",
+                    parcel.Text == "SHIP" && d.GeneratedZpl.Contains("^FDSHIP", StringComparison.Ordinal));
+
+                inspectorTabs.SelectedIndex = 1;
+                findBox.Focus();
+                view.FindControl<MenuItem>("EditOptionsMenu")!.Open();
+                Pump(100);
+                editMenu.Focus();
+                window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, "\r");
+                Pump(350);
+                Check("Edit menu opens the selected field's content editor",
+                    inspectorTabs.SelectedIndex == 0 &&
+                    view.FindControl<ContentControl>("PropertiesContent")!
+                        .GetVisualDescendants().OfType<AutoCompleteBox>()
+                        .Any(box => box.IsKeyboardFocusWithin));
+                view.FindControl<MenuItem>("EditOptionsMenu")!.Close();
+
+                d.NewDocumentCommand.Execute(null);
+                var shape = new BoxElement { X = 80, Y = 80, Name = "Old box" };
+                d.Document.Elements.Add(shape);
+                d.NotifyDocumentEdited();
+                d.Selection.Set(shape);
+                inspectorTabs.SelectedIndex = 1;
+                Pump(300);
+                string shapeZpl = d.GeneratedZpl;
+                editButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(350);
+                var nameEditor = view.FindControl<TextBox>("ElementNameInput")!;
+                Check("Edit button focuses shape name",
+                    inspectorTabs.SelectedIndex == 0 && nameEditor.IsKeyboardFocusWithin &&
+                    nameEditor.SelectionStart == 0 && nameEditor.SelectionEnd == nameEditor.Text?.Length);
+                window.KeyTextInput("Frame");
+                Pump(500);
+                Check("renaming a shape leaves printable ZPL alone",
+                    shape.Name == "Frame" && d.GeneratedZpl == shapeZpl);
+
+                d.NewDocumentCommand.Execute(null);
+                var compactField = new TextElement { X = 100, Y = 100, Text = "Compact" };
+                d.Document.Elements.Add(compactField);
+                d.NotifyDocumentEdited();
+                d.Selection.Set(compactField);
+                inspectorTabs.SelectedIndex = 1;
+                window.Width = 700;
+                window.Height = 480;
+                Pump(150);
+                if (inspector.IsVisible)
+                {
+                    view.FindControl<Button>("HideInspectorButton")!.RaiseEvent(
+                        new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                }
+                canvas.Focus();
+                window.KeyPress(Key.F2, RawInputModifiers.None, PhysicalKey.F2, null);
+                Pump(400);
+                Check("F2 reveals compact inspector and content editor",
+                    inspector.IsVisible && Within(inspector, window) && inspectorTabs.SelectedIndex == 0 &&
+                    view.FindControl<ContentControl>("PropertiesContent")!
+                        .GetVisualDescendants().OfType<AutoCompleteBox>()
+                        .Any(box => box.IsKeyboardFocusWithin));
+                using (var editFrame = window.CaptureRenderedFrame())
+                    editFrame?.Save(Path.Combine(output, "compact-edit-selected.png"), PngBitmapEncoderOptions.Default);
+                Check("keyboard help documents F2",
+                    new ShortcutsViewModel().Groups.SelectMany(g => g.Entries)
+                        .Any(entry => entry.Keys == "F2"));
+            }
         }
         d.ShutDown();
         window.Close();
