@@ -202,29 +202,27 @@ public sealed class BinaryKitsRenderer : IZplRenderer
         }
 
         var info = new SKImageInfo(widthDots, heightDots, SKColorType.Bgra8888, SKAlphaType.Premul);
-        using SKSurface? surface = SKSurface.Create(info);
-        if (surface is null)
-        {
-            // Skia refuses a surface it cannot allocate, most plausibly a label so large
-            // the buffer does not fit. Reported like any other render failure.
-            throw new InvalidOperationException(
-                $"Could not allocate a {widthDots} x {heightDots} rendering surface.");
-        }
-
-        drawer.DrawSurface(surface, elements, widthMm, heightMm, dpmm);
-        if (!transparent)
-        {
-            surface.Canvas.DrawColor(SKColors.White, SKBlendMode.DstOver);
-        }
-
         var pixels = new byte[(long)info.RowBytes * info.Height];
         GCHandle handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
         try
         {
-            if (!surface.ReadPixels(info, handle.AddrOfPinnedObject(), info.RowBytes, 0, 0))
+            // Draw into the output array itself. A separate surface followed by ReadPixels
+            // copied the entire buffer after every render, which is costly at 600 dpi.
+            using SKSurface? surface = SKSurface.Create(
+                info, handle.AddrOfPinnedObject(), info.RowBytes);
+            if (surface is null)
             {
-                throw new InvalidOperationException("Could not read the rendered pixels back.");
+                throw new InvalidOperationException(
+                    $"Could not allocate a {widthDots} x {heightDots} rendering surface.");
             }
+
+            drawer.DrawSurface(surface, elements, widthMm, heightMm, dpmm);
+            if (!transparent)
+            {
+                surface.Canvas.DrawColor(SKColors.White, SKBlendMode.DstOver);
+            }
+
+            surface.Flush();
         }
         finally
         {
