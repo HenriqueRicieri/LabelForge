@@ -12,7 +12,7 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 
 ## What works today
 
-- The designer has a scrollable creation rail and a resizable inspector with Properties,
+- The designer has a labeled, scrollable creation rail and a resizable inspector with Properties,
   Elements and Data tabs. Arrange holds alignment, distribution, sizing and grouping.
   In Elements, find a field by name or its full text/barcode content; Enter moves to
   the next match and wraps, while Escape or Clear empties the search. The field is
@@ -26,7 +26,8 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   Prev and Next beside the Elements heading move through editable fields in list order;
   Ctrl+Shift+Enter and Ctrl+Enter do the same from Content. They skip shapes and groups,
   wrap at the ends, and select the next value for typing without changing the label.
-  Hide the inspector for more canvas space; narrow windows open it over the canvas.
+  Hide the inspector for more canvas space; Show inspector in the setup row reopens it.
+  Narrow windows open it over the canvas.
   Label setup holds media, dimensions, stock layout and printer settings in a scrollable
   dialog. Changes apply as you edit. Generated ZPL and diagnostic details have their own
   bounded areas, and double-clicking an element opens the same selected-field editor.

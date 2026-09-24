@@ -59,7 +59,7 @@ public partial class DesignerView
         double available = WorkspaceGrid.Bounds.Width;
         if (available <= 0) return;
 
-        bool compact = available < 708; // 64 rail + 4 divider + 280 inspector + 360 canvas.
+        bool compact = available < 728; // 84 rail + 4 divider + 280 inspector + 360 canvas.
         if (compact != _compactInspector)
         {
             _compactInspector = compact;
@@ -72,7 +72,7 @@ public partial class DesignerView
         try
         {
             column.MinWidth = docked ? 280 : 0;
-            column.MaxWidth = docked ? Math.Min(420, available - 428) : double.PositiveInfinity;
+            column.MaxWidth = docked ? Math.Min(420, available - 448) : double.PositiveInfinity;
             column.Width = new GridLength(docked ? Math.Clamp(_inspectorWidth, 280, column.MaxWidth) : 0);
             WorkspaceGrid.ColumnDefinitions[2].Width = new GridLength(docked ? 4 : 0);
         }
@@ -88,5 +88,6 @@ public partial class DesignerView
         InspectorPanel.Width = compact ? Math.Max(0, Math.Min(_inspectorWidth, available - 16)) : double.NaN;
         InspectorPanel.HorizontalAlignment = compact ? HorizontalAlignment.Right : HorizontalAlignment.Stretch;
         InspectorPanel.IsVisible = compact ? _compactInspectorOpen : !_inspectorCollapsed;
+        ShowInspectorButton.IsVisible = !InspectorPanel.IsVisible;
     }
 }
