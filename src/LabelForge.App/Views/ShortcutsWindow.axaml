@@ -13,12 +13,12 @@
                    FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4" />
         <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Opacity="0.65" FontSize="12"
                    Margin="0,0,0,12"
-                   Text="Use the left rail to create elements. The inspector has Properties, Elements and Data tabs, with alignment and grouping under Arrange. Double-click or press F2 to edit the selected field. Label setup holds media, dimensions and printer settings." />
+                   Text="Create from the left rail. Use the inspector to edit fields and Arrange to align or group them. Double-click or press F2 to edit the selected field." />
 
         <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right"
                 Margin="0,12,0,0" Click="OnClose" IsCancel="True" />
 
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Name="ShortcutsScroll" VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding Groups}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="vm:ShortcutGroup">

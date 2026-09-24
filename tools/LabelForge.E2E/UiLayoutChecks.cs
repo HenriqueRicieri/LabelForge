@@ -188,6 +188,27 @@ internal static class UiLayoutChecks
                     PngBitmapEncoderOptions.Default);
                 narrowSetup.Close();
             }
+            foreach (var helpWidth in new[] { 700, 500 })
+            {
+                window.Width = helpWidth;
+                window.Height = 480;
+                Pump(100);
+                d.NewDocumentCommand.Execute(null);
+                view.FindControl<Button>("ShortcutHelpButton")!.RaiseEvent(
+                    new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(100);
+                var help = window.OwnedWindows.OfType<ShortcutsWindow>().Single();
+                Check($"help {helpWidth}: fits owner",
+                    help.Width <= window.ClientSize.Width - 40 &&
+                    help.Height <= window.ClientSize.Height - 40);
+                var helpScroll = help.FindControl<ScrollViewer>("ShortcutsScroll")!;
+                Check($"help {helpWidth}: no horizontal overflow",
+                    helpScroll.Extent.Width <= helpScroll.Viewport.Width + 1);
+                using var helpFrame = help.CaptureRenderedFrame();
+                helpFrame?.Save(Path.Combine(output, $"help-{helpWidth}x480.png"),
+                    PngBitmapEncoderOptions.Default);
+                help.Close();
+            }
             window.Width = 1200;
             window.Height = 760;
             Pump(100);

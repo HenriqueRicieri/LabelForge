@@ -312,7 +312,11 @@ public partial class DesignerView : UserControl
             return;
         }
 
-        await new ShortcutsWindow().ShowDialog(owner);
+        await new ShortcutsWindow
+        {
+            Width = Math.Max(280, Math.Min(560, owner.ClientSize.Width - 40)),
+            Height = Math.Max(240, Math.Min(640, owner.ClientSize.Height - 40)),
+        }.ShowDialog(owner);
     }
 
     /// <summary>Pushes the canvas view (extent, viewport, offset) into the scrollbars

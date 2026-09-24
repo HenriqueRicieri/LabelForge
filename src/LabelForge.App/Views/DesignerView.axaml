@@ -807,7 +807,7 @@
                                         </StackPanel>
                                     </Expander>
                                 </StackPanel>
-                                <Button Content="Keyboard and mouse help" Click="OnShowShortcuts" HorizontalAlignment="Left" FontSize="12" />
+                                <Button Name="ShortcutHelpButton" Content="Keyboard and mouse help" Click="OnShowShortcuts" HorizontalAlignment="Left" FontSize="12" />
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
