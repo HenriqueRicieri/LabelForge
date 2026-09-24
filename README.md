@@ -23,6 +23,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   The Elements tab also shows a compact Content box for a selected text, barcode or
   2D field, so you can change values and pick the next field without switching tabs.
   It offers the same field-marker completion as Properties and uses the same undo steps.
+  Prev and Next beside the Elements heading move through editable fields in list order;
+  Ctrl+Shift+Enter and Ctrl+Enter do the same from Content. They skip shapes and groups,
+  wrap at the ends, and select the next value for typing without changing the label.
   Hide the inspector for more canvas space; narrow windows open it over the canvas.
   Label setup holds media, dimensions, stock layout and printer settings in a scrollable
   dialog. Changes apply as you edit. Generated ZPL and diagnostic details have their own

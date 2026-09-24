@@ -772,6 +772,106 @@ internal static class UiLayoutChecks
                 using (var quickFrame = window.CaptureRenderedFrame())
                     quickFrame?.Save(Path.Combine(output, "compact-quick-content.png"), PngBitmapEncoderOptions.Default);
             }
+            var nextQuick = view.FindControl<Button>("NextQuickFieldButton");
+            var previousQuick = view.FindControl<Button>("PreviousQuickFieldButton");
+            Check("Elements offers Previous and Next fields",
+                nextQuick is not null && previousQuick is not null);
+            if (nextQuick is not null && previousQuick is not null && findBox is not null)
+            {
+                window.Width = 1200;
+                window.Height = 760;
+                d.NewDocumentCommand.Execute(null);
+                var firstQuick = new TextElement { X = 80, Y = 80, Text = "First value", Name = "First" };
+                var boxBetween = new BoxElement { X = 180, Y = 80 };
+                var groupId = Guid.NewGuid();
+                var groupedA = new TextElement { X = 80, Y = 130, Text = "Group A", GroupId = groupId };
+                var groupedB = new TextElement { X = 80, Y = 170, Text = "Group B", GroupId = groupId };
+                var secondQuick = new BarcodeElement { X = 80, Y = 210, Data = "ABC123", Name = "Second" };
+                var thirdQuick = new QrCodeElement { X = 80, Y = 300, Data = "Route", Name = "Third" };
+                foreach (var element in new Element[] { firstQuick, boxBetween, groupedA, groupedB, secondQuick, thirdQuick })
+                    d.Document.Elements.Add(element);
+                d.NotifyDocumentEdited();
+                Pump(300);
+                inspectorTabs.SelectedIndex = 1;
+                if (!inspector.IsVisible)
+                {
+                    view.FindControl<Button>("ShowInspectorButton")!.RaiseEvent(
+                        new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                }
+                findBox.Text = "First";
+                Pump(300);
+                Check("field navigation is enabled for selected content",
+                    nextQuick.IsEnabled && previousQuick.IsEnabled &&
+                    ReferenceEquals(d.SelectedElement, firstQuick));
+                string beforeQuickStep = d.SerializeDocument();
+                bool undoBeforeQuickStep = d.CanUndo;
+                nextQuick.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(350);
+                var quickValue = view.FindControl<ContentControl>("QuickContentEditor")!;
+                var stepBox = quickValue.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault();
+                var stepInner = stepBox?.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+                Check("Next skips shapes and grouped fields, then selects the value",
+                    ReferenceEquals(d.SelectedElement, secondQuick) &&
+                    d.OutlineFindText == string.Empty && inspectorTabs.SelectedIndex == 1 &&
+                    stepBox?.IsKeyboardFocusWithin == true &&
+                    stepInner?.SelectionStart == 0 && stepInner.SelectionEnd == stepInner.Text?.Length);
+                Check("field navigation leaves document and undo alone",
+                    d.SerializeDocument() == beforeQuickStep && d.CanUndo == undoBeforeQuickStep);
+                window.KeyTextInput("SKU9");
+                Pump(450);
+                Check("typing after Next edits the selected field",
+                    secondQuick.Data == "SKU9" && d.GeneratedZpl.Contains("^FDSKU9", StringComparison.Ordinal));
+
+                window.KeyPress(Key.Enter, RawInputModifiers.Control, PhysicalKey.Enter, "\r");
+                Pump(350);
+                Check("Ctrl+Enter advances to the next editable field",
+                    ReferenceEquals(d.SelectedElement, thirdQuick) &&
+                    quickValue.GetVisualDescendants().OfType<AutoCompleteBox>()
+                        .Any(box => box.IsKeyboardFocusWithin));
+                window.KeyPress(Key.Enter, RawInputModifiers.Control | RawInputModifiers.Shift,
+                    PhysicalKey.Enter, "\r");
+                Pump(350);
+                Check("Ctrl+Shift+Enter returns to the previous editable field",
+                    ReferenceEquals(d.SelectedElement, secondQuick) &&
+                    quickValue.GetVisualDescendants().OfType<AutoCompleteBox>()
+                        .Any(box => box.IsKeyboardFocusWithin));
+                previousQuick.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(300);
+                Check("Previous selects the earlier field", ReferenceEquals(d.SelectedElement, firstQuick));
+                previousQuick.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(300);
+                Check("Previous wraps to the last editable field",
+                    ReferenceEquals(d.SelectedElement, thirdQuick));
+                nextQuick.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(300);
+                Check("Next wraps to the first editable field",
+                    ReferenceEquals(d.SelectedElement, firstQuick));
+
+                window.Width = 700;
+                window.Height = 480;
+                Pump(150);
+                view.FindControl<Button>("ShowInspectorButton")!.RaiseEvent(
+                    new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(200);
+                previousQuick.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(350);
+                var outlineList = view.FindControl<ListBox>("ElementsList")!;
+                Check("compact navigation keeps the selected row visible",
+                    inspector.IsEffectivelyVisible && Within(previousQuick, inspector) &&
+                    Within(nextQuick, inspector) && ReferenceEquals(d.SelectedElement, thirdQuick) &&
+                    outlineList.GetVisualDescendants().OfType<ListBoxItem>().Any(item =>
+                        ReferenceEquals(item.DataContext, d.SelectedOutlineRow) && Within(item, outlineList)));
+                using (var navigationFrame = window.CaptureRenderedFrame())
+                    navigationFrame?.Save(Path.Combine(output, "compact-quick-navigation.png"), PngBitmapEncoderOptions.Default);
+                d.Selection.Clear();
+                Pump(150);
+                Check("field navigation disables without a quick value",
+                    !nextQuick.IsEnabled && !previousQuick.IsEnabled);
+                var shortcutEntries = new ShortcutsViewModel().Groups.SelectMany(g => g.Entries).ToArray();
+                Check("keyboard help documents quick field navigation",
+                    shortcutEntries.Any(entry => entry.Keys == "Ctrl + Enter") &&
+                    shortcutEntries.Any(entry => entry.Keys == "Ctrl + Shift + Enter"));
+            }
         }
         d.ShutDown();
         window.Close();

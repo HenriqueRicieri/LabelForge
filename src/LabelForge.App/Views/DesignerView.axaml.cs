@@ -26,6 +26,7 @@ public partial class DesignerView : UserControl
         InitializeComponent();
         InitializeWorkspace();
         InitializeOutlineDrag();
+        QuickContentEditor.AddHandler(KeyDownEvent, OnQuickContentKeyDown, RoutingStrategies.Tunnel);
 
         // The recent-files submenu is rebuilt in code: a handful of items, and it
         // sidesteps binding ancestor lookups inside menu popups.
@@ -577,6 +578,46 @@ public partial class DesignerView : UserControl
         TextElement or BarcodeElement or QrCodeElement or DataMatrixElement or Pdf417Element;
 
     private void OnEditSelectedField(object? sender, RoutedEventArgs e) => FocusSelectedField();
+
+    private void OnPreviousQuickField(object? sender, RoutedEventArgs e) => NavigateQuickField(-1);
+
+    private void OnNextQuickField(object? sender, RoutedEventArgs e) => NavigateQuickField(1);
+
+    private void OnQuickContentKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || e.KeyModifiers is not (KeyModifiers.Control or
+            (KeyModifiers.Control | KeyModifiers.Shift)))
+        {
+            return;
+        }
+
+        NavigateQuickField(e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -1 : 1);
+        e.Handled = true;
+    }
+
+    private void NavigateQuickField(int direction)
+    {
+        if (ViewModel?.SelectAdjacentQuickField(direction) is not { } row)
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!ReferenceEquals(ViewModel?.SelectedElement, row.Element) ||
+                InspectorTabs.SelectedIndex != 1 || !QuickContentEditor.IsEffectivelyVisible)
+            {
+                return;
+            }
+
+            ElementsList.ScrollIntoView(row);
+            if (QuickContentEditor.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault() is { } box)
+            {
+                box.Focus();
+                box.GetVisualDescendants().OfType<TextBox>().FirstOrDefault()?.SelectAll();
+            }
+        }, DispatcherPriority.Background);
+    }
 
     /// <summary>Reveals Properties and selects the selected field's content or name.</summary>
     private void FocusSelectedField()

@@ -154,7 +154,9 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial ElementPropertiesViewModel? SelectionProperties { get; set; }
 
-    public bool HasQuickContent => IsSingleSelection && SelectedElement is
+    public bool HasQuickContent => IsSingleSelection && HasEditableContent(SelectedElement);
+
+    private static bool HasEditableContent(Element? element) => element is
         TextElement or BarcodeElement or QrCodeElement or DataMatrixElement or Pdf417Element;
 
     [ObservableProperty]
@@ -241,6 +243,32 @@ public partial class DesignerViewModel : ViewModelBase
     }
 
     public void FindNextOutline() => FindOutline(next: true);
+
+    /// <summary>Steps through ungrouped content fields in the order shown by Elements.</summary>
+    public ElementOutlineViewModel? SelectAdjacentQuickField(int direction)
+    {
+        if (!HasQuickContent || direction is not (-1 or 1))
+        {
+            return null;
+        }
+
+        ElementOutlineViewModel[] fields = Outline
+            .Where(row => !row.IsGroupHeader && row.Element.GroupId is null &&
+                          HasEditableContent(row.Element))
+            .ToArray();
+        if (fields.Length == 0)
+        {
+            return null;
+        }
+
+        int current = Array.FindIndex(fields, row => ReferenceEquals(row.Element, SelectedElement));
+        int index = current < 0
+            ? direction > 0 ? 0 : fields.Length - 1
+            : (current + direction + fields.Length) % fields.Length;
+        OutlineFindText = string.Empty;
+        SelectedOutlineRow = fields[index];
+        return fields[index];
+    }
 
     private void FindOutline(bool next)
     {
