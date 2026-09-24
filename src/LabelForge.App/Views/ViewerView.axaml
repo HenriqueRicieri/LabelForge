@@ -27,25 +27,37 @@
 
     <DockPanel>
 
-        <!-- Label setup -->
-        <Border DockPanel.Dock="Top" Padding="10,8" Background="{DynamicResource AppToolbarBackground}">
-            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                <Button Content="Open..." Click="OnOpenFile" ToolTip.Tip="Open a .zpl file (Ctrl+O)" />
-                <Rectangle Width="1" Height="22" Fill="{DynamicResource AppSeparator}" />
-                <CheckBox Content="Auto size" IsChecked="{Binding AutoSize}"
-                          ToolTip.Tip="Read the label size from ^PW / ^LL in the ZPL" />
-                <TextBlock Text="Width (mm)" VerticalAlignment="Center" />
-                <NumericUpDown Value="{Binding WidthMm}" Minimum="5" Maximum="600"
-                               Increment="1" FormatString="0.###" Width="110"
-                               IsEnabled="{Binding !AutoSize}" />
-                <TextBlock Text="Height (mm)" VerticalAlignment="Center" />
-                <NumericUpDown Value="{Binding HeightMm}" Minimum="5" Maximum="1000"
-                               Increment="1" FormatString="0.###" Width="110"
-                               IsEnabled="{Binding !AutoSize}" />
-                <TextBlock Text="Density" VerticalAlignment="Center" />
-                <ComboBox ItemsSource="{Binding Densities}"
-                          SelectedItem="{Binding SelectedDensity}" Width="100" />
-                <Button Content="Print..." ToolTip.Tip="Send to a network printer (sample data is substituted, matching the preview)">
+        <!-- Viewer settings -->
+        <Border DockPanel.Dock="Top" Padding="10,6" Background="{DynamicResource AppToolbarBackground}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                <Button Content="Open..." Click="OnOpenFile" VerticalAlignment="Center"
+                        ToolTip.Tip="Open a .zpl file (Ctrl+O)" />
+                <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <CheckBox Content="Auto size" IsChecked="{Binding AutoSize}" Margin="0,0,12,4"
+                              VerticalAlignment="Center"
+                              ToolTip.Tip="Read the label size from ^PW / ^LL in the ZPL" />
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,12,4">
+                        <TextBlock Text="Width (mm)" VerticalAlignment="Center" />
+                        <NumericUpDown Value="{Binding WidthMm}" Minimum="5" Maximum="600"
+                                       Increment="1" FormatString="0.###" Width="110"
+                                       IsEnabled="{Binding !AutoSize}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,12,4">
+                        <TextBlock Text="Height (mm)" VerticalAlignment="Center" />
+                        <NumericUpDown Value="{Binding HeightMm}" Minimum="5" Maximum="1000"
+                                       Increment="1" FormatString="0.###" Width="110"
+                                       IsEnabled="{Binding !AutoSize}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,12,4">
+                        <TextBlock Text="Density" VerticalAlignment="Center" />
+                        <ComboBox ItemsSource="{Binding Densities}"
+                                  SelectedItem="{Binding SelectedDensity}" Width="100" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center"
+                               MaxWidth="180" TextTrimming="CharacterEllipsis" Margin="0,0,0,4"
+                               ToolTip.Tip="{Binding StatusText}" Opacity="0.6" />
+                </WrapPanel>
+                <Button Grid.Column="2" Content="Print..." VerticalAlignment="Center" ToolTip.Tip="Send to a network printer (sample data is substituted, matching the preview)">
                     <Button.Flyout>
                         <Flyout Placement="Bottom">
                             <ScrollViewer MaxHeight="540" HorizontalScrollBarVisibility="Disabled">
@@ -72,8 +84,7 @@
                         </Flyout>
                     </Button.Flyout>
                 </Button>
-                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Opacity="0.6" />
-            </StackPanel>
+            </Grid>
         </Border>
 
         <!-- Diagnostics strip -->
@@ -96,38 +107,48 @@
 
         <!-- Editor | Preview -->
         <Grid ColumnDefinitions="*,4,1.4*">
-            <aedit:TextEditor Grid.Column="0"
-                              Name="ZplEditor"
-                              FontFamily="Consolas,Menlo,Monospace" FontSize="13"
-                              ShowLineNumbers="True"
-                              HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Auto" />
+            <Grid Grid.Column="0" RowDefinitions="Auto,*">
+                <Border Padding="8,5" Background="{DynamicResource AppToolbarBackground}"
+                        BorderBrush="{DynamicResource AppSeparator}" BorderThickness="0,0,0,1">
+                    <TextBlock Text="ZPL source" FontSize="12" FontWeight="SemiBold" />
+                </Border>
+                <aedit:TextEditor Grid.Row="1"
+                                  Name="ZplEditor"
+                                  FontFamily="Consolas,Menlo,Monospace" FontSize="13"
+                                  ShowLineNumbers="True"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto" />
+            </Grid>
 
             <GridSplitter Grid.Column="1" Background="{DynamicResource AppSeparator}" ResizeDirection="Columns" />
 
-            <Grid Grid.Column="2" RowDefinitions="Auto,*">
+            <Grid Grid.Column="2" RowDefinitions="Auto,Auto,*">
+                <Border Grid.Row="0" Padding="8,5" Background="{DynamicResource AppToolbarBackground}"
+                        BorderBrush="{DynamicResource AppSeparator}" BorderThickness="0,0,0,1">
+                    <TextBlock Text="Preview" FontSize="12" FontWeight="SemiBold" />
+                </Border>
 
                 <!-- Preview toolbar -->
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6" Margin="6,6,6,4">
-                    <Button Content="Fit" Click="OnFit" ToolTip.Tip="Fit to window (Ctrl+9)" />
-                    <Button Content="100%" Click="OnActual" ToolTip.Tip="Actual size (Ctrl+0)" />
-                    <Button Content="&#8722;" Click="OnZoomOut" ToolTip.Tip="Zoom out (Ctrl+-)" Width="34" />
-                    <Button Content="+" Click="OnZoomIn" ToolTip.Tip="Zoom in (Ctrl++)" Width="34" />
-                    <TextBlock Name="ZoomLabel" Text="100%" VerticalAlignment="Center"
-                               MinWidth="46" Opacity="0.7" />
+                <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="6,4,6,4">
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,10,4">
+                        <Button Content="Fit" Click="OnFit" ToolTip.Tip="Fit to window (Ctrl+9)" />
+                        <Button Content="100%" Click="OnActual" ToolTip.Tip="Actual size (Ctrl+0)" />
+                        <Button Content="&#8722;" Click="OnZoomOut" ToolTip.Tip="Zoom out (Ctrl+-)" Width="34" />
+                        <Button Content="+" Click="OnZoomIn" ToolTip.Tip="Zoom in (Ctrl++)" Width="34" />
+                        <TextBlock Name="ZoomLabel" Text="100%" VerticalAlignment="Center"
+                                   MinWidth="46" Opacity="0.7" />
+                    </StackPanel>
                     <ComboBox ItemsSource="{Binding LabelOptions}"
                               SelectedIndex="{Binding SelectedLabelIndex}"
                               IsVisible="{Binding HasMultipleLabels}"
-                              MinWidth="100"
+                              MinWidth="100" Margin="0,0,10,4"
                               ToolTip.Tip="This file has several labels; pick one" />
-
-                    <Rectangle Width="1" Height="22" Fill="{DynamicResource AppSeparator}" />
 
                     <!-- Compare mode is a button with a flyout, not a toggle, and that is
                          deliberate: a live comparison would put the label on the wire on
                          every keystroke. Each press is one send the user asked for, with
                          what leaves the machine written above the button they press. -->
-                    <Button Content="Compare..." IsEnabled="{Binding !IsComparing}"
+                    <Button Content="Compare..." Margin="0,0,8,4" IsEnabled="{Binding !IsComparing}"
                             ToolTip.Tip="Render the same ZPL at Labelary and compare (sends the label over the internet)">
                         <Button.Flyout>
                             <Flyout Placement="Bottom">
@@ -144,14 +165,14 @@
                         </Button.Flyout>
                     </Button>
 
-                    <Button Content="Close compare" Command="{Binding ClearComparisonCommand}"
+                    <Button Content="Close compare" Margin="0,0,8,4" Command="{Binding ClearComparisonCommand}"
                             IsVisible="{Binding HasComparison}" />
 
                     <TextBlock Text="Comparing..." VerticalAlignment="Center" Opacity="0.7"
                                IsVisible="{Binding IsComparing}" />
-                </StackPanel>
+                </WrapPanel>
 
-                <Border Grid.Row="1" Background="{DynamicResource AppPreviewSurface}">
+                <Border Grid.Row="2" Background="{DynamicResource AppPreviewSurface}">
                     <ScrollViewer Name="PreviewScroll"
                                   HorizontalScrollBarVisibility="Auto"
                                   VerticalScrollBarVisibility="Auto"

@@ -44,6 +44,8 @@ jobs:
             arguments: ui-layout
           - scenario: viewer-size
             arguments: viewer-size
+          - scenario: viewer-layout
+            arguments: viewer-layout
           - scenario: viewer-compare
             arguments: viewer-compare
 

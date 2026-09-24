@@ -31,6 +31,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   Label setup holds media, dimensions, stock layout and printer settings in a scrollable
   dialog. Changes apply as you edit. Generated ZPL and diagnostic details have their own
   bounded areas, and double-clicking an element opens the same selected-field editor.
+- In the ZPL Viewer, size and density settings wrap at narrow widths while Open and
+  Print stay reachable. The source and preview panes have clear headings, and preview
+  zoom, label selection and Compare remain visible without horizontal clipping.
 - View > Element outlines reveals the bounds of white, covered and locked elements.
   Hidden elements stay hidden. View > Printer dot grid shows individual printer-dot
   boundaries at 800% zoom and above; it can be disabled independently of the design grid.

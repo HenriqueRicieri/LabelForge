@@ -52,7 +52,7 @@ if (args.Contains("dark"))
 // Media presets, field catalogs and crash snapshots all live per machine. Point every
 // one of them at scratch locations, so a harness run never touches what the person using
 // the app has saved.
-string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare"
+string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare" or "viewer-layout"
     ? Path.Combine(AppContext.BaseDirectory, args[0] + "-scratch")
     : AppContext.BaseDirectory;
 Directory.CreateDirectory(scratchRoot);
@@ -91,6 +91,58 @@ if (args.FirstOrDefault() == "ui-layout")
 // over these two and a captured local has to be assigned at every place it is called from.
 int graded = 0;
 var disagreed = new List<string>();
+if (args.FirstOrDefault() == "viewer-layout")
+{
+    vm.SelectedTab = MainViewModel.ViewerTab;
+    Pump(100);
+    var view = window.GetVisualDescendants().OfType<ViewerView>().Single();
+    vm.Viewer.LoadZpl("^XA^PW800^LL480^FO20,20^GB100,100,2^FS^XZ"
+        + "^XA^FO40,40^GB100,100,2^FS^XZ");
+    Pump(500);
+
+    bool WithinViewer(Control child)
+    {
+        if (child.TranslatePoint(default, view) is not { } point) return false;
+        return point.X >= -1 && point.Y >= -1 &&
+            point.X + child.Bounds.Width <= view.Bounds.Width + 1 &&
+            point.Y + child.Bounds.Height <= view.Bounds.Height + 1;
+    }
+
+    Button Action(string label) => view.GetVisualDescendants().OfType<Button>()
+        .Single(button => Equals(button.Content, label));
+
+    string output = Path.Combine(AppContext.BaseDirectory, "viewer-layout");
+    Directory.CreateDirectory(output);
+    foreach (var theme in new[] { Avalonia.Styling.ThemeVariant.Light, Avalonia.Styling.ThemeVariant.Dark })
+    {
+        Application.Current!.RequestedThemeVariant = theme;
+        foreach (var size in new[] { (1200, 760), (1024, 640), (700, 480) })
+        {
+            window.Width = size.Item1;
+            window.Height = size.Item2;
+            Pump(250);
+            string tag = $"{theme}-{size.Item1}x{size.Item2}";
+            Check($"{tag}: Open stays in viewer", WithinViewer(Action("Open...")), true);
+            Check($"{tag}: Print stays in viewer", WithinViewer(Action("Print...")), true);
+            var sizeInputs = view.GetVisualDescendants().OfType<NumericUpDown>().ToArray();
+            var choices = view.GetVisualDescendants().OfType<ComboBox>().ToArray();
+            Check($"{tag}: size and density stay in viewer",
+                sizeInputs.Length == 2 && choices.Length == 2 &&
+                sizeInputs.All(WithinViewer) && choices.All(WithinViewer), true);
+            Check($"{tag}: Compare stays in viewer", WithinViewer(Action("Compare...")), true);
+            var preview = view.FindControl<ScrollViewer>("PreviewScroll")!;
+            Check($"{tag}: preview stays usable", preview.Bounds.Height >= 180, true);
+            using var frame = window.CaptureRenderedFrame();
+            Check($"{tag}: screenshot available", frame is not null, true);
+            frame?.Save(Path.Combine(output, $"{tag}.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        }
+    }
+
+    Console.WriteLine($"{graded} viewer layout checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
 if (args.FirstOrDefault() == "viewer-compare")
 {
     var viewer = vm.Viewer;
