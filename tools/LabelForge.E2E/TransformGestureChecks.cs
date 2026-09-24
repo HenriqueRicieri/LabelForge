@@ -1,0 +1,236 @@
+using System.Diagnostics;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Input;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using LabelForge.App.Controls;
+using LabelForge.App.ViewModels;
+using LabelForge.App.Views;
+using LabelForge.Core.Model;
+
+internal static class TransformGestureChecks
+{
+    public static void Run(MainWindow window, DesignerViewModel designer, Action<string, bool> check)
+    {
+        var canvas = window.GetVisualDescendants().OfType<DesignerView>().Single()
+            .FindControl<DesignerCanvas>("Canvas")!;
+        var snapping = (designer.SnapToGrid, designer.SnapToGuides, designer.SnapToObjects);
+        designer.SnapToGrid = designer.SnapToGuides = designer.SnapToObjects = false;
+        try
+        {
+            BoxElement box = LoadBox();
+            window.MouseDown(At(280, 190), MouseButton.Left,
+                RawInputModifiers.Control | RawInputModifiers.Alt);
+            window.MouseMove(At(300, 190), RawInputModifiers.LeftMouseButton |
+                RawInputModifiers.Control | RawInputModifiers.Alt);
+            window.MouseUp(At(300, 190), MouseButton.Left,
+                RawInputModifiers.Control | RawInputModifiers.Alt);
+            check("Control resize keeps a single field centered",
+                (box.X, box.WidthDots) == (180, 120));
+
+            var qrDocument = new LabelDocument { WidthMm = 100, HeightMm = 80, Dpmm = 8,
+                CheckQuietZones = false };
+            var qr = new QrCodeElement { X = 200, Y = 160, Data = "Center",
+                Magnification = 3 };
+            qrDocument.Elements.Add(qr);
+            designer.LoadDocument(qrDocument, path: null);
+            designer.Selection.Set(qr);
+            canvas.ResetView();
+            canvas.SetZoom(0.5);
+            Pump(300);
+            DotRect qrBefore = new ElementBoundsCalculator().GetBounds(qr);
+            Point qrHandle = At(qrBefore.X + qrBefore.Width, qrBefore.Y + qrBefore.Height / 2.0);
+            window.MouseDown(qrHandle, MouseButton.Left, RawInputModifiers.Control);
+            window.MouseMove(At(qrBefore.X + qrBefore.Width + 40, qrBefore.Y + qrBefore.Height / 2.0),
+                RawInputModifiers.LeftMouseButton | RawInputModifiers.Control);
+            window.MouseUp(At(qrBefore.X + qrBefore.Width + 40, qrBefore.Y + qrBefore.Height / 2.0),
+                MouseButton.Left, RawInputModifiers.Control);
+            DotRect qrAfter = new ElementBoundsCalculator().GetBounds(qr);
+            check("Control resize keeps an offset QR footprint centered",
+                qr.Magnification > 3 &&
+                Math.Abs(qrAfter.X + qrAfter.Width / 2.0 -
+                    (qrBefore.X + qrBefore.Width / 2.0)) <= 0.5 &&
+                Math.Abs(qrAfter.Y + qrAfter.Height / 2.0 -
+                    (qrBefore.Y + qrBefore.Height / 2.0)) <= 0.5);
+
+            box = LoadBox();
+            designer.Document.VerticalGuides.Add(295);
+            designer.SnapToGuides = true;
+            window.MouseDown(At(280, 190), MouseButton.Left, RawInputModifiers.Control);
+            window.MouseMove(At(300, 190), RawInputModifiers.LeftMouseButton | RawInputModifiers.Control);
+            window.MouseMove(At(310, 190), RawInputModifiers.LeftMouseButton);
+            window.MouseUp(At(310, 190), MouseButton.Left);
+            check("Releasing Control uses the opposite resize anchor for snapping",
+                (box.X, box.WidthDots) == (200, 110));
+            designer.SnapToGuides = false;
+
+            box = LoadBox();
+            designer.Document.VerticalGuides.Add(285);
+            designer.SnapToGuides = true;
+            string beforeHandleClick = designer.SerializeDocument();
+            bool couldUndoHandleClick = designer.CanUndo;
+            window.MouseDown(At(280, 190), MouseButton.Left);
+            window.MouseMove(At(280, 190), RawInputModifiers.LeftMouseButton);
+            window.MouseUp(At(280, 190), MouseButton.Left);
+            check("Clicking a resize handle does not snap or edit",
+                (box.X, box.WidthDots) == (200, 80) &&
+                designer.SerializeDocument() == beforeHandleClick &&
+                designer.CanUndo == couldUndoHandleClick);
+            designer.SnapToGuides = false;
+
+            box = LoadBox();
+            designer.Document.VerticalGuides.Add(285);
+            designer.SnapToGuides = true;
+            string beforeRoundTrip = designer.SerializeDocument();
+            bool couldUndoRoundTrip = designer.CanUndo;
+            window.MouseDown(At(280, 190), MouseButton.Left);
+            window.MouseMove(At(300, 190), RawInputModifiers.LeftMouseButton);
+            window.MouseMove(At(280, 190), RawInputModifiers.LeftMouseButton);
+            window.MouseUp(At(280, 190), MouseButton.Left);
+            check("Returning a resize to its press point ignores nearby guides",
+                designer.SerializeDocument() == beforeRoundTrip &&
+                designer.CanUndo == couldUndoRoundTrip);
+            designer.SnapToGuides = false;
+
+            box = LoadBox();
+            window.MouseDown(At(220, 180), MouseButton.Left);
+            window.MouseMove(At(230, 180), RawInputModifiers.LeftMouseButton);
+            window.MouseUp(At(250, 180), MouseButton.Left);
+            check("Move commits the pointer position on release", box.X == 230);
+
+            box = LoadBox();
+            window.MouseDown(At(220, 180), MouseButton.Left);
+            window.MouseMove(At(250, 185), RawInputModifiers.LeftMouseButton | RawInputModifiers.Shift);
+            window.MouseMove(At(225, 220), RawInputModifiers.LeftMouseButton | RawInputModifiers.Shift);
+            window.MouseUp(At(225, 220), MouseButton.Left, RawInputModifiers.Shift);
+            check("Shift move switches axis after a clear direction change",
+                (box.X, box.Y) == (200, 200));
+
+            box = LoadBox();
+            window.MouseDown(At(220, 180), MouseButton.Left);
+            window.MouseMove(At(250, 185), RawInputModifiers.LeftMouseButton | RawInputModifiers.Shift);
+            window.MouseUp(At(250, 185), MouseButton.Left);
+            check("Releasing Shift before the mouse restores free movement",
+                (box.X, box.Y) == (230, 165));
+
+            box = LoadBox();
+            window.MouseDown(At(220, 180), MouseButton.Left, RawInputModifiers.Alt);
+            window.MouseMove(At(250, 180), RawInputModifiers.LeftMouseButton | RawInputModifiers.Alt);
+            window.MouseUp(At(250, 180), MouseButton.Left, RawInputModifiers.Alt);
+            check("Alt drag moves a field without snapping", box.X == 230);
+
+            box = LoadBox();
+            var topBox = new BoxElement { X = 200, Y = 160, WidthDots = 80,
+                HeightDots = 60, ZOrder = 1 };
+            designer.Document.Elements.Add(topBox);
+            designer.Selection.Set(topBox);
+            window.MouseDown(At(220, 180), MouseButton.Left, RawInputModifiers.Alt);
+            window.MouseUp(At(220, 180), MouseButton.Left, RawInputModifiers.Alt);
+            check("Alt click still selects the next overlapping field",
+                ReferenceEquals(designer.Selection.Primary, box));
+
+            box = LoadBox();
+            topBox = new BoxElement { X = 200, Y = 160, WidthDots = 80,
+                HeightDots = 60, ZOrder = 1 };
+            designer.Document.Elements.Add(topBox);
+            designer.Selection.Set(topBox);
+            window.MouseDown(At(220, 180), MouseButton.Left, RawInputModifiers.Alt);
+            window.MouseMove(At(250, 180), RawInputModifiers.LeftMouseButton | RawInputModifiers.Alt);
+            window.MouseUp(At(250, 180), MouseButton.Left, RawInputModifiers.Alt);
+            check("Alt drag moves the chosen field under an overlap",
+                box.X == 230 && topBox.X == 200 &&
+                ReferenceEquals(designer.Selection.Primary, box));
+
+            box = LoadBox();
+            window.MouseDown(At(280, 190), MouseButton.Left, RawInputModifiers.Alt);
+            window.MouseMove(At(300, 190), RawInputModifiers.LeftMouseButton | RawInputModifiers.Alt);
+            window.MouseUp(At(310, 190), MouseButton.Left, RawInputModifiers.Alt);
+            check("Resize commits the pointer position on release",
+                (box.X, box.WidthDots) == (200, 110));
+
+            var document = new LabelDocument { WidthMm = 100, HeightMm = 80, Dpmm = 8,
+                CheckQuietZones = false };
+            var text = new TextElement { X = 200, Y = 160, Text = "Rotation",
+                FontHeightDots = 40 };
+            document.Elements.Add(text);
+            designer.LoadDocument(document, path: null);
+            designer.Selection.Set(text);
+            canvas.ResetView();
+            canvas.SetZoom(0.5);
+            Pump(300);
+            DotRect bounds = new ElementBoundsCalculator().GetBounds(text);
+            string beforeRotation = designer.SerializeDocument();
+            Point top = At(bounds.X + bounds.Width / 2.0, bounds.Y);
+            Point center = At(bounds.X + bounds.Width / 2.0,
+                bounds.Y + bounds.Height / 2.0);
+            Point handle = new(top.X, top.Y - 26);
+            Point quarterTurn = new(center.X + center.Y - handle.Y, center.Y);
+            window.MouseDown(handle, MouseButton.Left);
+            window.MouseUp(quarterTurn, MouseButton.Left);
+            check("Rotation commits the pointer angle on release",
+                text.Orientation == Orientation.Rotated90);
+
+            designer.UndoCommand.Execute(null);
+            check("Undo restores text after a rotation",
+                designer.SerializeDocument() == beforeRotation);
+            text = designer.Document.Elements.OfType<TextElement>().Single();
+            designer.Selection.Set(text);
+            Pump(250);
+            DotRect secondStart = new ElementBoundsCalculator().GetBounds(text);
+            bool couldUndo = designer.CanUndo;
+            Point secondTop = At(secondStart.X + secondStart.Width / 2.0, secondStart.Y);
+            Point secondCenter = At(secondStart.X + secondStart.Width / 2.0,
+                secondStart.Y + secondStart.Height / 2.0);
+            Point secondHandle = new(secondTop.X, secondTop.Y - 26);
+            Point secondQuarter = new(secondCenter.X + secondCenter.Y - secondHandle.Y,
+                secondCenter.Y);
+            window.MouseDown(secondHandle, MouseButton.Left);
+            window.MouseMove(secondQuarter, RawInputModifiers.LeftMouseButton);
+            window.MouseMove(secondHandle, RawInputModifiers.LeftMouseButton);
+            window.MouseUp(secondHandle, MouseButton.Left);
+            check("Reversing a rotation restores orientation and drawn center",
+                text.Orientation == Orientation.Normal &&
+                new ElementBoundsCalculator().GetBounds(text) == secondStart &&
+                designer.CanUndo == couldUndo);
+        }
+        finally
+        {
+            designer.SnapToGrid = snapping.Item1;
+            designer.SnapToGuides = snapping.Item2;
+            designer.SnapToObjects = snapping.Item3;
+            designer.NewDocumentCommand.Execute(null);
+            canvas.ResetView();
+            Pump(150);
+        }
+
+        BoxElement LoadBox()
+        {
+            var document = new LabelDocument { WidthMm = 100, HeightMm = 80, Dpmm = 8,
+                CheckQuietZones = false };
+            var box = new BoxElement { X = 200, Y = 160, WidthDots = 80, HeightDots = 60 };
+            document.Elements.Add(box);
+            designer.LoadDocument(document, path: null);
+            designer.Selection.Set(box);
+            canvas.ResetView();
+            canvas.SetZoom(0.5);
+            Pump(300);
+            return box;
+        }
+
+        Point At(double x, double y) =>
+            canvas.TranslatePoint(canvas.DotsToView(x, y), window)!.Value;
+    }
+
+    private static void Pump(int milliseconds)
+    {
+        var timer = Stopwatch.StartNew();
+        while (timer.ElapsedMilliseconds < milliseconds)
+        {
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Thread.Sleep(10);
+        }
+    }
+}

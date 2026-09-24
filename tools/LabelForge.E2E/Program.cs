@@ -52,7 +52,7 @@ if (args.Contains("dark"))
 // Media presets, field catalogs and crash snapshots all live per machine. Point every
 // one of them at scratch locations, so a harness run never touches what the person using
 // the app has saved.
-string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare" or "viewer-layout" or "cm-units"
+string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "transform-gestures" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare" or "viewer-layout" or "cm-units"
     ? Path.Combine(AppContext.BaseDirectory, args[0] + "-scratch")
     : AppContext.BaseDirectory;
 Directory.CreateDirectory(scratchRoot);
@@ -340,6 +340,14 @@ if (args.FirstOrDefault() == "spacing")
 {
     SpacingChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
     Console.WriteLine($"{graded} spacing checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
+if (args.FirstOrDefault() == "transform-gestures")
+{
+    TransformGestureChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
+    Console.WriteLine($"{graded} transform gesture checks graded, {disagreed.Count} disagreed");
     vm.Designer.ShutDown();
     window.Close();
     return disagreed.Count == 0 ? 0 : 1;
@@ -3538,6 +3546,7 @@ if (mode == "designer")
     MarqueeSelectionChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
     ClipboardChecks.Run(window, Path.Combine(scratchRoot, "clipboard-scratch"), (label, held) => Check(label, held, true));
     SelectionScaleChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
+    TransformGestureChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
     SpacingChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
     CanvasPaintChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
     OutlineReorderChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));

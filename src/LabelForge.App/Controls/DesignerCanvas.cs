@@ -236,6 +236,8 @@ public sealed partial class DesignerCanvas : Control
 
     // The gesture rect follows the pointer; fields retain their printable size steps.
     private bool _resizing;
+    private Point _resizePressPoint;
+    private bool _resizePointerMoved;
     private SelectionScale? _selectionScale;
     private ResizeHandle _activeHandle;
     private DotRect _resizeStartBounds;
@@ -1550,6 +1552,8 @@ public sealed partial class DesignerCanvas : Control
                 }
 
                 _resizing = true;
+                _resizePressPoint = p;
+                _resizePointerMoved = false;
                 _activeHandle = kind;
                 _dragStartDots = new Point(dotX, dotY);
                 _selectionScale = SelectionScale.Start(doc, selection.Items);
@@ -1597,8 +1601,8 @@ public sealed partial class DesignerCanvas : Control
         // Alt picks the next element DOWN from the one selected, at the same point, and
         // wraps at the bottom. On the dense labels this is written for, the thing you want
         // is often under two others and there is no other way to reach it on the canvas.
-        // Alt is already "no snapping" on a drag; the two never collide, because that one
-        // needs movement and this one is over before any happens.
+        // An Alt press still arms a drag. If the pointer moves, the chosen field follows
+        // it without snapping; if it stays put, the press was just a stack-selection click.
         if (e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !additive)
         {
             List<Element> stack = ElementsAt(doc, dotX, dotY);
@@ -1617,6 +1621,11 @@ public sealed partial class DesignerCanvas : Control
                 // be picking one member out of it.
                 LeaveGroupUnlessInside(reached);
                 selection.Set(reached);
+                _pressArmed = true;
+                _pressPoint = p;
+                _pressHit = reached;
+                _pressPendingToggle = null;
+                e.Pointer.Capture(this);
                 InvalidateVisual();
                 return;
             }
@@ -1950,6 +1959,7 @@ public sealed partial class DesignerCanvas : Control
         StopAutoPan();
         _dragging = false;
         _resizing = false;
+        _resizePointerMoved = false;
         _spacingGaps = [];
         _spacingNeighbours.Clear();
         _selectionScale = null;
@@ -2338,9 +2348,25 @@ public sealed partial class DesignerCanvas : Control
             return;
         }
 
+        if (_resizing && !_drawing)
+        {
+            if (ResizePointerMoved(p))
+            {
+                _resizePointerMoved = true;
+            }
+            else if (!_resizePointerMoved)
+            {
+                return;
+            }
+        }
+
         ApplyGesture(p, e.KeyModifiers);
         UpdateAutoPan(p, e.KeyModifiers);
     }
+
+    private bool ResizePointerMoved(Point p) =>
+        Math.Max(Math.Abs(p.X - _resizePressPoint.X),
+            Math.Abs(p.Y - _resizePressPoint.Y)) >= 0.5;
 
     /// <summary>
     /// One frame of a move, resize or rotation, from a pointer position and the modifiers
@@ -2411,7 +2437,11 @@ public sealed partial class DesignerCanvas : Control
                 freeCorner: modifiers.HasFlag(KeyModifiers.Shift));
             _snapX = null;
             _snapY = null;
-            if (!modifiers.HasFlag(KeyModifiers.Alt))
+            // Returning to the press-time position restores the original size, even
+            // when a guide sits within the normal snap radius of that handle.
+            bool atStart = Math.Max(Math.Abs(dotX - _dragStartDots.X),
+                Math.Abs(dotY - _dragStartDots.Y)) * scale < 0.5;
+            if (!modifiers.HasFlag(KeyModifiers.Alt) && !atStart)
             {
                 if (_selectionScale is { } scaling)
                 {
@@ -2712,11 +2742,10 @@ public sealed partial class DesignerCanvas : Control
     /// default. Edge handles are one axis already and ignore it.</param>
     private void ComputeGestureRect(double dotX, double dotY, bool aboutCenter, bool freeCorner)
     {
-        if (_selectionScale is not null)
-        {
-            (_gestureX, _gestureY, _gestureW, _gestureH) =
-                (_resizeStartBounds.X, _resizeStartBounds.Y, _resizeStartBounds.Width, _resizeStartBounds.Height);
-        }
+        // Every frame starts from the press-time bounds. In particular, dropping Ctrl
+        // mid-resize must discard the previous centre-anchored rectangle before snapping.
+        (_gestureX, _gestureY, _gestureW, _gestureH) =
+            (_resizeStartBounds.X, _resizeStartBounds.Y, _resizeStartBounds.Width, _resizeStartBounds.Height);
         double startX = _resizeStartBounds.X;
         double startY = _resizeStartBounds.Y;
         double startW = Math.Max(_resizeStartBounds.Width, 1);
@@ -2929,7 +2958,7 @@ public sealed partial class DesignerCanvas : Control
     /// <summary>Puts the element's origin where the gesture rect says, compensating for
     /// bounds offsets (e.g. the QR vertical offset), so the anchored side never drifts
     /// even when the type-specific resize snaps.</summary>
-    private void RepositionToGesture()
+    private void RepositionToGesture(bool aboutCenter)
     {
         if (Selection?.Primary is not { } primary)
         {
@@ -2939,6 +2968,17 @@ public sealed partial class DesignerCanvas : Control
         DotRect bounds = _bounds.GetBounds(primary);
         int offX = bounds.X - primary.X;
         int offY = bounds.Y - primary.Y;
+
+        if (aboutCenter)
+        {
+            double centerX = _resizeStartBounds.X + _resizeStartBounds.Width / 2.0;
+            double centerY = _resizeStartBounds.Y + _resizeStartBounds.Height / 2.0;
+            primary.X = (int)Math.Round(centerX - bounds.Width / 2.0,
+                MidpointRounding.AwayFromZero) - offX;
+            primary.Y = (int)Math.Round(centerY - bounds.Height / 2.0,
+                MidpointRounding.AwayFromZero) - offY;
+            return;
+        }
 
         bool left = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Left or ResizeHandle.BottomLeft;
         bool top = _activeHandle is ResizeHandle.TopLeft or ResizeHandle.Top or ResizeHandle.TopRight;
@@ -3048,7 +3088,7 @@ public sealed partial class DesignerCanvas : Control
             ? (_candidateHeight, _candidateWidth)
             : (_candidateWidth, _candidateHeight);
         ElementResizer.Resize(primary, w, h);
-        RepositionToGesture();
+        RepositionToGesture(aboutCenter);
     }
 
     /// <summary>Clamps a group-move delta so every dragged element stays on the
@@ -3169,6 +3209,7 @@ public sealed partial class DesignerCanvas : Control
 
         if (_rotating)
         {
+            ApplyGesture(e.GetPosition(this), e.KeyModifiers);
             Cursor = Cursor.Default;
             bool turned = Selection?.Primary is { } rotated
                 && FieldRotation.Get(rotated) != _rotateGestureStart;
@@ -3207,6 +3248,12 @@ public sealed partial class DesignerCanvas : Control
         }
 
         bool wasResizing = _resizing;
+        Point releasePoint = e.GetPosition(this);
+        // A stationary click on a resize handle must not snap to a nearby guide.
+        if (!wasResizing || _resizePointerMoved || ResizePointerMoved(releasePoint))
+        {
+            ApplyGesture(releasePoint, e.KeyModifiers);
+        }
 
         // The model was updated live during the gesture; the release only decides
         // whether an undo step should be recorded.

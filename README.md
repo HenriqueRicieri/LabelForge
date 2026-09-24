@@ -64,11 +64,11 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   click instead of shifting an element by a few dots and recording an undo step for the accident.
   Shift locks a move to one axis, Ctrl leaves a copy behind and moves the copy, and Alt drags free
   of every kind of snapping. On a resize handle Ctrl works from the middle outwards and Shift lets
-  a corner's two sides go their own way. Alt-clicking picks the element under the one selected and
-  keeps going down, which on a dense label is the only way to reach a field buried under two
-  others. Adding to the selection happens as the button goes down, because a drag that follows
-  should move everything picked; removing one waits for a release that never moved, since pressing
-  on something already selected is the ordinary way to start dragging the whole group.
+  a corner's two sides go their own way. Alt-clicking picks the next element below the selected
+  one; moving before release drags that chosen element without snapping. This reaches a field
+  buried under others without giving up precise movement. Adding to a selection happens on
+  press so a following drag moves everything picked. Removing a field waits for a release without
+  movement, leaving a press on the selection free to drag the whole group.
 - Resize several selected fields or a group with the outer selection handles. Corners
   scale proportionally, Shift frees the axes, and Ctrl scales around the centre.
   Barcode modules and other size limits can make the result differ from the dragged
