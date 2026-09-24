@@ -2,16 +2,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:LabelForge.App.ViewModels"
         x:Class="LabelForge.App.Views.LabelSetupWindow" x:DataType="vm:DesignerViewModel"
-        Title="Label setup" Width="520" Height="660" WindowStartupLocation="CenterOwner">
+        Title="Label setup" Width="700" Height="620" WindowStartupLocation="CenterOwner">
     <Window.Styles>
         <Style Selector="TextBlock"><Setter Property="TextWrapping" Value="Wrap" /></Style>
     </Window.Styles>
     <Grid RowDefinitions="*,Auto" Margin="20">
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer Name="SetupScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Spacing="8" Margin="0,0,12,0">
                 <TextBlock Text="Media" FontSize="18" FontWeight="SemiBold" />
                 <AutoCompleteBox x:Name="MediaBox" HorizontalAlignment="Stretch"
-                                 PlaceholderText="Part number or my media"
+                                 PlaceholderText="Search by part number, material or size"
                                  ItemsSource="{Binding MediaCatalog}"
                                  SelectedItem="{Binding SelectedMedia}"
                                  FilterMode="Custom"
@@ -59,56 +59,59 @@
                     </Button.Flyout>
                 </Button>
 
-                <Separator Margin="0,12" />
-                <TextBlock Text="Dimensions and stock" FontSize="18" FontWeight="SemiBold" />
-                <TextBlock Text="Width (mm)" VerticalAlignment="Center" />
-                <NumericUpDown Name="LabelWidthInput" Value="{Binding WidthMm}" Minimum="5" Maximum="600"
-                               Increment="1" FormatString="0.#" />
-                <TextBlock Text="Height (mm)" VerticalAlignment="Center" />
-                <NumericUpDown Name="LabelHeightInput" Value="{Binding HeightMm}" Minimum="5" Maximum="1000"
-                               Increment="1" FormatString="0.#"
-                               IsEnabled="{Binding HasFixedLength}"
-                               ToolTip.Tip="{Binding LengthHint}" />
-                <CheckBox Content="Continuous" IsChecked="{Binding IsContinuous}"
-                          VerticalAlignment="Center"
-                          ToolTip.Tip="Stock with no gaps or die cuts. The label becomes exactly as long as its content, and the ZPL tells the printer to stop sensing gaps." />
-                <TextBlock Text="Gap (mm)" VerticalAlignment="Center"
-                           IsVisible="{Binding IsContinuous}"
-                           ToolTip.Tip="Blank stock left after the last ink, so the next label has something to start after." />
-                <NumericUpDown Value="{Binding ContinuousMarginMm}" Minimum="0" Maximum="50"
-                               Increment="0.5" FormatString="0.##"
-                               IsVisible="{Binding IsContinuous}" />
-                <TextBlock Text="Corner (mm)" VerticalAlignment="Center"
-                           IsVisible="{Binding HasFixedLength}"
-                           ToolTip.Tip="Die-cut corner radius. Shapes the canvas and the exported PDF so the design is checked against the real label; it never changes the ZPL." />
-                <NumericUpDown Value="{Binding CornerRadiusMm}" Minimum="0" Maximum="50"
-                               Increment="0.5" FormatString="0.##"
-                               IsVisible="{Binding HasFixedLength}" />
-                <TextBlock Text="Across" VerticalAlignment="Center"
-                           ToolTip.Tip="How many of this label sit side by side on the web. The design stays one label; a print repeats it across the roll." />
-                <NumericUpDown Value="{Binding LabelsAcross}" Minimum="1" Maximum="20"
-                               Increment="1" FormatString="0"
-                               ToolTip.Tip="{Binding AcrossHint}" />
-                <TextBlock Text="Web gap (mm)" VerticalAlignment="Center"
-                           IsVisible="{Binding IsMultiAcross}"
-                           ToolTip.Tip="Liner between one column and the next. With the label width it makes the pitch each column is offset by." />
-                <NumericUpDown Value="{Binding AcrossGapMm}" Minimum="0" Maximum="50"
-                               Increment="0.5" FormatString="0.##"
-                               IsVisible="{Binding IsMultiAcross}" />
+                <Separator Margin="0,10,0,12" />
+                <WrapPanel>
+                    <StackPanel Width="288" Margin="0,0,12,0" Spacing="8">
+                        <TextBlock Text="Label size" FontSize="17" FontWeight="SemiBold" />
+                        <TextBlock Text="Width (mm)" />
+                        <NumericUpDown Name="LabelWidthInput" Value="{Binding WidthMm}" Minimum="5" Maximum="600"
+                                       Increment="1" FormatString="0.#" />
+                        <TextBlock Text="Height (mm)" />
+                        <NumericUpDown Name="LabelHeightInput" Value="{Binding HeightMm}" Minimum="5" Maximum="1000"
+                                       Increment="1" FormatString="0.#"
+                                       IsEnabled="{Binding HasFixedLength}"
+                                       ToolTip.Tip="{Binding LengthHint}" />
+                        <CheckBox Content="Continuous roll" IsChecked="{Binding IsContinuous}"
+                                  ToolTip.Tip="Stock with no gaps or die cuts. The label becomes as long as its content." />
+                        <TextBlock Text="Gap after label (mm)"
+                                   IsVisible="{Binding IsContinuous}"
+                                   ToolTip.Tip="Blank stock after the last ink, before the next label starts." />
+                        <NumericUpDown Value="{Binding ContinuousMarginMm}" Minimum="0" Maximum="50"
+                                       Increment="0.5" FormatString="0.##"
+                                       IsVisible="{Binding IsContinuous}" />
+                        <TextBlock Text="Corner radius (mm)"
+                                   IsVisible="{Binding HasFixedLength}"
+                                   ToolTip.Tip="Shapes the canvas and exported PDF to match a die-cut label. It does not change the ZPL." />
+                        <NumericUpDown Value="{Binding CornerRadiusMm}" Minimum="0" Maximum="50"
+                                       Increment="0.5" FormatString="0.##"
+                                       IsVisible="{Binding HasFixedLength}" />
+                    </StackPanel>
 
+                    <StackPanel Width="288" Spacing="8">
+                        <TextBlock Text="Roll layout" FontSize="17" FontWeight="SemiBold" />
+                        <TextBlock Text="Labels across"
+                                   ToolTip.Tip="How many labels sit side by side on the roll. The design remains one label." />
+                        <NumericUpDown Value="{Binding LabelsAcross}" Minimum="1" Maximum="20"
+                                       Increment="1" FormatString="0" ToolTip.Tip="{Binding AcrossHint}" />
+                        <TextBlock Text="Gap between columns (mm)"
+                                   IsVisible="{Binding IsMultiAcross}"
+                                   ToolTip.Tip="Liner between labels that sit side by side." />
+                        <NumericUpDown Value="{Binding AcrossGapMm}" Minimum="0" Maximum="50"
+                                       Increment="0.5" FormatString="0.##"
+                                       IsVisible="{Binding IsMultiAcross}" />
 
-                <Separator Margin="0,12" />
-                <TextBlock Text="Printer" FontSize="18" FontWeight="SemiBold" />
-                <TextBlock Text="Density" VerticalAlignment="Center" />
-                <ComboBox ItemsSource="{Binding Densities}"
-                          Name="DensityInput" SelectedItem="{Binding SelectedDensity}" HorizontalAlignment="Stretch" />
-                <Rectangle Height="22" Fill="{DynamicResource AppSeparator}" />
-                <TextBlock Text="Printer" VerticalAlignment="Center" />
-                <ComboBox ItemsSource="{Binding Printers}"
-                          SelectedItem="{Binding SelectedPrinter}" HorizontalAlignment="Stretch"
-                          ToolTip.Tip="Selecting a printer adopts its density and validates the label against the print head" />
-
-                <TextBlock Text="{Binding PrinterWarning}" Foreground="#D97706" />
+                        <Separator Margin="0,10,0,8" />
+                        <TextBlock Text="Printer" FontSize="17" FontWeight="SemiBold" />
+                        <TextBlock Text="Density" />
+                        <ComboBox Name="DensityInput" ItemsSource="{Binding Densities}"
+                                  SelectedItem="{Binding SelectedDensity}" HorizontalAlignment="Stretch" />
+                        <TextBlock Text="Printer profile" />
+                        <ComboBox Name="PrinterInput" ItemsSource="{Binding Printers}"
+                                  SelectedItem="{Binding SelectedPrinter}" HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="Selecting a printer adopts its density and checks the label against the print head." />
+                        <TextBlock Text="{Binding PrinterWarning}" Foreground="#D97706" />
+                    </StackPanel>
+                </WrapPanel>
             </StackPanel>
         </ScrollViewer>
         <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,16,0,0">

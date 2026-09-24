@@ -28,8 +28,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   wrap at the ends, and select the next value for typing without changing the label.
   Hide the inspector for more canvas space; Show inspector in the setup row reopens it.
   Narrow windows open it over the canvas.
-  Label setup holds media, dimensions, stock layout and printer settings in a scrollable
-  dialog. Changes apply as you edit. Generated ZPL and diagnostic details have their own
+  Label setup puts media search above side-by-side size, roll layout and printer settings
+  at desktop widths. On narrow windows these sections stack and scroll. Changes apply
+  as you edit. Generated ZPL and diagnostic details have their own
   bounded areas, and double-clicking an element opens the same selected-field editor.
 - In the ZPL Viewer, size and density settings wrap at narrow widths while Open and
   Print stay reachable. The source and preview panes have clear headings, and preview

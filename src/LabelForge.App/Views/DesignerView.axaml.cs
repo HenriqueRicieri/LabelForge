@@ -443,8 +443,8 @@ public partial class DesignerView : UserControl
             await new LabelSetupWindow
             {
                 DataContext = vm,
-                Height = Math.Max(240, Math.Min(660, owner.ClientSize.Height - 40)),
-                Width = Math.Max(280, Math.Min(520, owner.ClientSize.Width - 40)),
+                Height = Math.Max(240, Math.Min(620, owner.ClientSize.Height - 40)),
+                Width = Math.Max(280, Math.Min(700, owner.ClientSize.Width - 40)),
             }.ShowDialog(owner);
         }
     }

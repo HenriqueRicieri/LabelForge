@@ -44,6 +44,14 @@ internal static class UiLayoutChecks
                     Pump(60);
                     Check("setup width edits the document", d.WidthMm == 110);
                     Check("media picker remains available", setupWindow.FindControl<AutoCompleteBox>("MediaBox") is not null);
+                    if (size.Item1 >= 1024)
+                    {
+                        Check("setup density visible without scrolling",
+                            Within(setupWindow.FindControl<ComboBox>("DensityInput")!, setupWindow));
+                        Check("setup printer visible without scrolling",
+                            setupWindow.FindControl<ComboBox>("PrinterInput") is { } printer &&
+                            Within(printer, setupWindow));
+                    }
                     using var setupFrame = setupWindow.CaptureRenderedFrame();
                     setupFrame?.Save(Path.Combine(output, $"{theme}-{size.Item1}x{size.Item2}-setup.png"), PngBitmapEncoderOptions.Default);
                     setupWindow.Close();
@@ -156,6 +164,30 @@ internal static class UiLayoutChecks
         }
         if (!baseline)
         {
+            foreach (var narrowWidth in new[] { 700, 500 })
+            {
+                window.Width = narrowWidth;
+                window.Height = 480;
+                Pump(100);
+                view.FindControl<Button>("LabelSetupButton")!.RaiseEvent(
+                    new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(100);
+                var narrowSetup = window.OwnedWindows.OfType<LabelSetupWindow>().Single();
+                var scroll = narrowSetup.FindControl<ScrollViewer>("SetupScroll")!;
+                var printer = narrowSetup.FindControl<ComboBox>("PrinterInput")!;
+                Check($"setup {narrowWidth}: fits owner",
+                    narrowSetup.Width <= window.Width && narrowSetup.Height <= window.Height);
+                Check($"setup {narrowWidth}: media search visible",
+                    Within(narrowSetup.FindControl<AutoCompleteBox>("MediaBox")!, scroll));
+                scroll.Offset = new Vector(0, scroll.Extent.Height);
+                Pump(100);
+                Check($"setup {narrowWidth}: printer reachable by scrolling",
+                    Within(printer, scroll));
+                using var narrowFrame = narrowSetup.CaptureRenderedFrame();
+                narrowFrame?.Save(Path.Combine(output, $"setup-{narrowWidth}x480-bottom.png"),
+                    PngBitmapEncoderOptions.Default);
+                narrowSetup.Close();
+            }
             window.Width = 1200;
             window.Height = 760;
             Pump(100);
