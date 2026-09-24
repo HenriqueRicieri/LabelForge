@@ -88,16 +88,16 @@ public abstract class ElementPropertiesViewModel : ObservableObject
 
     /// <summary>The unit choice is sticky: it survives selection changes within the
     /// session, so it lives here rather than on each per-selection editor instance.</summary>
-    private static bool _useMmDefault;
+    private static bool _useDotsDefault;
 
-    private bool _useMm;
+    private bool _useDots;
 
     protected ElementPropertiesViewModel(Element element, LabelDocument document, Action<string> edited)
     {
         Element = element;
         _document = document;
         _edited = edited;
-        _useMm = _useMmDefault;
+        _useDots = _useDotsDefault;
     }
 
     protected Element Element { get; }
@@ -122,20 +122,20 @@ public abstract class ElementPropertiesViewModel : ObservableObject
     /// is not what anybody calls a vertical line.</summary>
     public virtual IReadOnlyList<OrientationOption> Orientations => OrientationOption.All;
 
-    /// <summary>When set, X and Y display and accept millimeters (converted through
-    /// the document density); the model always stays in dots.</summary>
-    public bool UseMm
+    /// <summary>Centimeters are the default for measured dimensions. This switch
+    /// exposes printer dots when exact device coordinates are needed.</summary>
+    public bool UseDots
     {
-        get => _useMm;
+        get => _useDots;
         set
         {
-            if (_useMm == value)
+            if (_useDots == value)
             {
                 return;
             }
 
-            _useMm = value;
-            _useMmDefault = value;
+            _useDots = value;
+            _useDotsDefault = value;
             OnPropertyChanged(string.Empty);
         }
     }
@@ -149,36 +149,52 @@ public abstract class ElementPropertiesViewModel : ObservableObject
         set => Edit(Element.Name, (value ?? string.Empty).Trim(), v => Element.Name = v);
     }
 
-    public string UnitSuffix => UseMm ? "mm" : "dots";
+    public string UnitSuffix => UseDots ? "dots" : "cm";
 
-    public string PositionFormat => UseMm ? "0.##" : "0";
+    public string PositionFormat => UseDots ? "0" : "0.###";
 
-    /// <summary>How much a size spinner steps by. Ten dots is a sensible nudge; ten
-    /// millimetres is most of a small label.</summary>
-    public decimal SizeIncrement => UseMm ? 1 : 10;
+    public decimal PositionIncrement => UseDots ? 1m : 0.1m;
+
+    /// <summary>One millimeter per step in centimeter mode; ten dots in dot mode.</summary>
+    public decimal SizeIncrement => UseDots ? 10m : 0.1m;
+
+    public decimal FineIncrement => UseDots
+        ? 1m
+        : decimal.Round(1m / (_document.Dpmm * 10m), 3);
+
+    public decimal MinOneDot => FromDots(1);
+    public decimal MinFontHeight => FromDots(6);
+    public decimal MinBarcodeHeight => FromDots(10);
+    public decimal MaxFontSize => FromDots(600);
+    public decimal MaxBlockWidth => FromDots(9999);
+    public decimal MaxBarcodeHeight => FromDots(2000);
+    public decimal MaxThickness => FromDots(200);
+    public decimal MaxShapeSize => FromDots(5000);
+    public decimal MaxEllipseSize => FromDots(4095);
+    public decimal MaxLineSpacing => FromDots(200);
+    public decimal MinLineSpacing => -MaxLineSpacing;
 
     public decimal X
     {
-        get => UseMm ? (decimal)Math.Round(Units.DotsToMm(Element.X, _document.Dpmm), 2) : Element.X;
+        get => FromDots(Element.X);
         set => Edit(Element.X, ToDots(value), v => Element.X = v);
     }
 
     public decimal Y
     {
-        get => UseMm ? (decimal)Math.Round(Units.DotsToMm(Element.Y, _document.Dpmm), 2) : Element.Y;
+        get => FromDots(Element.Y);
         set => Edit(Element.Y, ToDots(value), v => Element.Y = v);
     }
 
-    /// <summary>A stored dot count as the unit currently on show. Sizes use it for the same
-    /// reason X and Y do: a size you can type is the other half of a typed position, and
-    /// having one in millimetres and the other in dots is the confusing arrangement.</summary>
+    /// <summary>Keep three decimal places so a single dot survives the display
+    /// round trip at 600 dpi.</summary>
     protected decimal FromDots(int dots) =>
-        UseMm ? (decimal)Math.Round(Units.DotsToMm(dots, _document.Dpmm), 2) : dots;
+        UseDots ? dots : decimal.Round((decimal)Units.DotsToMm(dots, _document.Dpmm) / 10m, 3);
 
-    /// <summary>What the user typed, in dots. Minimums stay in DOTS at the call site: they
-    /// are limits of the ZPL command, not of the unit someone chose to type in.</summary>
+    /// <summary>Convert the typed physical length once, at the model boundary.
+    /// Minimum dot sizes remain enforced by the individual element editors.</summary>
     protected int ToDots(decimal value) =>
-        UseMm ? Units.MmToDots((double)value, _document.Dpmm) : (int)value;
+        UseDots ? (int)value : Units.MmToDots((double)(value * 10m), _document.Dpmm);
 
     /// <summary>Whether to offer a rotation at all. A box, an ellipse and an image state a
     /// width and a height and draw them, so the control would be one that cannot do
@@ -361,7 +377,7 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
             char font = char.ToUpperInvariant(_text.Font);
             if (ZplFont.Cell(font, Document.Dpmm) is not { } cell)
             {
-                return "Scalable: any height and width in dots.";
+                return $"Scalable: any height and width in {UnitSuffix}.";
             }
 
             string size = $"Fixed pitch, {cell.HeightDots} x {cell.WidthDots} dots per "
@@ -375,22 +391,22 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
 
     public decimal FontHeight
     {
-        get => _text.FontHeightDots;
-        set => Edit(_text.FontHeightDots, Math.Max((int)value, 6), v => _text.FontHeightDots = v);
+        get => FromDots(_text.FontHeightDots);
+        set => Edit(_text.FontHeightDots, Math.Max(ToDots(value), 6), v => _text.FontHeightDots = v);
     }
 
     /// <summary>0 lets the printer derive the width from the height.</summary>
     public decimal FontWidth
     {
-        get => _text.FontWidthDots;
-        set => Edit(_text.FontWidthDots, Math.Max((int)value, 0), v => _text.FontWidthDots = v);
+        get => FromDots(_text.FontWidthDots);
+        set => Edit(_text.FontWidthDots, Math.Max(ToDots(value), 0), v => _text.FontWidthDots = v);
     }
 
     /// <summary>0 keeps the field a plain single line and emits no ^FB at all.</summary>
     public decimal BlockWidth
     {
-        get => _text.BlockWidthDots;
-        set => Edit(_text.BlockWidthDots, Math.Max((int)value, 0), v =>
+        get => FromDots(_text.BlockWidthDots);
+        set => Edit(_text.BlockWidthDots, Math.Max(ToDots(value), 0), v =>
         {
             _text.BlockWidthDots = v;
             OnPropertyChanged(nameof(IsBlock));
@@ -409,14 +425,14 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
 
     public decimal BlockLineSpacing
     {
-        get => _text.BlockLineSpacingDots;
-        set => Edit(_text.BlockLineSpacingDots, (int)value, v => _text.BlockLineSpacingDots = v);
+        get => FromDots(_text.BlockLineSpacingDots);
+        set => Edit(_text.BlockLineSpacingDots, ToDots(value), v => _text.BlockLineSpacingDots = v);
     }
 
     public decimal BlockHangingIndent
     {
-        get => _text.BlockHangingIndentDots;
-        set => Edit(_text.BlockHangingIndentDots, Math.Max((int)value, 0), v => _text.BlockHangingIndentDots = v);
+        get => FromDots(_text.BlockHangingIndentDots);
+        set => Edit(_text.BlockHangingIndentDots, Math.Max(ToDots(value), 0), v => _text.BlockHangingIndentDots = v);
     }
 
     public IReadOnlyList<TextJustification> Justifications { get; } =
@@ -525,8 +541,8 @@ public sealed partial class BarcodePropertiesViewModel : ElementPropertiesViewMo
 
     public decimal Height
     {
-        get => _barcode.HeightDots;
-        set => Edit(_barcode.HeightDots, Math.Max((int)value, 10), v => _barcode.HeightDots = v);
+        get => FromDots(_barcode.HeightDots);
+        set => Edit(_barcode.HeightDots, Math.Max(ToDots(value), 10), v => _barcode.HeightDots = v);
     }
 
     public decimal ModuleWidth
@@ -673,10 +689,10 @@ public sealed class Pdf417PropertiesViewModel : ElementPropertiesViewModel
 
     public decimal RowHeight
     {
-        get => _pdf.RowHeightDots;
+        get => FromDots(_pdf.RowHeightDots);
         set
         {
-            Edit(_pdf.RowHeightDots, Math.Max((int)value, 1), v => _pdf.RowHeightDots = v);
+            Edit(_pdf.RowHeightDots, Math.Max(ToDots(value), 1), v => _pdf.RowHeightDots = v);
             OnShapeChanged();
         }
     }
@@ -727,7 +743,7 @@ public sealed class Pdf417PropertiesViewModel : ElementPropertiesViewModel
             string columns = Count(shape.Columns, "column");
             return (shape.ColumnsAreAutomatic ? $"about {columns}" : columns)
                    + $" x {Count(shape.Rows, "row")}, "
-                   + $"about {shape.WidthDots} x {shape.HeightDots} dots";
+                   + $"about {FromDots(shape.WidthDots)} x {FromDots(shape.HeightDots)} {UnitSuffix}";
         }
     }
 
@@ -838,8 +854,8 @@ public sealed class LinePropertiesViewModel : ElementPropertiesViewModel
 
     public decimal Thickness
     {
-        get => _line.ThicknessDots;
-        set => Edit(_line.ThicknessDots, Math.Max((int)value, 1), v => _line.ThicknessDots = v);
+        get => FromDots(_line.ThicknessDots);
+        set => Edit(_line.ThicknessDots, Math.Max(ToDots(value), 1), v => _line.ThicknessDots = v);
     }
 
     /// <summary>A bar has no direction, so it has two turns rather than four, and they are
@@ -883,8 +899,8 @@ public sealed class BoxPropertiesViewModel : ElementPropertiesViewModel
 
     public decimal Thickness
     {
-        get => _box.ThicknessDots;
-        set => Edit(_box.ThicknessDots, Math.Max((int)value, 1), v => _box.ThicknessDots = v);
+        get => FromDots(_box.ThicknessDots);
+        set => Edit(_box.ThicknessDots, Math.Max(ToDots(value), 1), v => _box.ThicknessDots = v);
     }
 
     /// <inheritdoc cref="LinePropertiesViewModel.IsWhite"/>
@@ -937,8 +953,8 @@ public sealed partial class EllipsePropertiesViewModel : ElementPropertiesViewMo
 
     public decimal Thickness
     {
-        get => _ellipse.ThicknessDots;
-        set => Edit(_ellipse.ThicknessDots, Math.Max((int)value, 1), v => _ellipse.ThicknessDots = v);
+        get => FromDots(_ellipse.ThicknessDots);
+        set => Edit(_ellipse.ThicknessDots, Math.Max(ToDots(value), 1), v => _ellipse.ThicknessDots = v);
     }
 
     /// <summary>True when the two sides match, which is all a circle is: ZPL's own ^GC
@@ -971,7 +987,7 @@ public sealed partial class EllipsePropertiesViewModel : ElementPropertiesViewMo
     /// <summary>Makes the height match the width, since dragging two boxes to the same
     /// number by hand is the fiddliest way to ask for a circle.</summary>
     [RelayCommand]
-    private void MakeCircle() => EllipseHeight = _ellipse.WidthDots;
+    private void MakeCircle() => EllipseHeight = EllipseWidth;
 
     private void NotifyShape()
     {
@@ -1013,10 +1029,10 @@ public sealed class DiagonalPropertiesViewModel : ElementPropertiesViewModel
 
     public decimal Thickness
     {
-        get => _diagonal.ThicknessDots;
+        get => FromDots(_diagonal.ThicknessDots);
         set
         {
-            Edit(_diagonal.ThicknessDots, Math.Max((int)value, 1), v => _diagonal.ThicknessDots = v);
+            Edit(_diagonal.ThicknessDots, Math.Max(ToDots(value), 1), v => _diagonal.ThicknessDots = v);
             OnPropertyChanged(nameof(ThicknessNote));
             OnPropertyChanged(nameof(HasThicknessNote));
         }

@@ -56,12 +56,18 @@ public sealed record StockMedia(
             ? FormattableString.Invariant($"{widthMm:0.##}mm continuous")
             : FormattableString.Invariant($"{widthMm:0.##}mm x {heightMm:0.##}mm");
 
+    /// <summary>Physical size in the unit shown by default in the app. SizeText remains
+    /// the catalog's millimeter metadata and the saved preset format.</summary>
+    public string DisplaySizeCm => Continuous
+        ? FormattableString.Invariant($"{WidthMm / 10:0.###} cm continuous")
+        : FormattableString.Invariant($"{WidthMm / 10:0.###} x {HeightMm / 10:0.###} cm");
+
     /// <summary>Display form used by pickers and search results. The column count is named
     /// because it is not in the size text and it changes what a run produces: two entries
     /// with the same die cut print very differently at 4 across.</summary>
     public override string ToString()
     {
-        string size = Across > 1 ? $"{SizeText}, {Across} across" : SizeText;
+        string size = Across > 1 ? $"{DisplaySizeCm}, {Across} across" : DisplaySizeCm;
         string text = Material.Length > 0
             ? $"{PartNumber} - {Material} ({size})"
             : $"{PartNumber} ({size})";

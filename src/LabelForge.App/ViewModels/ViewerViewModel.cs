@@ -45,6 +45,18 @@ public partial class ViewerViewModel : ViewModelBase
     [ObservableProperty]
     public partial decimal HeightMm { get; set; } = 150m;
 
+    public decimal WidthCm
+    {
+        get => decimal.Round(WidthMm / 10m, 3);
+        set => WidthMm = value * 10m;
+    }
+
+    public decimal HeightCm
+    {
+        get => decimal.Round(HeightMm / 10m, 3);
+        set => HeightMm = value * 10m;
+    }
+
     [ObservableProperty]
     public partial DensityOption? SelectedDensity { get; set; }
 
@@ -167,6 +179,7 @@ public partial class ViewerViewModel : ViewModelBase
 
     partial void OnWidthMmChanged(decimal value)
     {
+        OnPropertyChanged(nameof(WidthCm));
         if (!_suppressSizeRender)
         {
             ScheduleRender();
@@ -175,6 +188,7 @@ public partial class ViewerViewModel : ViewModelBase
 
     partial void OnHeightMmChanged(decimal value)
     {
+        OnPropertyChanged(nameof(HeightCm));
         if (!_suppressSizeRender)
         {
             ScheduleRender();
@@ -262,7 +276,9 @@ public partial class ViewerViewModel : ViewModelBase
         {
             using var stream = new MemoryStream(result.Png);
             PreviewImage = new Bitmap(stream);
-            StatusText = $"{result.WidthDots} x {result.HeightDots} dots";
+            double dotsPerCm = (SelectedDensity?.Dpmm ?? 8) * 10.0;
+            StatusText = FormattableString.Invariant(
+                $"{result.WidthDots / dotsPerCm:0.###} x {result.HeightDots / dotsPerCm:0.###} cm");
         }
         else
         {

@@ -250,7 +250,7 @@ public partial class DesignerView : UserControl
     /// The grid pitches on offer, with a tick beside the one in force.
     ///
     /// A handful of presets rather than a free number: the useful pitches are the ones a
-    /// ruler already reads in, and a box accepting 3.7 mm would invite a grid nothing else
+    /// ruler already reads in, and a box accepting an arbitrary pitch would invite a grid nothing else
     /// on the label lines up with.
     /// </summary>
     private void BuildGridMenu()
@@ -268,7 +268,7 @@ public partial class DesignerView : UserControl
             {
                 Header = value <= 0
                     ? "Off"
-                    : value.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture) + " mm",
+                    : (value / 10).ToString("0.###", System.Globalization.CultureInfo.CurrentCulture) + " cm",
                 Icon = Check(Math.Abs(vm.GridPitchMm - value) < 0.001),
             };
             item.Click += (_, _) => vm.GridPitchMm = value;

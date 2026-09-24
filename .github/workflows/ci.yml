@@ -42,6 +42,8 @@ jobs:
             arguments: designer dark synthetic
           - scenario: workspace-layout
             arguments: ui-layout
+          - scenario: cm-units
+            arguments: cm-units
           - scenario: viewer-size
             arguments: viewer-size
           - scenario: viewer-layout

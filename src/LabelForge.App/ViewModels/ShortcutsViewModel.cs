@@ -63,7 +63,7 @@ public sealed class ShortcutsViewModel
             new("Arrow keys", "Nudge by a grid step, or one dot with grid snapping off"),
             new("Shift + arrows", "Nudge by ten steps"),
             new("Alt + arrows", "Nudge by one dot, or ten with Shift, even with grid snapping on"),
-            new("Drag", "Move the selection; show gaps in mm and snap to equal spacing"),
+            new("Drag", "Move the selection; show gaps in cm and snap to equal spacing"),
             new("Shift + drag", "Move along one axis only"),
             new("Ctrl + drag", "Leave a copy behind and move the copy"),
             new("Alt + drag", "Move without snapping to anything, whatever View has switched on"),

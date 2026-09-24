@@ -22,7 +22,7 @@ public sealed class PrinterProfileTests
 
         Assert.Equal(2, warnings.Count);
         Assert.Contains(warnings, w => w.Contains("density"));
-        Assert.Contains(warnings, w => w.Contains("print head"));
+        Assert.Contains("Label width 12 cm exceeds the print head (10.4 cm)", warnings);
     }
 
     [Fact]

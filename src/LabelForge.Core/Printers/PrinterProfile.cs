@@ -38,8 +38,8 @@ public sealed record PrinterProfile(string Id, string ModelName, int Dpi, int Dp
         {
             int columns = AcrossLayout.Columns(document);
             warnings.Add(columns > 1
-                ? $"Web width {webMm:0.#} mm ({columns} across) exceeds the print head ({MaxPrintWidthMm:0.#} mm)"
-                : $"Label width {webMm:0.#} mm exceeds the print head ({MaxPrintWidthMm:0.#} mm)");
+                ? FormattableString.Invariant($"Web width {webMm / 10:0.###} cm ({columns} across) exceeds the print head ({MaxPrintWidthMm / 10:0.###} cm)")
+                : FormattableString.Invariant($"Label width {webMm / 10:0.###} cm exceeds the print head ({MaxPrintWidthMm / 10:0.###} cm)"));
         }
 
         return warnings;

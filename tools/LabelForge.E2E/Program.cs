@@ -52,7 +52,7 @@ if (args.Contains("dark"))
 // Media presets, field catalogs and crash snapshots all live per machine. Point every
 // one of them at scratch locations, so a harness run never touches what the person using
 // the app has saved.
-string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare" or "viewer-layout"
+string scratchRoot = args.FirstOrDefault() is "ui-layout" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare" or "viewer-layout" or "cm-units"
     ? Path.Combine(AppContext.BaseDirectory, args[0] + "-scratch")
     : AppContext.BaseDirectory;
 Directory.CreateDirectory(scratchRoot);
@@ -91,6 +91,62 @@ if (args.FirstOrDefault() == "ui-layout")
 // over these two and a captured local has to be assigned at every place it is called from.
 int graded = 0;
 var disagreed = new List<string>();
+if (args.FirstOrDefault() == "cm-units")
+{
+    foreach (int dpmm in new[] { 8, 12, 24 })
+    {
+        var document = new LabelForge.Core.Model.LabelDocument { Dpmm = dpmm };
+        var box = new LabelForge.Core.Model.BoxElement { X = 1, WidthDots = 80, HeightDots = 40 };
+        int edits = 0;
+        var boxEditor = new BoxPropertiesViewModel(box, document, _ => edits++);
+        Check($"{dpmm} dpmm: measured lengths default to cm", boxEditor.UnitSuffix, "cm");
+
+        boxEditor.X = 2.5m;
+        Check($"{dpmm} dpmm: 2.5 cm position converts to dots", box.X, 25 * dpmm);
+        boxEditor.BoxWidth = 1.25m;
+        Check($"{dpmm} dpmm: 1.25 cm width converts to dots", box.WidthDots, 125 * dpmm / 10);
+
+        box.X = 1;
+        int before = edits;
+        decimal oneDotCm = boxEditor.X;
+        boxEditor.X = oneDotCm;
+        Check($"{dpmm} dpmm: displayed one-dot position round trips", box.X, 1);
+        Check($"{dpmm} dpmm: redisplaying one dot records no edit", edits, before);
+        boxEditor.UseDots = true;
+        Check($"{dpmm} dpmm: printer-dot switch shows exact position", boxEditor.X, 1m);
+        boxEditor.UseDots = false;
+
+        var textElement = new LabelForge.Core.Model.TextElement();
+        var textEditor = new TextPropertiesViewModel(textElement, document, _ => { });
+        textEditor.FontHeight = 0.5m;
+        Check($"{dpmm} dpmm: 0.5 cm font height converts to dots",
+            textElement.FontHeightDots, 5 * dpmm);
+
+        var barcode = new LabelForge.Core.Model.BarcodeElement();
+        var barcodeEditor = new BarcodePropertiesViewModel(barcode, document, _ => { });
+        barcodeEditor.Height = 1.25m;
+        Check($"{dpmm} dpmm: 1.25 cm bar height converts to dots",
+            barcode.HeightDots, 125 * dpmm / 10);
+
+        var ellipse = new LabelForge.Core.Model.EllipseElement
+        {
+            WidthDots = 20 * dpmm,
+            HeightDots = 5 * dpmm,
+        };
+        var ellipseEditor = new EllipsePropertiesViewModel(ellipse, document, _ => { });
+        ellipseEditor.MakeCircleCommand.Execute(null);
+        Check($"{dpmm} dpmm: Make Circle preserves the physical width",
+            ellipse.HeightDots, ellipse.WidthDots);
+    }
+
+    vm.Designer.WidthCm = 5.08m;
+    Check("designer label size accepts centimeters", vm.Designer.WidthCm, 5.08m);
+    Check("designer keeps millimeters in the document", vm.Designer.Document.WidthMm, 50.8);
+    Console.WriteLine($"{graded} centimeter checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
 if (args.FirstOrDefault() == "viewer-layout")
 {
     vm.SelectedTab = MainViewModel.ViewerTab;
@@ -238,23 +294,23 @@ if (args.FirstOrDefault() == "viewer-size")
     Pump(700);
     Check("second label width", viewer.WidthMm, 50m);
     Check("second label inherits height", viewer.HeightMm, 150m);
-    Check("second preview pixel size", viewer.StatusText, "400 x 1200 dots");
+    Check("second preview physical size", viewer.StatusText, "5 x 15 cm");
 
     viewer.SelectedLabelIndex = 2;
     Pump(700);
     Check("third label inherits width", viewer.WidthMm, 50m);
     Check("third label height", viewer.HeightMm, 75m);
-    Check("third preview pixel size", viewer.StatusText, "400 x 600 dots");
+    Check("third preview physical size", viewer.StatusText, "5 x 7.5 cm");
 
     viewer.ZplText = "^PW800^LL1200^XA^FO0,0^GB20,20,1^FS^XZ"
         + "^XA^PW400^LL600^FO0,0^GB20,20,1^FS^XZ";
     Pump(700);
     Check("removed label selects rendered last label", viewer.SelectedLabelIndex, 1);
-    Check("removed label preview pixel size", viewer.StatusText, "400 x 600 dots");
+    Check("removed label physical size", viewer.StatusText, "5 x 7.5 cm");
 
     viewer.AutoSize = false;
-    viewer.WidthMm = 90m;
-    viewer.HeightMm = 80m;
+    viewer.WidthCm = 9m;
+    viewer.HeightCm = 8m;
     viewer.SelectedLabelIndex = 0;
     Pump(700);
     Check("manual width survives label switch", viewer.WidthMm, 90m);
@@ -264,7 +320,8 @@ if (args.FirstOrDefault() == "viewer-size")
     viewer.SelectedDensity = viewer.Densities.First(option => option.Dpmm == 24);
     viewer.LoadZpl("^PW241^LL481^XA^FO0,0^GB20,20,1^FS^XZ");
     Pump(700);
-    Check("24 dpmm preview keeps declared dot size", viewer.StatusText, "241 x 481 dots");
+    Check("24 dpmm preview shows physical size", viewer.StatusText, "1.004 x 2.004 cm");
+    Check("24 dpmm auto size appears in centimeters", viewer.WidthCm, 1.004m);
 
     Console.WriteLine($"{graded} viewer size checks graded, {disagreed.Count} disagreed");
     vm.Designer.ShutDown();
@@ -394,8 +451,8 @@ else
     Console.WriteLine($"add: {baseline} -> {d.Document.Elements.Count} (expected {baseline + 1}), placed at {d.SelectedElement!.X},{d.SelectedElement!.Y} (expected 200,100), IsPlacing={d.IsPlacing}");
 
     d.Selection.Set(d.Document.Elements[^1]);
-    d.SelectionProperties!.X = 300;
-    Console.WriteLine($"move via panel: X={d.Document.Elements[^1].X} (expected 300)");
+    d.SelectionProperties!.X = 300m / (d.Document.Dpmm * 10m);
+    Check("move via centimeter panel", d.Document.Elements[^1].X, 300);
 
     d.UndoCommand.Execute(null);
     d.UndoCommand.Execute(null);
@@ -479,12 +536,12 @@ else
     d.HeightMm = 30m;
     d.NewMediaName = "Etiqueta Filial";
     d.NewMediaMaterial = "Couche";
-    Console.WriteLine($"preset size preview: '{d.NewMediaSizeText}' (expected 50.8mm x 30mm)");
+    Console.WriteLine($"preset size preview: '{d.NewMediaSizeText}' (expected 5.08 x 3 cm)");
     d.SaveUserMediaCommand.Execute(null);
     Console.WriteLine(
         $"save preset: {d.UserMedia.Count} saved, name cleared={d.NewMediaName.Length == 0}, "
         + $"display='{(d.UserMedia.Count > 0 ? d.UserMedia[0].Display : "none")}' "
-        + "(expected 1/True/Etiqueta Filial - Couche (50.8mm x 30mm) - my media)");
+        + "(expected 1/True/Etiqueta Filial - Couche (5.08 x 3 cm) - my media)");
     Console.WriteLine(
         $"preset leads the picker: {d.MediaCatalog.Count > 0 && d.MediaCatalog[0].IsUserDefined}, "
         + $"entries={d.MediaCatalog.Count} (expected True/798)");
@@ -724,14 +781,15 @@ if (mode == "designer")
 
         // A one-dot diagonal prints and the preview cannot draw it, so the panel says so
         // instead of the thickness being quietly clamped to what the canvas can show.
-        diagonal.Thickness = 1;
+        decimal oneDotCm = decimal.Round(1m / (d.Document.Dpmm * 10m), 3);
+        diagonal.Thickness = oneDotCm;
         Pump(500);
         Check("one-dot diagonal warns", diagonal.HasThicknessNote, true);
         Check(
             "and is kept at 1 rather than clamped to what the canvas can draw",
             d.GeneratedZpl.Contains("^GD140,200,1,B,L"), true,
             "^GD140,200,1,B,L, in the box the turn above left it in");
-        diagonal.Thickness = 3;
+        diagonal.Thickness = decimal.Round(3m / (d.Document.Dpmm * 10m), 3);
         Pump(300);
     }
     else
@@ -886,13 +944,15 @@ if (mode == "designer")
     canvas.ResetView();
     Pump(100);
 
-    // mm position entry: 25 mm at 8 dpmm lands on 200 dots; the display reads mm.
+    // A measured 2.5 cm at 8 dpmm lands on 200 printer dots.
     d.Selection.Set(d.Document.Elements[1]);
     var panel = d.SelectionProperties!;
-    panel.UseMm = true;
-    panel.X = 25;
-    Console.WriteLine($"mm entry: X={d.Document.Elements[1].X} dots (expected 200), shown as {panel.X} mm");
-    panel.UseMm = false;
+    panel.X = 2.5m;
+    Check("position defaults to centimeters", panel.UnitSuffix, "cm");
+    Check("centimeter position reaches printer dots", d.Document.Elements[1].X, 200);
+    panel.UseDots = true;
+    Check("printer-dot position remains available", panel.X, 200m);
+    panel.UseDots = false;
     d.Selection.Set(d.Document.Elements[2]);
     Pump(200);
 
@@ -1787,16 +1847,13 @@ if (mode == "designer")
     window.MouseMove(canvas.TranslatePoint(canvas.DotsToView(160, 80), window)!.Value);
     Pump(300);
     string readout = d.CanvasReadout;
-    Console.WriteLine(
-        $"readout follows the pointer: '{readout}' "
-        + $"(expected the dots to read 160, 80): {readout.Contains("160, 80 dots")}");
+    Check("readout follows the pointer in cm", readout, "2, 1 cm");
 
     d.Selection.Set(readoutBox);
     Pump(300);
     string withSelection = d.CanvasReadout;
-    Console.WriteLine(
-        $"and the selection: '{withSelection}' (expected 200, 100 and 300 x 150): "
-        + $"{withSelection.Contains("200, 100") && withSelection.Contains("300 x 150")}");
+    Check("selection readout uses drawn cm bounds", withSelection,
+        "2, 1 cm   selection 2.5, 1.25  3.75 x 1.875 cm");
 
     // The hover outline goes on the element under the pointer while it is NOT selected,
     // which is the state the screenshot has to show. Text rather than the box above: a
@@ -2424,27 +2481,18 @@ if (mode == "designer")
 
     d.AlignToLabel = false;
 
-    // A size can be typed in millimetres, the same toggle X and Y already answer to. The
-    // model stays in dots whatever the panel is showing.
+    // Geometric sizes use the same centimeter default as positions.
     d.Selection.Set(aLeft);
     Pump(400);
     var sizeEditor = (LabelForge.App.ViewModels.BoxPropertiesViewModel)d.SelectionProperties!;
-    sizeEditor.UseMm = true;
-    Console.WriteLine(
-        $"size shows in mm: {sizeEditor.BoxWidth} mm for {aLeft.WidthDots} dots at "
-        + $"{d.Document.Dpmm} dpmm (expected {aLeft.WidthDots / d.Document.Dpmm}), "
-        + $"label reads '{sizeEditor.UnitSuffix}' (expected mm)");
-
-    sizeEditor.BoxWidth = 25;
+    Check("shape size defaults to centimeters", sizeEditor.UnitSuffix, "cm");
+    sizeEditor.BoxWidth = 2.5m;
     Pump(500);
-    Console.WriteLine(
-        $"and a size typed in mm lands in dots: {aLeft.WidthDots} "
-        + $"(expected {25 * d.Document.Dpmm})");
+    Check("centimeter size reaches printer dots", aLeft.WidthDots, 25 * d.Document.Dpmm);
 
-    sizeEditor.UseMm = false;
-    Console.WriteLine(
-        $"back in dots: {sizeEditor.BoxWidth} (expected {aLeft.WidthDots}), "
-        + $"label reads '{sizeEditor.UnitSuffix}' (expected dots)");
+    sizeEditor.UseDots = true;
+    Check("shape size can show exact printer dots", sizeEditor.BoxWidth, (decimal)aLeft.WidthDots);
+    sizeEditor.UseDots = false;
 
     d.Selection.Clear();
     Pump(300);

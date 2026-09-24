@@ -12,7 +12,7 @@ public partial class DesignerViewModel
     [ObservableProperty] private bool _showPrinterDotGrid = true;
 
     public string SetupSummary =>
-        $"{Document.WidthMm:0.##} x {Document.HeightMm:0.##} mm  |  {SelectedDensity}"
+        $"{WidthCm:0.###} x {HeightCm:0.###} cm  |  {SelectedDensity}"
         + (Document.IsContinuous ? "  |  Continuous" : "")
         + (IsMultiAcross ? $"  |  {Document.LabelsAcross} across" : "");
 
@@ -28,6 +28,22 @@ public partial class DesignerViewModel
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
+        string? centimeters = e.PropertyName switch
+        {
+            nameof(WidthMm) => nameof(WidthCm),
+            nameof(HeightMm) => nameof(HeightCm),
+            nameof(ContinuousMarginMm) => nameof(ContinuousMarginCm),
+            nameof(CornerRadiusMm) => nameof(CornerRadiusCm),
+            nameof(AcrossGapMm) => nameof(AcrossGapCm),
+            nameof(NewMediaRadiusMm) => nameof(NewMediaRadiusCm),
+            nameof(GridPitchMm) => nameof(GridPitchCm),
+            _ => null,
+        };
+        if (centimeters is not null)
+        {
+            base.OnPropertyChanged(new PropertyChangedEventArgs(centimeters));
+        }
+
         if (e.PropertyName is nameof(Document) or nameof(WidthMm) or nameof(HeightMm)
             or nameof(SelectedDensity) or nameof(IsContinuous) or nameof(LabelsAcross)
             or nameof(CanvasRevision))

@@ -201,8 +201,9 @@ public partial class DesignerViewModel : ViewModelBase
     {
         get
         {
-            string size = Core.Media.StockMedia.FormatSize(
-                (double)WidthMm, (double)HeightMm, NewMediaContinuous);
+            string size = NewMediaContinuous
+                ? FormattableString.Invariant($"{WidthCm:0.###} cm continuous")
+                : FormattableString.Invariant($"{WidthCm:0.###} x {HeightCm:0.###} cm");
             int columns = Core.Model.AcrossLayout.Columns(Document);
             return columns > 1 ? $"{size}, {columns} across" : size;
         }
@@ -591,7 +592,7 @@ public partial class DesignerViewModel : ViewModelBase
                 ScheduleRender();
                 Notify(value <= 0
                     ? "Grid off"
-                    : FormattableString.Invariant($"Grid at {value:0.##} mm; drags snap to it"));
+                    : FormattableString.Invariant($"Grid at {value / 10:0.###} cm; drags snap to it"));
             }
         }
     }
@@ -697,10 +698,10 @@ public partial class DesignerViewModel : ViewModelBase
 
             int rows = Core.Model.AcrossLayout.Rows(Document.Print.Copies, columns);
             int labels = Core.Model.AcrossLayout.LabelsInRows(rows, columns);
-            string web = FormattableString.Invariant($"{Document.WebWidthMm:0.#}");
+            string web = FormattableString.Invariant($"{Document.WebWidthMm / 10:0.###}");
             string copies = Document.Print.Copies == 1 ? "1 copy" : $"{Document.Print.Copies} copies";
             string pulls = rows == 1 ? "1 row" : $"{rows} rows";
-            return $"{columns} across: {web} mm of web, "
+            return $"{columns} across: {web} cm of web, "
                 + $"{copies} prints {labels} labels in {pulls}";
         }
     }
@@ -1198,11 +1199,9 @@ public partial class DesignerViewModel : ViewModelBase
         var text = new StringBuilder();
         if (_pointerDots is { } dots)
         {
-            double mmX = dots.X / Document.Dpmm;
-            double mmY = dots.Y / Document.Dpmm;
-            text.Append(CultureInfo.InvariantCulture, $"{mmX:0.0}, {mmY:0.0} mm");
-            text.Append(CultureInfo.InvariantCulture,
-                $"  ({(int)Math.Round(dots.X)}, {(int)Math.Round(dots.Y)} dots)");
+            double cmX = dots.X / (Document.Dpmm * 10.0);
+            double cmY = dots.Y / (Document.Dpmm * 10.0);
+            text.Append(CultureInfo.InvariantCulture, $"{cmX:0.###}, {cmY:0.###} cm");
         }
 
         if (Selection.Count > 0)
@@ -1221,8 +1220,10 @@ public partial class DesignerViewModel : ViewModelBase
                     text.Append("   ");
                 }
 
+                double dotsPerCm = Document.Dpmm * 10.0;
                 text.Append(CultureInfo.InvariantCulture,
-                    $"selection {box.X}, {box.Y}  {box.Width} x {box.Height} dots");
+                    $"selection {box.X / dotsPerCm:0.###}, {box.Y / dotsPerCm:0.###}  "
+                    + $"{box.Width / dotsPerCm:0.###} x {box.Height / dotsPerCm:0.###} cm");
             }
         }
 
@@ -1413,7 +1414,7 @@ public partial class DesignerViewModel : ViewModelBase
     {
         ArgumentNullException.ThrowIfNull(starter);
         LoadDocument(starter.Create(Document.Dpmm), path: null);
-        Notify($"Started from {starter.Name}, {starter.SizeText}");
+        Notify(FormattableString.Invariant($"Started from {starter.Name}, {WidthCm:0.###} x {HeightCm:0.###} cm"));
     }
 
     [RelayCommand]
@@ -2644,10 +2645,10 @@ public partial class DesignerViewModel : ViewModelBase
         ScheduleRender();
         string kind = value.IsUserDefined ? "my media" : "media";
         StatusText = value.Continuous
-            ? $"Applied {kind} {value.PartNumber}: continuous {value.WidthMm:0.#} mm roll, the length now follows the content"
+            ? $"Applied {kind} {value.PartNumber}: continuous {value.WidthMm / 10:0.###} cm roll, the length now follows the content"
             : value.Across > 1
-                ? $"Applied {kind} {value.PartNumber} ({value.SizeText}), {value.Across} across the web"
-                : $"Applied {kind} {value.PartNumber} ({value.SizeText})";
+                ? $"Applied {kind} {value.PartNumber} ({value.DisplaySizeCm}), {value.Across} across the web"
+                : $"Applied {kind} {value.PartNumber} ({value.DisplaySizeCm})";
     }
 
     /// <summary>Saves the label's current size as one of the user's own media. Presets
@@ -2683,7 +2684,7 @@ public partial class DesignerViewModel : ViewModelBase
         // A failed write still leaves a usable preset in this session; say which it is
         // rather than reporting a success the next start would contradict.
         StatusText = result.Error is null
-            ? $"Saved my media {name} ({media.SizeText})"
+            ? $"Saved my media {name} ({media.DisplaySizeCm})"
             : $"Saved for this session only, the presets file could not be written: {result.Error}";
     }
 
@@ -3371,7 +3372,8 @@ public partial class DesignerViewModel : ViewModelBase
             }
             else if (!_statusHeld)
             {
-                StatusText = $"{document.WidthDots} x {document.HeightDots} dots";
+                StatusText = FormattableString.Invariant(
+                    $"{document.WidthMm / 10:0.###} x {document.HeightMm / 10:0.###} cm");
             }
         }
         catch (OperationCanceledException)

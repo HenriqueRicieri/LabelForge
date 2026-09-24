@@ -51,7 +51,8 @@ public static class StockCatalog
     private static bool Matches(StockMedia media, string term) =>
         media.PartNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
         || media.Material.Contains(term, StringComparison.OrdinalIgnoreCase)
-        || media.SizeText.Contains(term, StringComparison.OrdinalIgnoreCase);
+        || media.SizeText.Contains(term, StringComparison.OrdinalIgnoreCase)
+        || media.DisplaySizeCm.Contains(term.Replace(',', '.'), StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<StockMedia> Load()
     {

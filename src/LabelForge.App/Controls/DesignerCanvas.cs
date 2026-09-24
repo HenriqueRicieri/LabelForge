@@ -1101,22 +1101,22 @@ public sealed partial class DesignerCanvas : Control
         {
             double x = origin.X + _tempGuideDots * scale;
             context.DrawLine(TempGuidePen, new Point(x, RulerSize), new Point(x, Bounds.Height));
-            DrawReadout(context, MmText(_tempGuideDots, doc), new Point(x + 6, RulerSize + 6));
+            DrawReadout(context, CmText(_tempGuideDots, doc), new Point(x + 6, RulerSize + 6));
         }
         else if (_tempGuideAxis == GuideAxis.Horizontal)
         {
             double y = origin.Y + _tempGuideDots * scale;
             context.DrawLine(TempGuidePen, new Point(RulerSize, y), new Point(Bounds.Width, y));
-            DrawReadout(context, MmText(_tempGuideDots, doc), new Point(RulerSize + 6, y + 6));
+            DrawReadout(context, CmText(_tempGuideDots, doc), new Point(RulerSize + 6, y + 6));
         }
 
-        // A guide being repositioned gets the same mm readout at the pointer.
+        // A guide being repositioned gets the same cm readout at the pointer.
         if (_dragGuideAxis != GuideAxis.None && !_dragGuideDelete && _pointerPosition is { } p)
         {
             int dots = _dragGuideAxis == GuideAxis.Vertical
                 ? doc.VerticalGuides[_dragGuideIndex]
                 : doc.HorizontalGuides[_dragGuideIndex];
-            DrawReadout(context, MmText(dots, doc), new Point(p.X + 12, p.Y + 12));
+            DrawReadout(context, CmText(dots, doc), new Point(p.X + 12, p.Y + 12));
         }
     }
 
@@ -1134,7 +1134,7 @@ public sealed partial class DesignerCanvas : Control
             context.DrawLine(SnapPen, a, b);
             context.DrawLine(SnapPen, a - tick, a + tick);
             context.DrawLine(SnapPen, b - tick, b + tick);
-            var text = new FormattedText(MmText(gap.Dots, doc),
+            var text = new FormattedText(CmText(gap.Dots, doc),
                 System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
                 Typeface.Default, 12, SnapPen.Brush);
             double x = gap.Horizontal ? (a.X + b.X - text.Width) / 2 : a.X + 6;
@@ -1147,10 +1147,11 @@ public sealed partial class DesignerCanvas : Control
         }
     }
 
-    private static string MmText(double dots, LabelDocument doc) =>
-        (dots / doc.Dpmm).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " mm";
+    private static string CmText(double dots, LabelDocument doc) =>
+        (dots / (doc.Dpmm * 10.0)).ToString("0.###",
+            System.Globalization.CultureInfo.InvariantCulture) + " cm";
 
-    /// <summary>Millimeter rulers pinned along the top and left edges. All mapping goes
+    /// <summary>Centimeter-labeled rulers pinned along the top and left edges. All mapping goes
     /// through dpmm (x = origin + mm * dpmm * scale) so a density change re-scales the
     /// ruler, never the other way around. The white band marks the label's extent and
     /// the thin accent lines mirror the pointer.</summary>
@@ -2168,7 +2169,7 @@ public sealed partial class DesignerCanvas : Control
         var insert = new MenuItem
         {
             Header = "Insert guide at " +
-                mm.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " mm",
+                (mm / 10).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + " cm",
         };
         insert.Click += (_, _) => InsertGuide(doc, axis, mm);
         menu.Items.Add(insert);
@@ -2194,7 +2195,7 @@ public sealed partial class DesignerCanvas : Control
     {
         IList<int> guides = axis == GuideAxis.Vertical ? doc.VerticalGuides : doc.HorizontalGuides;
         var menu = new MenuFlyout();
-        var remove = new MenuItem { Header = "Remove guide at " + MmText(guides[index], doc) };
+        var remove = new MenuItem { Header = "Remove guide at " + CmText(guides[index], doc) };
         remove.Click += (_, _) =>
         {
             if (index < guides.Count)

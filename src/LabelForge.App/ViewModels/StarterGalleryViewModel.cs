@@ -24,7 +24,8 @@ public sealed partial class StarterCardViewModel : ViewModelBase
 
     public string Summary => Starter.Summary;
 
-    public string SizeText => Starter.SizeText;
+    public string SizeText => FormattableString.Invariant(
+        $"{Starter.WidthMm / 10:0.###} x {Starter.HeightMm / 10:0.###} cm");
 
     /// <summary>The rendered label, or null until the render finishes. Null is a real
     /// state rather than a failure: the pictures arrive one at a time so the window opens

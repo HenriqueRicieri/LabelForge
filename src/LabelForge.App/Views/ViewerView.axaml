@@ -37,15 +37,15 @@
                               VerticalAlignment="Center"
                               ToolTip.Tip="Read the label size from ^PW / ^LL in the ZPL" />
                     <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,12,4">
-                        <TextBlock Text="Width (mm)" VerticalAlignment="Center" />
-                        <NumericUpDown Value="{Binding WidthMm}" Minimum="5" Maximum="600"
-                                       Increment="1" FormatString="0.###" Width="110"
+                        <TextBlock Text="Width (cm)" VerticalAlignment="Center" />
+                        <NumericUpDown Value="{Binding WidthCm}" Minimum="0.5" Maximum="60"
+                                       Increment="0.1" FormatString="0.###" Width="110"
                                        IsEnabled="{Binding !AutoSize}" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,12,4">
-                        <TextBlock Text="Height (mm)" VerticalAlignment="Center" />
-                        <NumericUpDown Value="{Binding HeightMm}" Minimum="5" Maximum="1000"
-                                       Increment="1" FormatString="0.###" Width="110"
+                        <TextBlock Text="Height (cm)" VerticalAlignment="Center" />
+                        <NumericUpDown Value="{Binding HeightCm}" Minimum="0.5" Maximum="100"
+                                       Increment="0.1" FormatString="0.###" Width="110"
                                        IsEnabled="{Binding !AutoSize}" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,12,4">

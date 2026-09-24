@@ -40,9 +40,12 @@ internal static class UiLayoutChecks
                     Check("setup uses the active document", ReferenceEquals(setupWindow.DataContext, d));
                     Check("setup fits its owner", setupWindow.Width <= window.Width && setupWindow.Height <= window.Height);
                     var width = setupWindow.FindControl<NumericUpDown>("LabelWidthInput")!;
-                    width.Value = 110;
+                    width.Value = 10;
+                    Pump(30);
+                    width.Value = 11;
                     Pump(60);
-                    Check("setup width edits the document", d.WidthMm == 110);
+                    Check("setup width accepts centimeters", d.WidthMm == 110);
+                    Check("setup width displays centimeters", width.Value == 11);
                     Check("media picker remains available", setupWindow.FindControl<AutoCompleteBox>("MediaBox") is not null);
                     if (size.Item1 >= 1024)
                     {
@@ -260,10 +263,12 @@ internal static class UiLayoutChecks
             Check("double-click focuses the content editor",
                 view.FindControl<ContentControl>("PropertiesContent")!.GetVisualDescendants()
                     .OfType<AutoCompleteBox>().Any(b => b.IsKeyboardFocusWithin));
-            view.FindControl<NumericUpDown>("PositionXInput")!.Value = 175;
-            view.FindControl<NumericUpDown>("PositionYInput")!.Value = 165;
+            Check("position defaults to centimeters", d.SelectionProperties!.UnitSuffix == "cm");
+            view.FindControl<NumericUpDown>("PositionXInput")!.Value = 2.5m;
+            view.FindControl<NumericUpDown>("PositionYInput")!.Value = 2m;
             Pump(100);
-            Check("Properties edits element position", text.X == 175 && text.Y == 165);
+            Check("Properties accepts centimeter positions", text.X == 200 && text.Y == 160);
+            Check("canvas readout uses centimeters", d.CanvasReadout.Contains("cm"));
             string original = d.SerializeDocument();
             bool undo = d.CanUndo;
             var splitter = view.FindControl<GridSplitter>("InspectorSplitter")!;

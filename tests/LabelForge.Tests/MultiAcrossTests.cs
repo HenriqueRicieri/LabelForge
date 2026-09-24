@@ -279,9 +279,8 @@ public sealed class MultiAcrossTests
 
         Assert.Empty(printer.Validate(narrow));
         Assert.Contains(
-            printer.Validate(web),
-            w => w.Contains("Web width", StringComparison.Ordinal)
-                 && w.Contains("3 across", StringComparison.Ordinal));
+            "Web width 12.6 cm (3 across) exceeds the print head (10.4 cm)",
+            printer.Validate(web));
     }
 
     // ---- and where the ink actually lands ----

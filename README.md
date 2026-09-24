@@ -30,7 +30,8 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   Narrow windows open it over the canvas.
   Label setup puts media search above side-by-side size, roll layout and printer settings
   at desktop widths. On narrow windows these sections stack and scroll. Changes apply
-  as you edit. Generated ZPL and diagnostic details have their own
+  as you edit. Enter measured label dimensions, margins and web gaps in centimeters.
+  Generated ZPL and diagnostic details have their own
   bounded areas, and double-clicking an element opens the same selected-field editor.
 - In the ZPL Viewer, size and density settings wrap at narrow widths while Open and
   Print stay reachable. The source and preview panes have clear headings, and preview
@@ -88,7 +89,7 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   A rotation deliberately does not do this, since turning something does not take it anywhere.
 - The canvas says what is under the pointer before you commit to it: a thin outline on whatever a
   click would take, and below the canvas beside the zoom control, the pointer position in
-  millimeters and dots beside the drawn width and height of the selection. Those are the bounds the
+  centimeters beside the drawn width and height of the selection. Those are the bounds the
   canvas outlines, which is the only answer defined for every element type, so they can read
   differently from the properties panel's X and Y for a barcode that prints digits outside its bars
   or for a field placed by its own baseline. Both numbers are right, and they are answering
@@ -124,16 +125,16 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   rotation handle. Ctrl + R turns a supported element by a quarter turn at its stored origin.
   Resize handles hide when both selection dimensions are under about two dozen screen pixels;
   a long thin line keeps its handles.
-- A drafting-table workspace: millimeter rulers pinned top and left (tick steps adapt to zoom, all
+- A drafting-table workspace: centimeter rulers pinned top and left (tick steps adapt to zoom, all
   conversion through the label density), and a pasteboard around the label where elements can be
   parked. Off-label content stays visible, dimmed, with an amber outline and a clear warning; at
   print time content crossing the edge is clipped like the printer would, and elements whose origin
   is off the label are skipped from the generated ZPL.
-- While dragging, pink guides show the nearest gaps in millimeters. Snap between two
+- While dragging, pink guides show the nearest gaps in centimeters. Snap between two
   fields for equal gaps, or repeat their spacing at either end. This follows Snap to
   objects; hold Alt during the drag to move freely while keeping the measurements.
   Groups and multiple selections use their combined bounds.
-- Alignment guides: hold the mouse on a ruler for a transient guide with a live mm readout, double
+- Alignment guides: hold the mouse on a ruler for a transient guide with a live cm readout, double
   click (or right-click menu) for a permanent one. Guides drag to reposition, drop back on the
   ruler to delete, save with the document, and participate in undo.
 - Snapping while dragging and resizing: to guides, label edges and center, and the edges and
@@ -148,7 +149,7 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   them, Same Width, Same Height and Same Size copy from the element picked last, resizing through
   the same clamps a handle drag obeys and saying how many elements could only land on a step, as a
   barcode does.
-- An optional design grid (View > Grid) at 1, 2, 2.5, 5 or 10 mm. Drags and resizes snap to
+- An optional design grid (View > Grid) at 0.1, 0.2, 0.25, 0.5 or 1 cm. Drags and resizes snap to
   it alongside the guides, edges and other elements, by proximity rather than as a cage, and
   Alt still drags free of everything. With grid snapping enabled, arrow keys move by
   one grid step and Shift by ten. Alt uses one dot, or ten with Shift. Saved with the
@@ -171,7 +172,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   guaranteed to save and reopen correctly. Related edits coalesce into one step by identity.
 - Element types: text, linear barcode (Code 128, Code 39, EAN-13, UPC-A, Interleaved 2 of 5 and so
   ITF-14), QR code, Data Matrix, PDF417, image, line, box, ellipse, diagonal line, with a per-type
-  properties panel and positions and sizes typed in dots or millimeters. Barcode data is validated
+  properties panel and measured positions and dimensions typed in centimeters by default.
+  The Use printer dots switch shows exact dot values when needed; switching units keeps the
+  physical size. Barcode data is validated
   against its symbology with a clear warning when it cannot be encoded. A PDF417 states the shape
   its settings produce, and says so when the column count is left automatic, because that hands the
   shape to the printer.

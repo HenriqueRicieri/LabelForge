@@ -204,11 +204,11 @@ public sealed class UserMediaTests : IDisposable
     public void UserMedia_SaysSoInThePicker_SoItIsNotMistakenForAZebraPartNumber()
     {
         Assert.Equal(
-            "Etiqueta 50 x 30 - Couche (50mm x 30mm) - my media",
+            "Etiqueta 50 x 30 - Couche (5 x 3 cm) - my media",
             StockMedia.UserDefined("Etiqueta 50 x 30", 50, 30, "Couche").ToString());
 
         Assert.Equal(
-            "Sem material (50mm x 30mm) - my media",
+            "Sem material (5 x 3 cm) - my media",
             StockMedia.UserDefined("Sem material", 50, 30).ToString());
     }
 
@@ -227,6 +227,8 @@ public sealed class UserMediaTests : IDisposable
         // The same rule the Zebra catalog is searched with, so one box serves both.
         Assert.True(StockCatalog.IsMatch(media, "filial"));
         Assert.True(StockCatalog.IsMatch(media, "couche 50.8"));
+        Assert.True(StockCatalog.IsMatch(media, "couche 5.08"));
+        Assert.True(StockCatalog.IsMatch(media, "couche 5,08"));
         Assert.False(StockCatalog.IsMatch(media, "filial bopp"));
         Assert.False(StockCatalog.IsMatch(media, ""));
     }
