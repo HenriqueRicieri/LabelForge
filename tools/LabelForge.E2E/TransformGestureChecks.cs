@@ -194,6 +194,62 @@ internal static class TransformGestureChecks
                 text.Orientation == Orientation.Normal &&
                 new ElementBoundsCalculator().GetBounds(text) == secondStart &&
                 designer.CanUndo == couldUndo);
+
+            var lineDocument = new LabelDocument { WidthMm = 100, HeightMm = 80, Dpmm = 8,
+                CheckQuietZones = false };
+            designer.LoadDocument(lineDocument, path: null);
+            canvas.ResetView();
+            canvas.SetZoom(0.5);
+            Pump(300);
+            designer.AddLineCommand.Execute(null);
+            window.MouseDown(At(200, 240), MouseButton.Left);
+            window.MouseUp(At(200, 240), MouseButton.Left);
+            Pump(700);
+            var line = designer.Document.Elements.OfType<LineElement>().Single();
+            DotRect lineStart = new ElementBoundsCalculator().GetBounds(line);
+            Point lineTop = At(lineStart.X + lineStart.Width / 2.0, lineStart.Y);
+            Point lineCenter = At(lineStart.X + lineStart.Width / 2.0,
+                lineStart.Y + lineStart.Height / 2.0);
+            Point lineHandle = new(lineTop.X, lineTop.Y - 26);
+            Point lineQuarter = new(lineCenter.X + lineCenter.Y - lineHandle.Y,
+                lineCenter.Y);
+            window.MouseDown(lineHandle, MouseButton.Left);
+            window.MouseMove(lineQuarter, RawInputModifiers.LeftMouseButton);
+            window.MouseUp(lineQuarter, MouseButton.Left);
+            Pump(700);
+            DotRect lineBeforeDeselect = new ElementBoundsCalculator().GetBounds(line);
+            string documentBeforeDeselect = designer.SerializeDocument();
+            string zplBeforeDeselect = designer.GeneratedZpl;
+            bool couldUndoBeforeDeselect = designer.CanUndo;
+            window.MouseDown(At(500, 500), MouseButton.Left);
+            window.MouseUp(At(500, 500), MouseButton.Left);
+            Pump(700);
+            check("Line rotation stays put after clicking empty canvas",
+                line.IsVertical && designer.Selection.Primary is null &&
+                new ElementBoundsCalculator().GetBounds(line) == lineBeforeDeselect &&
+                designer.SerializeDocument() == documentBeforeDeselect &&
+                designer.GeneratedZpl == zplBeforeDeselect &&
+                designer.CanUndo == couldUndoBeforeDeselect);
+
+            var textDocument = new LabelDocument { WidthMm = 100, HeightMm = 80, Dpmm = 8,
+                CheckQuietZones = false };
+            var styledText = new TextElement { X = 200, Y = 240, Text = "Stable",
+                Orientation = Orientation.Rotated90, Anchor = FieldAnchor.Baseline,
+                Font = 'A', FontHeightDots = 36 };
+            textDocument.Elements.Add(styledText);
+            designer.LoadDocument(textDocument, path: null);
+            designer.Selection.Set(styledText);
+            canvas.ResetView();
+            canvas.SetZoom(0.5);
+            Pump(700);
+            string styledBeforeDeselect = designer.SerializeDocument();
+            window.MouseDown(At(500, 500), MouseButton.Left);
+            window.MouseUp(At(500, 500), MouseButton.Left);
+            Pump(700);
+            check("Deselecting text preserves rotation anchor and font",
+                styledText.Orientation == Orientation.Rotated90 &&
+                styledText.Anchor == FieldAnchor.Baseline && styledText.Font == 'A' &&
+                designer.SerializeDocument() == styledBeforeDeselect);
         }
         finally
         {

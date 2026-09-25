@@ -214,9 +214,12 @@ public abstract class ElementPropertiesViewModel : ObservableObject
         get => Orientations.First(o => o.Value == FieldRotation.Get(Element));
         set
         {
+            // Clearing selection clears the ComboBox. That is not a request to
+            // rotate the old field back to its default direction.
+            if (value is null) return;
             Edit(
                 FieldRotation.Get(Element),
-                value?.Value ?? Orientation.Normal,
+                value.Value,
                 v => FieldRotation.Set(Element, v));
 
             // The one panel edit that changes another control on the same panel: a
@@ -242,11 +245,15 @@ public abstract class ElementPropertiesViewModel : ObservableObject
     public AnchorOption SelectedAnchor
     {
         get => Anchors.First(a => a.Value == Element.Anchor);
-        set => Edit(Element.Anchor, value?.Value ?? FieldAnchor.TopLeft, v =>
+        set
         {
-            Element.Anchor = v;
-            OnPropertyChanged(nameof(AnchorHint));
-        });
+            if (value is null) return;
+            Edit(Element.Anchor, value.Value, v =>
+            {
+                Element.Anchor = v;
+                OnPropertyChanged(nameof(AnchorHint));
+            });
+        }
     }
 
     public string AnchorHint => Element.Anchor == FieldAnchor.Baseline
@@ -318,26 +325,30 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
     public FontOption SelectedFont
     {
         get => Fonts.FirstOrDefault(f => f.Value == char.ToUpperInvariant(_text.Font)) ?? Fonts[0];
-        set => Edit(_text.Font, value?.Value ?? ZplFont.Scalable, v =>
+        set
         {
-            _text.Font = v;
-
-            // A bitmapped font only prints whole multiples of its cell, so landing on one
-            // is not a preference: an in-between size is a size the printer will not use.
-            if (ZplFont.Cell(v, Document.Dpmm) is { } cell)
+            if (value is null) return;
+            Edit(_text.Font, value.Value, v =>
             {
-                int magnification = ZplFont.Magnification(
-                    v, _text.FontHeightDots, vertical: true, Document.Dpmm);
-                _text.FontHeightDots = cell.HeightDots * magnification;
-                _text.FontWidthDots = cell.WidthDots * magnification;
-            }
+                _text.Font = v;
 
-            OnPropertyChanged(nameof(FontHeight));
-            OnPropertyChanged(nameof(FontWidth));
-            OnPropertyChanged(nameof(IsScalableFont));
-            OnPropertyChanged(nameof(Magnification));
-            OnPropertyChanged(nameof(FontNote));
-        });
+                // A bitmapped font only prints whole multiples of its cell, so landing on one
+                // is not a preference: an in-between size is a size the printer will not use.
+                if (ZplFont.Cell(v, Document.Dpmm) is { } cell)
+                {
+                    int magnification = ZplFont.Magnification(
+                        v, _text.FontHeightDots, vertical: true, Document.Dpmm);
+                    _text.FontHeightDots = cell.HeightDots * magnification;
+                    _text.FontWidthDots = cell.WidthDots * magnification;
+                }
+
+                OnPropertyChanged(nameof(FontHeight));
+                OnPropertyChanged(nameof(FontWidth));
+                OnPropertyChanged(nameof(IsScalableFont));
+                OnPropertyChanged(nameof(Magnification));
+                OnPropertyChanged(nameof(FontNote));
+            });
+        }
     }
 
     /// <summary>Drives which size editor the panel shows: free dots for the scalable
