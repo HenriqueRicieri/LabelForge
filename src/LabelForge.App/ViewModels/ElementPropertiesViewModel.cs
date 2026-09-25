@@ -247,11 +247,8 @@ public abstract class ElementPropertiesViewModel : ObservableObject
         set
         {
             if (value is null) return;
-            Edit(Element.Anchor, value.Value, v =>
-            {
-                Element.Anchor = v;
-                OnPropertyChanged(nameof(AnchorHint));
-            });
+            Edit(Element.Anchor, value.Value, v => AnchorPlacement.Set(Element, v));
+            Refresh();
         }
     }
 

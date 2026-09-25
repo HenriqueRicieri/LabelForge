@@ -93,7 +93,8 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   canvas outlines, which is the only answer defined for every element type, so they can read
   differently from the properties panel's X and Y for a barcode that prints digits outside its bars
   or for a field placed by its own baseline. Both numbers are right, and they are answering
-  different questions.
+  different questions. Changing the placement anchor between top-left and baseline updates X/Y
+  while keeping the drawn field in place; switching back restores the original coordinates.
 - Reaching an element without the mouse: Tab steps down the stacking order and Shift + Tab back up,
   both wrapping, which is the point on a label carrying sixty fields. Ctrl + A takes everything
   visible. Double-clicking an element puts the caret in its content field with the text selected,

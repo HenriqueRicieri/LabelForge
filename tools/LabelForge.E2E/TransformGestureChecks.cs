@@ -306,6 +306,24 @@ internal static class TransformGestureChecks
             check("Panel rotation keeps a baseline text field centered",
                 baselineText.Orientation == Orientation.Rotated90 &&
                 SameCenter(baselineStart, new ElementBoundsCalculator().GetBounds(baselineText)));
+
+            DotRect anchorStart = new ElementBoundsCalculator().GetBounds(baselineText);
+            int anchoredX = baselineText.X;
+            int anchoredY = baselineText.Y;
+            if (designer.SelectionProperties is TextPropertiesViewModel anchorPanel)
+                anchorPanel.SelectedAnchor = anchorPanel.Anchors[0];
+            Pump(300);
+            check("Switching text anchor keeps its drawn bounds",
+                baselineText.Anchor == FieldAnchor.TopLeft &&
+                new ElementBoundsCalculator().GetBounds(baselineText) == anchorStart);
+
+            if (designer.SelectionProperties is TextPropertiesViewModel returnPanel)
+                returnPanel.SelectedAnchor = returnPanel.Anchors[1];
+            Pump(300);
+            check("Switching text anchor back restores its position",
+                baselineText.Anchor == FieldAnchor.Baseline &&
+                baselineText.X == anchoredX && baselineText.Y == anchoredY &&
+                new ElementBoundsCalculator().GetBounds(baselineText) == anchorStart);
         }
         finally
         {
