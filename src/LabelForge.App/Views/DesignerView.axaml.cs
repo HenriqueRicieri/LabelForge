@@ -27,6 +27,8 @@ public partial class DesignerView : UserControl
         InitializeWorkspace();
         InitializeOutlineDrag();
         QuickContentEditor.AddHandler(KeyDownEvent, OnQuickContentKeyDown, RoutingStrategies.Tunnel);
+        PositionXInput.LostFocus += (_, _) => NormalizePositionInput(PositionXInput, horizontal: true);
+        PositionYInput.LostFocus += (_, _) => NormalizePositionInput(PositionYInput, horizontal: false);
 
         // The recent-files submenu is rebuilt in code: a handful of items, and it
         // sidesteps binding ancestor lookups inside menu popups.
@@ -78,6 +80,18 @@ public partial class DesignerView : UserControl
         CanvasVScroll.ValueChanged += (_, _) => OnScrollBarChanged();
         ZoomOutButton.Click += (_, _) => Canvas.ZoomBy(1 / 1.25);
         ZoomInButton.Click += (_, _) => Canvas.ZoomBy(1.25);
+    }
+
+    private void NormalizePositionInput(NumericUpDown input, bool horizontal)
+    {
+        // The binding keeps a typed value if it rounds to the dot already stored.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (ViewModel?.SelectionProperties is not { } properties) return;
+            decimal stored = horizontal ? properties.X : properties.Y;
+            if (input.Value != stored)
+                input.SetCurrentValue(NumericUpDown.ValueProperty, stored);
+        }, DispatcherPriority.Background);
     }
 
     /// <summary>

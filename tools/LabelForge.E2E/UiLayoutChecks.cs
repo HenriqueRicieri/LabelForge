@@ -264,10 +264,25 @@ internal static class UiLayoutChecks
                 view.FindControl<ContentControl>("PropertiesContent")!.GetVisualDescendants()
                     .OfType<AutoCompleteBox>().Any(b => b.IsKeyboardFocusWithin));
             Check("position defaults to centimeters", d.SelectionProperties!.UnitSuffix == "cm");
-            view.FindControl<NumericUpDown>("PositionXInput")!.Value = 2.5m;
-            view.FindControl<NumericUpDown>("PositionYInput")!.Value = 2m;
+            var positionX = view.FindControl<NumericUpDown>("PositionXInput")!;
+            var positionY = view.FindControl<NumericUpDown>("PositionYInput")!;
+            positionX.SetCurrentValue(NumericUpDown.ValueProperty, 2.5m);
+            positionY.SetCurrentValue(NumericUpDown.ValueProperty, 2m);
             Pump(100);
             Check("Properties accepts centimeter positions", text.X == 200 && text.Y == 160);
+            var xEditor = positionX.GetVisualDescendants().OfType<TextBox>().First();
+            var yEditor = positionY.GetVisualDescendants().OfType<TextBox>().First();
+            xEditor.Focus();
+            positionX.SetCurrentValue(NumericUpDown.ValueProperty, 2.501m);
+            yEditor.Focus();
+            Pump(100);
+            Check("Position shows the stored centimeter value after dot rounding",
+                text.X == 200 && positionX.Value == 2.5m);
+            positionY.SetCurrentValue(NumericUpDown.ValueProperty, 2.001m);
+            xEditor.Focus();
+            Pump(100);
+            Check("Y shows the stored centimeter value after dot rounding",
+                text.Y == 160 && positionY.Value == 2m);
             Check("canvas readout uses centimeters", d.CanvasReadout.Contains("cm"));
             string original = d.SerializeDocument();
             bool undo = d.CanUndo;
