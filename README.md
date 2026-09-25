@@ -75,8 +75,8 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   follows the height; the inspector shows that effective width and lets you turn automatic
   sizing off. For a single text field, top and bottom handles change font height, left and
   right handles change character width, and corners scale both proportionally. On rotated
-  text, a handle follows the visual axis under the pointer. A field block keeps its
-  separate wrapping width in Properties.
+  text, a handle follows the visual axis under the pointer. On a text block, horizontal
+  resizing also changes the wrapping width so the selected box follows the handle.
 - Resize several selected fields or a group with the outer selection handles. Corners
   scale proportionally, Shift frees the axes, and Ctrl scales around the centre.
   Barcode modules and other size limits can make the result differ from the dragged

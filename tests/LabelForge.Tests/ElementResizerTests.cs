@@ -107,6 +107,36 @@ public sealed class ElementResizerTests
     }
 
     [Fact]
+    public void TextBlockResizeKeepsItsSelectionWidthUnderTheHandle()
+    {
+        var text = new TextElement { Text = "WRAPPED WORDS", FontHeightDots = 40,
+            BlockWidthDots = 200, BlockMaxLines = 3 };
+        TextResizeStart start = ElementResizer.CaptureText(text);
+
+        ElementResizer.ResizeText(text, start, 300, start.BoundsHeightDots,
+            TextResizeMode.Width);
+        Assert.Equal((40, 60, 300),
+            (text.FontHeightDots, text.FontWidthDots, text.BlockWidthDots));
+        Assert.Equal(300, _bounds.GetLocalBounds(text).Width);
+        Assert.Equal(start.BoundsHeightDots, _bounds.GetLocalBounds(text).Height);
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots,
+            start.BoundsHeightDots * 2, TextResizeMode.Height);
+        Assert.Equal((80, 40, 200),
+            (text.FontHeightDots, text.FontWidthDots, text.BlockWidthDots));
+
+        ElementResizer.ResizeText(text, start, 300, start.BoundsHeightDots * 3 / 2,
+            TextResizeMode.Proportional);
+        Assert.Equal((60, 0, 300),
+            (text.FontHeightDots, text.FontWidthDots, text.BlockWidthDots));
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots,
+            start.BoundsHeightDots, TextResizeMode.Width);
+        Assert.Equal((40, 0, 200),
+            (text.FontHeightDots, text.FontWidthDots, text.BlockWidthDots));
+    }
+
+    [Fact]
     public void BitmapText_EdgesSnapToWholeCellMultiples()
     {
         var text = new TextElement { Text = "WIDE", Font = 'A', FontHeightDots = 27 };

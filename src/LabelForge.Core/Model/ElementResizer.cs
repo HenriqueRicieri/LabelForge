@@ -10,7 +10,7 @@ public enum TextResizeMode
 }
 
 public readonly record struct TextResizeStart(
-    int HeightDots, int WidthDots, int BoundsWidthDots, int BoundsHeightDots);
+    int HeightDots, int WidthDots, int BlockWidthDots, int BoundsWidthDots, int BoundsHeightDots);
 
 /// <summary>Maps a target footprint in dots onto each element's printable dimensions.</summary>
 public static class ElementResizer
@@ -28,7 +28,8 @@ public static class ElementResizer
     {
         ArgumentNullException.ThrowIfNull(text);
         DotRect bounds = Bounds.GetLocalBounds(text);
-        return new TextResizeStart(text.FontHeightDots, text.FontWidthDots, bounds.Width, bounds.Height);
+        return new TextResizeStart(text.FontHeightDots, text.FontWidthDots,
+            text.BlockWidthDots, bounds.Width, bounds.Height);
     }
 
     public static void ResizeText(TextElement text, TextResizeStart start,
@@ -45,6 +46,7 @@ public static class ElementResizer
         {
             text.FontHeightDots = start.HeightDots;
             text.FontWidthDots = start.WidthDots;
+            text.BlockWidthDots = start.BlockWidthDots;
             return;
         }
 
@@ -78,6 +80,18 @@ public static class ElementResizer
              mode == TextResizeMode.Free && height == start.HeightDots && width == initialWidth);
         text.FontHeightDots = height;
         text.FontWidthDots = keepAutomaticWidth ? 0 : width;
+        if (start.BlockWidthDots > 0)
+        {
+            int blockWidth = mode switch
+            {
+                TextResizeMode.Height => start.BlockWidthDots,
+                TextResizeMode.Proportional => Round(
+                    start.BlockWidthDots * (double)height / initialHeight),
+                _ => Round(start.BlockWidthDots * (double)targetWidth /
+                    Math.Max(start.BoundsWidthDots, 1)),
+            };
+            text.BlockWidthDots = Math.Clamp(blockWidth, 1, 9999);
+        }
     }
 
     private static int Round(double value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);

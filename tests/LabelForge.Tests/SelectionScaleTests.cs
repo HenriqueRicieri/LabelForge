@@ -55,6 +55,8 @@ public sealed class SelectionScaleTests
     {
         yield return [new TextElement { Text = "A", FontHeightDots = 31, FontWidthDots = 17 }];
         yield return [new TextElement { Text = "bitmap", Font = 'A', FontHeightDots = 18 }];
+        yield return [new TextElement { Text = "block text", FontHeightDots = 40,
+            BlockWidthDots = 150, BlockMaxLines = 3 }];
         yield return [new BarcodeElement { Data = "123456", ModuleWidthDots = 3, HeightDots = 83 }];
         yield return [new QrCodeElement { Data = "Scale", Magnification = 3 }];
         yield return [new DataMatrixElement { Data = "Scale", ModuleSizeDots = 3 }];
@@ -102,6 +104,25 @@ public sealed class SelectionScaleTests
 
         scaling.Apply(new ScaleFrame(b.X, b.Y, b.Width, b.Height), 0, 1, false);
         Assert.Equal((40, 0), (text.FontHeightDots, text.FontWidthDots));
+        Assert.False(scaling.HasChanged);
+    }
+
+    [Fact]
+    public void TextBlockInSelectionScalesItsWrappingWidthWithCharacterWidth()
+    {
+        var text = new TextElement { X = 100, Y = 100, Text = "Group block",
+            FontHeightDots = 40, BlockWidthDots = 200, BlockMaxLines = 3 };
+        var scaling = Start(text, new BoxElement { X = 400, Y = 200,
+            WidthDots = 40, HeightDots = 40 });
+        DotRect b = scaling.StartBounds;
+
+        scaling.Apply(new ScaleFrame(b.X, b.Y, b.Width * 1.5, b.Height), 1, 0, false);
+        Assert.Equal((40, 60, 300),
+            (text.FontHeightDots, text.FontWidthDots, text.BlockWidthDots));
+
+        scaling.Apply(new ScaleFrame(b.X, b.Y, b.Width, b.Height), 1, 0, false);
+        Assert.Equal((40, 0, 200),
+            (text.FontHeightDots, text.FontWidthDots, text.BlockWidthDots));
         Assert.False(scaling.HasChanged);
     }
 

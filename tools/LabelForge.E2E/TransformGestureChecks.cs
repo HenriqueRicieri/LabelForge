@@ -78,6 +78,17 @@ internal static class TransformGestureChecks
                 resizedText.FontHeightDots > 60 && resizedText.FontWidthDots == 0 &&
                 textAfter.Width > textBefore.Width && textAfter.Height > textBefore.Height);
 
+            resizedText = LoadText(blockWidthDots: 320);
+            textBefore = textBounds.GetBounds(resizedText);
+            DragTextHandle(
+                textBefore.X + textBefore.Width, textBefore.Y + textBefore.Height / 2.0,
+                textBefore.X + textBefore.Width + 40, textBefore.Y + textBefore.Height / 2.0);
+            textAfter = textBounds.GetBounds(resizedText);
+            check("Block text width handle follows the pointer without changing height",
+                resizedText.FontHeightDots == 60 && resizedText.FontWidthDots > 60 &&
+                resizedText.BlockWidthDots == 360 && textAfter.Width == 360 &&
+                textAfter.Height == textBefore.Height && textAfter.X == textBefore.X);
+
             resizedText = LoadText(Orientation.Rotated90);
             textBefore = textBounds.GetBounds(resizedText);
             DragTextHandle(textBefore.X + textBefore.Width / 2.0,
@@ -410,12 +421,12 @@ internal static class TransformGestureChecks
             Pump(150);
         }
 
-        TextElement LoadText(Orientation orientation = Orientation.Normal)
+        TextElement LoadText(Orientation orientation = Orientation.Normal, int blockWidthDots = 0)
         {
             var document = new LabelDocument { WidthMm = 100, HeightMm = 80, Dpmm = 8,
                 CheckQuietZones = false };
             var text = new TextElement { X = 200, Y = 160, Text = "Scale me",
-                FontHeightDots = 60, Orientation = orientation };
+                FontHeightDots = 60, Orientation = orientation, BlockWidthDots = blockWidthDots };
             document.Elements.Add(text);
             designer.LoadDocument(document, path: null);
             designer.Selection.Set(text);
