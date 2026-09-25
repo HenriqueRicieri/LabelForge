@@ -75,21 +75,34 @@
                            TextWrapping="Wrap" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Font height ({0})'}"
                            IsVisible="{Binding IsScalableFont}" />
-                <NumericUpDown Value="{Binding FontHeight}" Tag="{Binding FontHeight, Mode=OneWay}"
+                <NumericUpDown Name="FontHeightInput" Value="{Binding FontHeight}" Tag="{Binding FontHeight, Mode=OneWay}"
                                LostFocus="OnMeasuredInputLostFocus" Minimum="{Binding MinFontHeight}" Maximum="{Binding MaxFontSize}"
                                Increment="{Binding FineIncrement}" FormatString="{Binding PositionFormat}"
                                IsVisible="{Binding IsScalableFont}" />
-                <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Font width ({0})'}" ToolTip.Tip="0 lets the printer choose the width"
-                           IsVisible="{Binding IsScalableFont}" />
-                <NumericUpDown Value="{Binding FontWidth}" Tag="{Binding FontWidth, Mode=OneWay}"
-                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxFontSize}"
-                               Increment="{Binding FineIncrement}" FormatString="{Binding PositionFormat}"
-                               IsVisible="{Binding IsScalableFont}" />
-                <TextBlock Classes="propLabel" Text="Size (times the font's own cell)"
+                <TextBlock Classes="propLabel" Text="Height (times the font cell)"
                            IsVisible="{Binding !IsScalableFont}" />
-                <NumericUpDown Value="{Binding Magnification}" Minimum="1" Maximum="10"
-                               Increment="1" FormatString="0"
+                <NumericUpDown Name="BitmapHeightInput" Value="{Binding Magnification}"
+                               Tag="{Binding Magnification, Mode=OneWay}" LostFocus="OnMeasuredInputLostFocus"
+                               Minimum="1" Maximum="10" Increment="1" FormatString="0"
                                IsVisible="{Binding !IsScalableFont}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Classes="propLabel"
+                               Text="{Binding UnitSuffix, StringFormat='Character width ({0})'}"
+                               IsVisible="{Binding IsScalableFont}" />
+                    <TextBlock Grid.Column="0" Classes="propLabel" Text="Width (times the font cell)"
+                               IsVisible="{Binding !IsScalableFont}" />
+                    <CheckBox Grid.Column="1" Name="FontWidthAutoInput" Content="Auto"
+                              IsChecked="{Binding IsFontWidthAutomatic}"
+                              ToolTip.Tip="The printer derives character width from height when width is omitted from ^A." />
+                </Grid>
+                <NumericUpDown Name="FontWidthInput" Value="{Binding FontWidth}" Tag="{Binding FontWidth, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="{Binding MinFontWidth}" Maximum="{Binding MaxFontSize}"
+                               Increment="{Binding FineIncrement}" FormatString="{Binding PositionFormat}"
+                               IsVisible="{Binding IsScalableFont}" IsEnabled="{Binding !IsFontWidthAutomatic}" />
+                <NumericUpDown Name="BitmapWidthInput" Value="{Binding BitmapWidthMagnification}"
+                               Tag="{Binding BitmapWidthMagnification, Mode=OneWay}" LostFocus="OnMeasuredInputLostFocus"
+                               Minimum="1" Maximum="10" Increment="1" FormatString="0"
+                               IsVisible="{Binding !IsScalableFont}" IsEnabled="{Binding !IsFontWidthAutomatic}" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Block width ({0})'}" ToolTip.Tip="0 keeps the text on one line"
                            Margin="0,8,0,0" />
                 <NumericUpDown Value="{Binding BlockWidth}" Tag="{Binding BlockWidth, Mode=OneWay}"

@@ -84,6 +84,27 @@ public sealed class SelectionScaleTests
         Assert.False(scaling.HasChanged);
     }
 
+    [Fact]
+    public void TextInMultipleSelectionUsesTheDraggedAxisAndReturnsToAutomaticWidth()
+    {
+        var text = new TextElement { X = 100, Y = 100, Text = "Group", FontHeightDots = 40 };
+        var scaling = Start(text, new BoxElement { X = 300, Y = 200,
+            WidthDots = 40, HeightDots = 40 });
+        DotRect b = scaling.StartBounds;
+
+        scaling.Apply(new ScaleFrame(b.X, b.Y, b.Width * 1.5, b.Height), 1, 0, false);
+        Assert.Equal(40, text.FontHeightDots);
+        Assert.True(text.FontWidthDots > 40);
+
+        scaling.Apply(new ScaleFrame(b.X, b.Y, b.Width, b.Height * 1.5), 0, 1, false);
+        Assert.True(text.FontHeightDots > 40);
+        Assert.Equal(40, text.FontWidthDots);
+
+        scaling.Apply(new ScaleFrame(b.X, b.Y, b.Width, b.Height), 0, 1, false);
+        Assert.Equal((40, 0), (text.FontHeightDots, text.FontWidthDots));
+        Assert.False(scaling.HasChanged);
+    }
+
     [Theory]
     [InlineData(Orientation.Normal)]
     [InlineData(Orientation.Rotated90)]

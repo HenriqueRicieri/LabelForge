@@ -1,12 +1,18 @@
 ﻿namespace LabelForge.Core.Model;
 
-/// <summary>
-/// Maps a resize gesture (target footprint in dots) onto each element type's real
-/// degrees of freedom. Barcodes and QR codes are quantized: their width only changes
-/// in module steps, so the gesture snaps to the nearest valid module width or
-/// magnification instead of resizing freely (what you get is what prints).
-/// Rotated elements are resized using their unrotated footprint (approximation).
-/// </summary>
+/// <summary>Which text dimensions a resize handle controls.</summary>
+public enum TextResizeMode
+{
+    Height,
+    Width,
+    Proportional,
+    Free,
+}
+
+public readonly record struct TextResizeStart(
+    int HeightDots, int WidthDots, int BoundsWidthDots, int BoundsHeightDots);
+
+/// <summary>Maps a target footprint in dots onto each element's printable dimensions.</summary>
 public static class ElementResizer
 {
     /// <summary>Smallest side ^GE and ^GD accept.</summary>
@@ -17,6 +23,64 @@ public static class ElementResizer
     public const int MaxEllipseSideDots = 4095;
 
     private static readonly ElementBoundsCalculator Bounds = new();
+
+    public static TextResizeStart CaptureText(TextElement text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        DotRect bounds = Bounds.GetLocalBounds(text);
+        return new TextResizeStart(text.FontHeightDots, text.FontWidthDots, bounds.Width, bounds.Height);
+    }
+
+    public static void ResizeText(TextElement text, TextResizeStart start,
+        int targetWidth, int targetHeight, TextResizeMode mode, int dpmm = 8)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        int initialHeight = Math.Max(start.HeightDots, 1);
+        int initialWidth = start.WidthDots > 0 ? start.WidthDots :
+            ZplFont.Cell(text.Font, dpmm) is { } cell
+                ? cell.WidthDots * ZplFont.Magnification(text.Font, initialHeight, vertical: true, dpmm)
+                : initialHeight;
+
+        if (targetWidth == start.BoundsWidthDots && targetHeight == start.BoundsHeightDots)
+        {
+            text.FontHeightDots = start.HeightDots;
+            text.FontWidthDots = start.WidthDots;
+            return;
+        }
+
+        int height = mode == TextResizeMode.Width
+            ? start.HeightDots
+            : Round(initialHeight * (double)targetHeight / Math.Max(start.BoundsHeightDots, 1));
+        int width = mode switch
+        {
+            TextResizeMode.Height => initialWidth,
+            TextResizeMode.Proportional => Round(initialWidth * (double)height / initialHeight),
+            _ => Round(initialWidth * (double)targetWidth / Math.Max(start.BoundsWidthDots, 1)),
+        };
+
+        if (ZplFont.Cell(text.Font, dpmm) is { } bitmap)
+        {
+            height = Math.Clamp(Round((double)height / bitmap.HeightDots), 1,
+                ZplFont.MaxMagnification) * bitmap.HeightDots;
+            width = Math.Clamp(Round((double)width / bitmap.WidthDots), 1,
+                ZplFont.MaxMagnification) * bitmap.WidthDots;
+        }
+        else
+        {
+            height = Math.Clamp(height, 10, 32_000);
+            width = Math.Clamp(width, 10, 32_000);
+        }
+
+        bool keepAutomaticWidth = start.WidthDots == 0 &&
+            (mode == TextResizeMode.Proportional ||
+             mode == TextResizeMode.Width && width == initialWidth ||
+             mode == TextResizeMode.Height && height == start.HeightDots ||
+             mode == TextResizeMode.Free && height == start.HeightDots && width == initialWidth);
+        text.FontHeightDots = height;
+        text.FontWidthDots = keepAutomaticWidth ? 0 : width;
+    }
+
+    private static int Round(double value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);
 
     public static void Resize(Element element, int targetWidth, int targetHeight)
     {
@@ -47,16 +111,8 @@ public static class ElementResizer
                 break;
 
             case TextElement text:
-                // Font 0 scales freely by height; width stays derived (0) unless the
-                // user had set an explicit width, which then scales proportionally.
-                int newHeight = Math.Max(targetHeight, 6);
-                if (text.FontWidthDots > 0 && text.FontHeightDots > 0)
-                {
-                    text.FontWidthDots = Math.Max(
-                        (int)Math.Round((double)text.FontWidthDots * newHeight / text.FontHeightDots), 1);
-                }
-
-                text.FontHeightDots = newHeight;
+                ResizeText(text, CaptureText(text), targetWidth, targetHeight,
+                    TextResizeMode.Proportional);
                 break;
 
             case BarcodeElement barcode:

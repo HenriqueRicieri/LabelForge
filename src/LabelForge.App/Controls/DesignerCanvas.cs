@@ -241,6 +241,7 @@ public sealed partial class DesignerCanvas : Control
     private SelectionScale? _selectionScale;
     private ResizeHandle _activeHandle;
     private DotRect _resizeStartBounds;
+    private TextResizeStart? _textResizeStart;
     private int _resizeStartX;
     private int _resizeStartY;
     private int _candidateWidth;
@@ -1559,6 +1560,8 @@ public sealed partial class DesignerCanvas : Control
                 _selectionScale = SelectionScale.Start(doc, selection.Items);
                 IReadOnlyList<Element> resizing = _selectionScale?.Elements ?? [primary];
                 _resizeStartBounds = _selectionScale?.StartBounds ?? _bounds.GetBounds(primary);
+                _textResizeStart = primary is TextElement text && _selectionScale is null
+                    ? ElementResizer.CaptureText(text) : null;
                 _resizeStartX = primary.X;
                 _resizeStartY = primary.Y;
                 BuildSnapTargets(doc, resizing.ToHashSet());
@@ -1963,6 +1966,7 @@ public sealed partial class DesignerCanvas : Control
         _spacingGaps = [];
         _spacingNeighbours.Clear();
         _selectionScale = null;
+        _textResizeStart = null;
         _rotating = false;
         _drawArmed = false;
         _drawing = false;
@@ -2457,7 +2461,8 @@ public sealed partial class DesignerCanvas : Control
 
             _candidateWidth = Math.Max((int)Math.Round(_gestureW), 4);
             _candidateHeight = Math.Max((int)Math.Round(_gestureH), 4);
-            ApplyCandidateResize(modifiers.HasFlag(KeyModifiers.Control));
+            ApplyCandidateResize(modifiers.HasFlag(KeyModifiers.Control),
+                modifiers.HasFlag(KeyModifiers.Shift));
         }
         else
         {
@@ -3063,12 +3068,12 @@ public sealed partial class DesignerCanvas : Control
 
     /// <summary>Applies the resize gesture to the model. Targets derive from the start
     /// bounds plus the pointer delta, so repeated application is idempotent.</summary>
-    private void ApplyCandidateResize(bool aboutCenter)
+    private void ApplyCandidateResize(bool aboutCenter, bool freeCorner)
     {
         if (_selectionScale is { } scaling)
         {
             scaling.Apply(new ScaleFrame(_gestureX, _gestureY, _gestureW, _gestureH),
-                ResizeDirectionX, ResizeDirectionY, aboutCenter);
+                ResizeDirectionX, ResizeDirectionY, aboutCenter, freeCorner);
             return;
         }
         if (Selection?.Primary is not { } primary)
@@ -3087,7 +3092,23 @@ public sealed partial class DesignerCanvas : Control
         (int w, int h) = primary.Orientation is Orientation.Rotated90 or Orientation.Rotated270
             ? (_candidateHeight, _candidateWidth)
             : (_candidateWidth, _candidateHeight);
-        ElementResizer.Resize(primary, w, h);
+        if (primary is TextElement text && _textResizeStart is { } start)
+        {
+            bool turned = primary.Orientation is Orientation.Rotated90 or Orientation.Rotated270;
+            TextResizeMode mode = _activeHandle switch
+            {
+                ResizeHandle.Left or ResizeHandle.Right =>
+                    turned ? TextResizeMode.Height : TextResizeMode.Width,
+                ResizeHandle.Top or ResizeHandle.Bottom =>
+                    turned ? TextResizeMode.Width : TextResizeMode.Height,
+                _ => freeCorner ? TextResizeMode.Free : TextResizeMode.Proportional,
+            };
+            ElementResizer.ResizeText(text, start, w, h, mode, Document?.Dpmm ?? 8);
+        }
+        else
+        {
+            ElementResizer.Resize(primary, w, h);
+        }
         RepositionToGesture(aboutCenter);
     }
 
@@ -3260,9 +3281,8 @@ public sealed partial class DesignerCanvas : Control
         // A duplicating drag changed the document the moment it made the copies, so it
         // records a step whether or not the pointer ended up anywhere new.
         bool changed = wasResizing
-            ? _selectionScale?.HasChanged ?? (_candidateWidth != _resizeStartBounds.Width ||
-              _candidateHeight != _resizeStartBounds.Height ||
-              Selection?.Primary is { } r && (r.X != _resizeStartX || r.Y != _resizeStartY))
+            ? _selectionScale?.HasChanged ?? (_gestureBefore is not null &&
+              Selection?.Primary is { } r && ElementSnapshot.Capture([r]) != _gestureBefore)
             : _duplicated || _dragDx != 0 || _dragDy != 0;
 
         EndGestureState(changed);

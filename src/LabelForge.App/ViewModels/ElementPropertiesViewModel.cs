@@ -164,9 +164,10 @@ public abstract class ElementPropertiesViewModel : ObservableObject
         : decimal.Round(1m / (_document.Dpmm * 10m), 3);
 
     public decimal MinOneDot => FromDots(1);
-    public decimal MinFontHeight => FromDots(6);
+    public decimal MinFontHeight => FromDots(Element is TextElement text
+        ? Math.Min(text.FontHeightDots, 10) : 10);
     public decimal MinBarcodeHeight => FromDots(10);
-    public decimal MaxFontSize => FromDots(600);
+    public decimal MaxFontSize => FromDots(32_000);
     public decimal MaxBlockWidth => FromDots(9999);
     public decimal MaxBarcodeHeight => FromDots(2000);
     public decimal MaxThickness => FromDots(200);
@@ -340,6 +341,10 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
 
                 OnPropertyChanged(nameof(FontHeight));
                 OnPropertyChanged(nameof(FontWidth));
+                OnPropertyChanged(nameof(IsFontWidthAutomatic));
+                OnPropertyChanged(nameof(MinFontHeight));
+                OnPropertyChanged(nameof(MinFontWidth));
+                OnPropertyChanged(nameof(BitmapWidthMagnification));
                 OnPropertyChanged(nameof(IsScalableFont));
                 OnPropertyChanged(nameof(Magnification));
                 OnPropertyChanged(nameof(FontNote));
@@ -351,7 +356,7 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
     /// font, whole multiples of the cell for a bitmapped one.</summary>
     public bool IsScalableFont => ZplFont.IsScalable(char.ToUpperInvariant(_text.Font));
 
-    /// <summary>The bitmapped size, as the multiple of the cell the printer will use.</summary>
+    /// <summary>The bitmap font height as a whole multiple of its native cell.</summary>
     public decimal Magnification
     {
         get => ZplFont.Magnification(_text.Font, _text.FontHeightDots, vertical: true, Document.Dpmm);
@@ -366,11 +371,36 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
             Edit(_text.FontHeightDots, cell.HeightDots * times, v =>
             {
                 _text.FontHeightDots = v;
-                _text.FontWidthDots = cell.WidthDots * times;
                 OnPropertyChanged(nameof(FontHeight));
-                OnPropertyChanged(nameof(FontWidth));
-                OnPropertyChanged(nameof(FontNote));
+                OnPropertyChanged(nameof(MinFontHeight));
+                if (IsFontWidthAutomatic)
+                {
+                    OnPropertyChanged(nameof(FontWidth));
+                    OnPropertyChanged(nameof(BitmapWidthMagnification));
+                }
             });
+        }
+    }
+
+    public decimal BitmapWidthMagnification
+    {
+        get
+        {
+            if (ZplFont.Cell(_text.Font, Document.Dpmm) is not { } cell) return 1;
+            int width = _text.FontWidthDots > 0
+                ? _text.FontWidthDots
+                : cell.WidthDots * ZplFont.Magnification(
+                    _text.Font, _text.FontHeightDots, vertical: true, Document.Dpmm);
+            return ZplFont.Magnification(_text.Font, width, vertical: false, Document.Dpmm);
+        }
+        set
+        {
+            if (ZplFont.Cell(_text.Font, Document.Dpmm) is not { } cell) return;
+            int times = Math.Clamp((int)value, 1, ZplFont.MaxMagnification);
+            Edit(_text.FontWidthDots, cell.WidthDots * times, v => _text.FontWidthDots = v);
+            OnPropertyChanged(nameof(IsFontWidthAutomatic));
+            OnPropertyChanged(nameof(FontWidth));
+            OnPropertyChanged(nameof(MinFontWidth));
         }
     }
 
@@ -384,7 +414,7 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
             char font = char.ToUpperInvariant(_text.Font);
             if (ZplFont.Cell(font, Document.Dpmm) is not { } cell)
             {
-                return $"Scalable: any height and width in {UnitSuffix}.";
+                return "Smooth font 0 scales one printer dot at a time. Automatic width follows height.";
             }
 
             string size = $"Fixed pitch, {cell.HeightDots} x {cell.WidthDots} dots per "
@@ -396,17 +426,55 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
         }
     }
 
+    public decimal MinFontWidth => FromDots(Math.Min(
+        _text.FontWidthDots > 0 ? _text.FontWidthDots : _text.FontHeightDots, 10));
+
     public decimal FontHeight
     {
         get => FromDots(_text.FontHeightDots);
-        set => Edit(_text.FontHeightDots, Math.Max(ToDots(value), 6), v => _text.FontHeightDots = v);
+        set => Edit(_text.FontHeightDots, Math.Max(ToDots(value), 10), v =>
+        {
+            _text.FontHeightDots = v;
+            OnPropertyChanged(nameof(MinFontHeight));
+            if (IsFontWidthAutomatic)
+            {
+                OnPropertyChanged(nameof(FontWidth));
+                OnPropertyChanged(nameof(MinFontWidth));
+            }
+        });
     }
 
-    /// <summary>0 lets the printer derive the width from the height.</summary>
+    /// <summary>The panel shows the effective width, including when ^A0 omits it.</summary>
     public decimal FontWidth
     {
-        get => FromDots(_text.FontWidthDots);
-        set => Edit(_text.FontWidthDots, Math.Max(ToDots(value), 0), v => _text.FontWidthDots = v);
+        get => FromDots(_text.FontWidthDots > 0 ? _text.FontWidthDots : _text.FontHeightDots);
+        set
+        {
+            Edit(_text.FontWidthDots, Math.Max(ToDots(value), 10), v => _text.FontWidthDots = v);
+            OnPropertyChanged(nameof(IsFontWidthAutomatic));
+            OnPropertyChanged(nameof(MinFontWidth));
+        }
+    }
+
+    public bool IsFontWidthAutomatic
+    {
+        get => _text.FontWidthDots == 0;
+        set
+        {
+            if (value == IsFontWidthAutomatic) return;
+            int width = 0;
+            if (!value)
+            {
+                width = ZplFont.Cell(_text.Font, Document.Dpmm) is { } cell
+                    ? cell.WidthDots * ZplFont.Magnification(
+                        _text.Font, _text.FontHeightDots, vertical: true, Document.Dpmm)
+                    : Math.Max(_text.FontHeightDots, 10);
+            }
+            Edit(_text.FontWidthDots, width, v => _text.FontWidthDots = v);
+            OnPropertyChanged(nameof(FontWidth));
+            OnPropertyChanged(nameof(BitmapWidthMagnification));
+            OnPropertyChanged(nameof(MinFontWidth));
+        }
     }
 
     /// <summary>0 keeps the field a plain single line and emits no ^FB at all.</summary>

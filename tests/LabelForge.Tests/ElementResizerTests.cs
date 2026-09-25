@@ -1,4 +1,5 @@
 using LabelForge.Core.Model;
+using LabelForge.Core.Zpl;
 
 namespace LabelForge.Tests;
 
@@ -43,6 +44,81 @@ public sealed class ElementResizerTests
         ElementResizer.Resize(fixedWidth, 0, 80);
         Assert.Equal(80, fixedWidth.FontHeightDots);
         Assert.Equal(60, fixedWidth.FontWidthDots);
+    }
+
+    [Fact]
+    public void Text_EdgeHandles_ChangeOnlyTheirOwnFontDimension()
+    {
+        var text = new TextElement { Text = "WIDE", FontHeightDots = 40 };
+        TextResizeStart start = ElementResizer.CaptureText(text);
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots, 80, TextResizeMode.Height);
+        Assert.Equal(80, text.FontHeightDots);
+        Assert.Equal(40, text.FontWidthDots);
+        Assert.Equal(start.BoundsWidthDots, _bounds.GetLocalBounds(text).Width);
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots * 2,
+            start.BoundsHeightDots, TextResizeMode.Width);
+        Assert.Equal(40, text.FontHeightDots);
+        Assert.Equal(80, text.FontWidthDots);
+        Assert.InRange(_bounds.GetLocalBounds(text).Width, start.BoundsWidthDots * 2 - 1,
+            start.BoundsWidthDots * 2 + 1);
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots + 1,
+            start.BoundsHeightDots, TextResizeMode.Width);
+        Assert.Equal((40, 0), (text.FontHeightDots, text.FontWidthDots));
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots,
+            start.BoundsHeightDots, TextResizeMode.Width);
+        Assert.Equal((40, 0), (text.FontHeightDots, text.FontWidthDots));
+    }
+
+    [Fact]
+    public void Text_CornerPreservesAutomaticWidth_AndShiftAllowsFreeAxes()
+    {
+        var text = new TextElement { Text = "WIDE", FontHeightDots = 40 };
+        TextResizeStart start = ElementResizer.CaptureText(text);
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots * 2, 80,
+            TextResizeMode.Proportional);
+        Assert.Equal((80, 0), (text.FontHeightDots, text.FontWidthDots));
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots * 2, 60,
+            TextResizeMode.Free);
+        Assert.Equal((60, 80), (text.FontHeightDots, text.FontWidthDots));
+    }
+
+    [Fact]
+    public void TextResizeEmitsExplicitWidthOnlyWhenTheAxesSeparate()
+    {
+        var text = new TextElement { Text = "SIZE", FontHeightDots = 40 };
+        var document = new LabelDocument();
+        document.Elements.Add(text);
+        TextResizeStart start = ElementResizer.CaptureText(text);
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots, 80, TextResizeMode.Height);
+        Assert.Contains("^A0N,80,40^FDSIZE", new ZplGenerator().Generate(document),
+            StringComparison.Ordinal);
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots * 2, 80,
+            TextResizeMode.Proportional);
+        Assert.Contains("^A0N,80^FDSIZE", new ZplGenerator().Generate(document),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BitmapText_EdgesSnapToWholeCellMultiples()
+    {
+        var text = new TextElement { Text = "WIDE", Font = 'A', FontHeightDots = 27 };
+        TextResizeStart start = ElementResizer.CaptureText(text);
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots * 2,
+            start.BoundsHeightDots, TextResizeMode.Width);
+        Assert.Equal((27, 30), (text.FontHeightDots, text.FontWidthDots));
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots, 54,
+            TextResizeMode.Height);
+        Assert.Equal((54, 15), (text.FontHeightDots, text.FontWidthDots));
     }
 
     [Fact]

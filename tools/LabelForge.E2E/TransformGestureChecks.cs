@@ -30,6 +30,81 @@ internal static class TransformGestureChecks
             check("Control resize keeps a single field centered",
                 (box.X, box.WidthDots) == (180, 120));
 
+            var textBounds = new ElementBoundsCalculator();
+            var resizedText = LoadText();
+            DotRect textBefore = textBounds.GetBounds(resizedText);
+            DragTextHandle(
+                textBefore.X + textBefore.Width / 2.0, textBefore.Y + textBefore.Height,
+                textBefore.X + textBefore.Width / 2.0, textBefore.Y + textBefore.Height + 30);
+            DotRect textAfter = textBounds.GetBounds(resizedText);
+            check("Bottom text handle changes only font height",
+                resizedText.FontHeightDots == 90 && resizedText.FontWidthDots == 60 &&
+                textAfter.Width == textBefore.Width && textAfter.Y == textBefore.Y);
+
+            resizedText = LoadText();
+            textBefore = textBounds.GetBounds(resizedText);
+            DragTextHandle(
+                textBefore.X + textBefore.Width, textBefore.Y + textBefore.Height / 2.0,
+                textBefore.X + textBefore.Width + 40, textBefore.Y + textBefore.Height / 2.0);
+            textAfter = textBounds.GetBounds(resizedText);
+            check("Right text handle changes only character width",
+                resizedText.FontHeightDots == 60 && resizedText.FontWidthDots > 60 &&
+                textAfter.Height == textBefore.Height && textAfter.X == textBefore.X);
+
+            resizedText = LoadText();
+            textBefore = textBounds.GetBounds(resizedText);
+            DragTextHandle(textBefore.X, textBefore.Y + textBefore.Height / 2.0,
+                textBefore.X - 40, textBefore.Y + textBefore.Height / 2.0);
+            textAfter = textBounds.GetBounds(resizedText);
+            check("Left text handle keeps the right edge pinned",
+                resizedText.FontHeightDots == 60 && resizedText.FontWidthDots > 60 &&
+                textAfter.X + textAfter.Width == textBefore.X + textBefore.Width);
+
+            resizedText = LoadText();
+            textBefore = textBounds.GetBounds(resizedText);
+            DragTextHandle(textBefore.X + textBefore.Width / 2.0, textBefore.Y,
+                textBefore.X + textBefore.Width / 2.0, textBefore.Y - 30);
+            textAfter = textBounds.GetBounds(resizedText);
+            check("Top text handle keeps the bottom edge pinned",
+                resizedText.FontHeightDots == 90 && resizedText.FontWidthDots == 60 &&
+                textAfter.Y + textAfter.Height == textBefore.Y + textBefore.Height);
+
+            resizedText = LoadText();
+            textBefore = textBounds.GetBounds(resizedText);
+            DragTextHandle(textBefore.X + textBefore.Width, textBefore.Y + textBefore.Height,
+                textBefore.X + textBefore.Width + 40, textBefore.Y + textBefore.Height + 30);
+            textAfter = textBounds.GetBounds(resizedText);
+            check("Corner text handle scales both dimensions proportionally",
+                resizedText.FontHeightDots > 60 && resizedText.FontWidthDots == 0 &&
+                textAfter.Width > textBefore.Width && textAfter.Height > textBefore.Height);
+
+            resizedText = LoadText(Orientation.Rotated90);
+            textBefore = textBounds.GetBounds(resizedText);
+            DragTextHandle(textBefore.X + textBefore.Width / 2.0,
+                textBefore.Y + textBefore.Height,
+                textBefore.X + textBefore.Width / 2.0,
+                textBefore.Y + textBefore.Height + 40);
+            textAfter = textBounds.GetBounds(resizedText);
+            check("Rotated text handle follows its visual axis",
+                resizedText.FontHeightDots == 60 && resizedText.FontWidthDots > 60 &&
+                textAfter.Width == textBefore.Width && textAfter.Height > textBefore.Height);
+
+            resizedText = LoadText();
+            textBefore = textBounds.GetBounds(resizedText);
+            string textBeforeResize = designer.SerializeDocument();
+            bool undoBeforeTextResize = designer.CanUndo;
+            Point textBottom = At(textBefore.X + textBefore.Width / 2.0,
+                textBefore.Y + textBefore.Height);
+            window.MouseDown(textBottom, MouseButton.Left);
+            window.MouseMove(At(textBefore.X + textBefore.Width / 2.0,
+                textBefore.Y + textBefore.Height + 25), RawInputModifiers.LeftMouseButton);
+            window.MouseMove(textBottom, RawInputModifiers.LeftMouseButton);
+            window.MouseUp(textBottom, MouseButton.Left);
+            check("Returning a text handle to its start restores automatic width and undo",
+                resizedText.FontHeightDots == 60 && resizedText.FontWidthDots == 0 &&
+                designer.SerializeDocument() == textBeforeResize &&
+                designer.CanUndo == undoBeforeTextResize);
+
             var qrDocument = new LabelDocument { WidthMm = 100, HeightMm = 80, Dpmm = 8,
                 CheckQuietZones = false };
             var qr = new QrCodeElement { X = 200, Y = 160, Data = "Center",
@@ -333,6 +408,29 @@ internal static class TransformGestureChecks
             designer.NewDocumentCommand.Execute(null);
             canvas.ResetView();
             Pump(150);
+        }
+
+        TextElement LoadText(Orientation orientation = Orientation.Normal)
+        {
+            var document = new LabelDocument { WidthMm = 100, HeightMm = 80, Dpmm = 8,
+                CheckQuietZones = false };
+            var text = new TextElement { X = 200, Y = 160, Text = "Scale me",
+                FontHeightDots = 60, Orientation = orientation };
+            document.Elements.Add(text);
+            designer.LoadDocument(document, path: null);
+            designer.Selection.Set(text);
+            canvas.ResetView();
+            canvas.SetZoom(1);
+            Pump(300);
+            return text;
+        }
+
+        void DragTextHandle(double fromX, double fromY, double toX, double toY)
+        {
+            window.MouseDown(At(fromX, fromY), MouseButton.Left);
+            window.MouseMove(At(toX, toY), RawInputModifiers.LeftMouseButton);
+            window.MouseUp(At(toX, toY), MouseButton.Left);
+            Pump(100);
         }
 
         BoxElement LoadBox()

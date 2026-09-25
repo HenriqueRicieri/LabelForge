@@ -11,9 +11,11 @@ public sealed class SelectionScale
     private readonly record struct Entry(Element Live, Element Original, DotRect Bounds);
     private readonly Entry[] _entries;
     private readonly ElementBoundsCalculator _bounds = new();
+    private readonly int _dpmm;
 
-    private SelectionScale(IReadOnlyList<Element> elements)
+    private SelectionScale(LabelDocument document, IReadOnlyList<Element> elements)
     {
+        _dpmm = document.Dpmm;
         Elements = elements.ToArray();
         Snapshot = ElementSnapshot.Capture(Elements);
         var originals = LabelDocumentJson.DeserializeElements(Snapshot);
@@ -31,7 +33,7 @@ public sealed class SelectionScale
         elements.Count > 1 && elements.All(e => document.Elements.Contains(e) && !Groups.IsHeld(document, e));
 
     public static SelectionScale? Start(LabelDocument document, IReadOnlyList<Element> elements) =>
-        CanStart(document, elements) ? new SelectionScale(elements) : null;
+        CanStart(document, elements) ? new SelectionScale(document, elements) : null;
 
     public static DotRect GetBounds(IReadOnlyList<Element> elements)
     {
@@ -51,7 +53,8 @@ public sealed class SelectionScale
     }
 
     // Directions are -1 for the near edge, +1 for the far edge, and 0 for an unchanged axis.
-    public void Apply(ScaleFrame frame, int horizontal, int vertical, bool aboutCenter)
+    public void Apply(ScaleFrame frame, int horizontal, int vertical, bool aboutCenter,
+        bool freeCorner = false)
     {
         double sx = frame.Width / Math.Max(StartBounds.Width, 1);
         double sy = frame.Height / Math.Max(StartBounds.Height, 1);
@@ -68,7 +71,23 @@ public sealed class SelectionScale
             {
                 bool turned = FieldRotation.Applies(element) &&
                     element.Orientation is Orientation.Rotated90 or Orientation.Rotated270;
-                ElementResizer.Resize(element, turned ? height : width, turned ? width : height);
+                int intrinsicWidth = turned ? height : width;
+                int intrinsicHeight = turned ? width : height;
+                if (element is TextElement text && entry.Original is TextElement original)
+                {
+                    TextResizeMode mode = (horizontal, vertical) switch
+                    {
+                        (not 0, 0) => turned ? TextResizeMode.Height : TextResizeMode.Width,
+                        (0, not 0) => turned ? TextResizeMode.Width : TextResizeMode.Height,
+                        _ => freeCorner ? TextResizeMode.Free : TextResizeMode.Proportional,
+                    };
+                    ElementResizer.ResizeText(text, ElementResizer.CaptureText(original),
+                        intrinsicWidth, intrinsicHeight, mode, _dpmm);
+                }
+                else
+                {
+                    ElementResizer.Resize(element, intrinsicWidth, intrinsicHeight);
+                }
             }
 
             DotRect after = _bounds.GetBounds(element);

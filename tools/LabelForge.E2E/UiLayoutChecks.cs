@@ -284,6 +284,91 @@ internal static class UiLayoutChecks
             Check("Y shows the stored centimeter value after dot rounding",
                 text.Y == 160 && positionY.Value == 2m);
             Check("canvas readout uses centimeters", d.CanvasReadout.Contains("cm"));
+            var fontWidthInput = view.FindControl<ContentControl>("PropertiesContent")!
+                .GetVisualDescendants().OfType<NumericUpDown>()
+                .FirstOrDefault(input => input.Name == "FontWidthInput");
+            var autoWidth = view.FindControl<ContentControl>("PropertiesContent")!
+                .GetVisualDescendants().OfType<CheckBox>()
+                .FirstOrDefault(box => box.Name == "FontWidthAutoInput");
+            Check("text shows its effective width instead of zero",
+                fontWidthInput?.Value == 0.5m && !fontWidthInput.IsEnabled && autoWidth?.IsChecked == true);
+            if (autoWidth is not null && fontWidthInput is not null)
+            {
+                autoWidth.IsChecked = false;
+                Pump(100);
+                Check("disabling automatic width makes the current width editable",
+                    text.FontWidthDots == 40 && fontWidthInput.IsEnabled &&
+                    fontWidthInput.Value == 0.5m);
+                autoWidth.IsChecked = true;
+                Pump(100);
+                Check("automatic width restores the printer default without showing zero",
+                    text.FontWidthDots == 0 && !fontWidthInput.IsEnabled &&
+                    fontWidthInput.Value == 0.5m);
+            }
+            var importedTinyText = new TextElement { X = 30, Y = 30, Text = "Legacy",
+                FontHeightDots = 6, FontWidthDots = 4 };
+            d.Document.Elements.Add(importedTinyText);
+            d.NotifyDocumentEdited();
+            d.Selection.Set(importedTinyText);
+            Pump(150);
+            var tinyMeasures = view.FindControl<ContentControl>("PropertiesContent")!
+                .GetVisualDescendants().OfType<NumericUpDown>()
+                .Where(input => ReferenceEquals(input.DataContext, d.SelectionProperties)).ToArray();
+            Check("selecting a legacy tiny font preserves its stored dimensions",
+                importedTinyText.FontHeightDots == 6 && importedTinyText.FontWidthDots == 4 &&
+                tinyMeasures.FirstOrDefault(input => input.Name == "FontHeightInput")?.Value == 0.075m &&
+                tinyMeasures.FirstOrDefault(input => input.Name == "FontWidthInput")?.Value == 0.05m);
+
+            var bitmapText = new TextElement { X = 30, Y = 60, Text = "Bitmap",
+                Font = 'A', FontHeightDots = 27, FontWidthDots = 15 };
+            d.Document.Elements.Add(bitmapText);
+            d.NotifyDocumentEdited();
+            d.Selection.Set(bitmapText);
+            Pump(150);
+            var bitmapControls = view.FindControl<ContentControl>("PropertiesContent")!
+                .GetVisualDescendants().OfType<NumericUpDown>().ToArray();
+            var bitmapHeight = bitmapControls.FirstOrDefault(input => input.Name == "BitmapHeightInput");
+            var bitmapWidth = bitmapControls.FirstOrDefault(input => input.Name == "BitmapWidthInput");
+            Check("bitmap font exposes separate height and width multiples",
+                bitmapHeight?.Value == 3 && bitmapWidth?.Value == 3);
+            if (bitmapHeight is not null && bitmapWidth is not null)
+            {
+                bitmapHeight.SetCurrentValue(NumericUpDown.ValueProperty, 4m);
+                bitmapWidth.SetCurrentValue(NumericUpDown.ValueProperty, 5m);
+                Pump(100);
+                Check("bitmap font dimensions edit independently",
+                    bitmapText.FontHeightDots == 36 && bitmapText.FontWidthDots == 25);
+                bitmapWidth.ApplyTemplate();
+                bitmapHeight.ApplyTemplate();
+                var bitmapWidthEditor = bitmapWidth.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+                var bitmapHeightEditor = bitmapHeight.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+                if (bitmapWidthEditor is not null && bitmapHeightEditor is not null)
+                {
+                    bitmapWidthEditor.Focus();
+                    bitmapWidth.SetCurrentValue(NumericUpDown.ValueProperty, 5.1m);
+                    bitmapHeightEditor.Focus();
+                    Pump(100);
+                    Check("bitmap width shows the actual whole-cell multiple",
+                        bitmapText.FontWidthDots == 25 && bitmapWidth.Value == 5m);
+                }
+                var bitmapAuto = view.FindControl<ContentControl>("PropertiesContent")!
+                    .GetVisualDescendants().OfType<CheckBox>()
+                    .FirstOrDefault(box => box.Name == "FontWidthAutoInput");
+                if (bitmapAuto is not null)
+                {
+                    bitmapAuto.IsChecked = true;
+                    Pump(100);
+                    Check("bitmap automatic width follows its height multiple",
+                        bitmapText.FontWidthDots == 0 && bitmapWidth.Value == 4m &&
+                        !bitmapWidth.IsEnabled);
+                    bitmapAuto.IsChecked = false;
+                    Pump(100);
+                    Check("bitmap explicit width starts at the current cell multiple",
+                        bitmapText.FontWidthDots == 20 && bitmapWidth.Value == 4m &&
+                        bitmapWidth.IsEnabled);
+                }
+            }
+
             var measuredLine = new LineElement { X = 80, Y = 80, LengthDots = 200, ThicknessDots = 4 };
             d.Document.Elements.Add(measuredLine);
             d.NotifyDocumentEdited();

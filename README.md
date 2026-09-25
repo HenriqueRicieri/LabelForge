@@ -69,6 +69,14 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   buried under others without giving up precise movement. Adding to a selection happens on
   press so a following drag moves everything picked. Removing a field waits for a release without
   movement, leaving a press on the selection free to drag the whole group.
+- Text uses Zebra's scalable font 0 by default. Its height and character width change one
+  printer dot at a time, so centimeter entries round to the nearest printable dot. Bitmap
+  fonts A-H use whole multiples of their character cells. Automatic character width
+  follows the height; the inspector shows that effective width and lets you turn automatic
+  sizing off. For a single text field, top and bottom handles change font height, left and
+  right handles change character width, and corners scale both proportionally. On rotated
+  text, a handle follows the visual axis under the pointer. A field block keeps its
+  separate wrapping width in Properties.
 - Resize several selected fields or a group with the outer selection handles. Corners
   scale proportionally, Shift frees the axes, and Ctrl scales around the centre.
   Barcode modules and other size limits can make the result differ from the dragged
