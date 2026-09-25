@@ -250,6 +250,41 @@ internal static class TransformGestureChecks
                 styledText.Orientation == Orientation.Rotated90 &&
                 styledText.Anchor == FieldAnchor.Baseline && styledText.Font == 'A' &&
                 designer.SerializeDocument() == styledBeforeDeselect);
+
+            line = LoadLine();
+            DotRect commandStart = new ElementBoundsCalculator().GetBounds(line);
+            designer.Rotate90Command.Execute(null);
+            Pump(300);
+            check("Rotate 90 keeps a line's drawn center",
+                line.IsVertical && SameCenter(commandStart,
+                    new ElementBoundsCalculator().GetBounds(line)));
+
+            line = LoadLine();
+            DotRect panelStart = new ElementBoundsCalculator().GetBounds(line);
+            if (designer.SelectionProperties is LinePropertiesViewModel linePanel)
+                linePanel.SelectedOrientation = linePanel.Orientations[1];
+            Pump(300);
+            check("Panel rotation keeps a line's drawn center",
+                line.IsVertical && SameCenter(panelStart,
+                    new ElementBoundsCalculator().GetBounds(line)));
+
+            var baselineDocument = new LabelDocument { WidthMm = 100, HeightMm = 80,
+                Dpmm = 8, CheckQuietZones = false };
+            var baselineText = new TextElement { X = 200, Y = 260, Text = "Anchor",
+                FontHeightDots = 40, Anchor = FieldAnchor.Baseline };
+            baselineDocument.Elements.Add(baselineText);
+            designer.LoadDocument(baselineDocument, path: null);
+            designer.Selection.Set(baselineText);
+            canvas.ResetView();
+            canvas.SetZoom(0.5);
+            Pump(300);
+            DotRect baselineStart = new ElementBoundsCalculator().GetBounds(baselineText);
+            if (designer.SelectionProperties is TextPropertiesViewModel textPanel)
+                textPanel.SelectedOrientation = textPanel.Orientations[1];
+            Pump(300);
+            check("Panel rotation keeps a baseline text field centered",
+                baselineText.Orientation == Orientation.Rotated90 &&
+                SameCenter(baselineStart, new ElementBoundsCalculator().GetBounds(baselineText)));
         }
         finally
         {
@@ -277,7 +312,26 @@ internal static class TransformGestureChecks
 
         Point At(double x, double y) =>
             canvas.TranslatePoint(canvas.DotsToView(x, y), window)!.Value;
+
+        LineElement LoadLine()
+        {
+            var document = new LabelDocument { WidthMm = 100, HeightMm = 80, Dpmm = 8,
+                CheckQuietZones = false };
+            var line = new LineElement { X = 200, Y = 160, LengthDots = 240,
+                ThicknessDots = 4 };
+            document.Elements.Add(line);
+            designer.LoadDocument(document, path: null);
+            designer.Selection.Set(line);
+            canvas.ResetView();
+            canvas.SetZoom(0.5);
+            Pump(300);
+            return line;
+        }
     }
+
+    private static bool SameCenter(DotRect a, DotRect b) =>
+        Math.Abs(a.X + a.Width / 2.0 - b.X - b.Width / 2.0) <= 0.5 &&
+        Math.Abs(a.Y + a.Height / 2.0 - b.Y - b.Height / 2.0) <= 0.5;
 
     private static void Pump(int milliseconds)
     {

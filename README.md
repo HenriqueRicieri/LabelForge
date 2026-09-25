@@ -120,9 +120,9 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   or holds unrelated content, the designer uses its last internal copy.
 - Rotation handles support text, the four symbol types, straight lines and diagonal lines.
   Straight lines switch between horizontal and vertical; diagonals change lean and swap their
-  width and height. Canvas rotation keeps the drawn centre fixed, with whole-dot rounding,
-  and line outlines show the actual snapped bounds. Boxes, ellipses and images have no
-  rotation handle. Ctrl + R turns a supported element by a quarter turn at its stored origin.
+  width and height. The canvas handle, rotation property and Ctrl + R keep each field's drawn
+  centre fixed, with whole-dot rounding. The command turns supported fields by a quarter turn;
+  line outlines show the actual snapped bounds. Boxes, ellipses and images have no rotation handle.
   Resize handles hide when both selection dimensions are under about two dozen screen pixels;
   a long thin line keeps its handles.
 - A drafting-table workspace: centimeter rulers pinned top and left (tick steps adapt to zoom, all

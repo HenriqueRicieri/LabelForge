@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LabelForge.Core.Editing;
 using LabelForge.Core.Model;
 
 namespace LabelForge.App.ViewModels;
@@ -220,13 +221,11 @@ public abstract class ElementPropertiesViewModel : ObservableObject
             Edit(
                 FieldRotation.Get(Element),
                 value.Value,
-                v => FieldRotation.Set(Element, v));
+                v => RotationGesture.Apply(Element, v,
+                    new ElementBoundsCalculator().GetBounds(Element)));
 
-            // The one panel edit that changes another control on the same panel: a
-            // diagonal's sides trade places when it turns. Edit announces only the property
-            // that was set, so without this the width and height spinners keep showing the
-            // numbers from before the turn, which is the value-you-cannot-read problem this
-            // control was added to solve, reintroduced two fields along.
+            // A turn can also move the origin and swap a diagonal's sides. Refresh
+            // the position and size controls after the orientation changes.
             Refresh();
         }
     }
