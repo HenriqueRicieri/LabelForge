@@ -23,9 +23,10 @@ public static class RotationGesture
     private static void RepositionToCenter(Element element, DotRect startBounds)
     {
         DotRect bounds = new ElementBoundsCalculator().GetBounds(element);
-        double x = startBounds.X + startBounds.Width / 2.0 - bounds.Width / 2.0;
-        double y = startBounds.Y + startBounds.Height / 2.0 - bounds.Height / 2.0;
-        element.X += (int)Math.Round(x, MidpointRounding.AwayFromZero) - bounds.X;
-        element.Y += (int)Math.Round(y, MidpointRounding.AwayFromZero) - bounds.Y;
+        // Truncating the half-dot difference makes an opposite turn cancel it.
+        int x = startBounds.X + (startBounds.Width - bounds.Width) / 2;
+        int y = startBounds.Y + (startBounds.Height - bounds.Height) / 2;
+        element.X += x - bounds.X;
+        element.Y += y - bounds.Y;
     }
 }

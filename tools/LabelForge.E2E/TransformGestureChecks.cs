@@ -268,6 +268,27 @@ internal static class TransformGestureChecks
                 line.IsVertical && SameCenter(panelStart,
                     new ElementBoundsCalculator().GetBounds(line)));
 
+            line = LoadLine(length: 241);
+            DotRect roundTripStart = new ElementBoundsCalculator().GetBounds(line);
+            designer.Rotate90Command.Execute(null);
+            designer.Rotate90Command.Execute(null);
+            Pump(300);
+            check("Two Rotate 90 commands return a line to its starting bounds",
+                !line.IsVertical &&
+                new ElementBoundsCalculator().GetBounds(line) == roundTripStart);
+
+            line = LoadLine(length: 241);
+            roundTripStart = new ElementBoundsCalculator().GetBounds(line);
+            if (designer.SelectionProperties is LinePropertiesViewModel roundTripPanel)
+            {
+                roundTripPanel.SelectedOrientation = roundTripPanel.Orientations[1];
+                roundTripPanel.SelectedOrientation = roundTripPanel.Orientations[0];
+            }
+            Pump(300);
+            check("Two panel turns return a line to its starting bounds",
+                !line.IsVertical &&
+                new ElementBoundsCalculator().GetBounds(line) == roundTripStart);
+
             var baselineDocument = new LabelDocument { WidthMm = 100, HeightMm = 80,
                 Dpmm = 8, CheckQuietZones = false };
             var baselineText = new TextElement { X = 200, Y = 260, Text = "Anchor",
@@ -313,11 +334,11 @@ internal static class TransformGestureChecks
         Point At(double x, double y) =>
             canvas.TranslatePoint(canvas.DotsToView(x, y), window)!.Value;
 
-        LineElement LoadLine()
+        LineElement LoadLine(int length = 240)
         {
             var document = new LabelDocument { WidthMm = 100, HeightMm = 80, Dpmm = 8,
                 CheckQuietZones = false };
-            var line = new LineElement { X = 200, Y = 160, LengthDots = 240,
+            var line = new LineElement { X = 200, Y = 160, LengthDots = length,
                 ThicknessDots = 4 };
             document.Elements.Add(line);
             designer.LoadDocument(document, path: null);
