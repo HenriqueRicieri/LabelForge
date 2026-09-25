@@ -284,6 +284,78 @@ internal static class UiLayoutChecks
             Check("Y shows the stored centimeter value after dot rounding",
                 text.Y == 160 && positionY.Value == 2m);
             Check("canvas readout uses centimeters", d.CanvasReadout.Contains("cm"));
+            var measuredLine = new LineElement { X = 80, Y = 80, LengthDots = 200, ThicknessDots = 4 };
+            d.Document.Elements.Add(measuredLine);
+            d.NotifyDocumentEdited();
+            d.Selection.Set(measuredLine);
+            inspectorTabs.SelectedIndex = 0;
+            Pump(200);
+            var measuredFields = view.FindControl<ContentControl>("PropertiesContent")!
+                .GetVisualDescendants().OfType<NumericUpDown>()
+                .Where(input => ReferenceEquals(input.DataContext, d.SelectionProperties)).ToArray();
+            Check("line exposes length and thickness in centimeters",
+                measuredFields.Length == 2 && measuredFields[0].Value == 2.5m &&
+                measuredFields[1].Value == 0.05m);
+            if (measuredFields.Length == 2)
+            {
+                measuredFields[0].ApplyTemplate();
+                measuredFields[1].ApplyTemplate();
+                var lengthEditor = measuredFields[0].GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+                var thicknessEditor = measuredFields[1].GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+                Check("line measure editors are available", lengthEditor is not null && thicknessEditor is not null);
+                if (lengthEditor is not null && thicknessEditor is not null)
+                {
+                    string unchangedLine = d.SerializeDocument();
+                    lengthEditor.Focus();
+                    measuredFields[0].SetCurrentValue(NumericUpDown.ValueProperty, 2.501m);
+                    thicknessEditor.Focus();
+                    Pump(100);
+                    Check("line length shows the printable centimeter value after rounding",
+                        measuredLine.LengthDots == 200 && measuredFields[0].Value == 2.5m);
+                    measuredFields[1].SetCurrentValue(NumericUpDown.ValueProperty, 0.051m);
+                    lengthEditor.Focus();
+                    Pump(100);
+                    Check("line thickness shows the printable centimeter value after rounding",
+                        measuredLine.ThicknessDots == 4 && measuredFields[1].Value == 0.05m);
+                    Check("unprintable centimeter changes leave label data alone",
+                        d.SerializeDocument() == unchangedLine);
+                    measuredFields[0].SetCurrentValue(NumericUpDown.ValueProperty, 2.63m);
+                    thicknessEditor.Focus();
+                    Pump(100);
+                    Check("changed line length shows its rounded printer size",
+                        measuredLine.LengthDots == 210 && measuredFields[0].Value == 2.625m);
+                }
+            }
+
+            var measuredBox = new BoxElement { X = 80, Y = 120, WidthDots = 100, HeightDots = 80 };
+            d.Document.Elements.Add(measuredBox);
+            d.NotifyDocumentEdited();
+            d.Selection.Set(measuredBox);
+            Pump(200);
+            var boxMeasures = view.FindControl<ContentControl>("PropertiesContent")!
+                .GetVisualDescendants().OfType<NumericUpDown>()
+                .Where(input => ReferenceEquals(input.DataContext, d.SelectionProperties)).ToArray();
+            Check("box exposes width and height in centimeters",
+                boxMeasures.Length == 4 && boxMeasures[0].Value == 1.25m &&
+                boxMeasures[1].Value == 1m);
+            if (boxMeasures.Length == 4)
+            {
+                boxMeasures[0].ApplyTemplate();
+                boxMeasures[1].ApplyTemplate();
+                var widthEditor = boxMeasures[0].GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+                var heightEditor = boxMeasures[1].GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+                Check("box measure editors are available", widthEditor is not null && heightEditor is not null);
+                if (widthEditor is not null && heightEditor is not null)
+                {
+                    widthEditor.Focus();
+                    boxMeasures[0].SetCurrentValue(NumericUpDown.ValueProperty, 1.251m);
+                    heightEditor.Focus();
+                    Pump(100);
+                    Check("box width shows the printable centimeter value after rounding",
+                        measuredBox.WidthDots == 100 && boxMeasures[0].Value == 1.25m);
+                }
+            }
+
             string original = d.SerializeDocument();
             bool undo = d.CanUndo;
             var splitter = view.FindControl<GridSplitter>("InspectorSplitter")!;

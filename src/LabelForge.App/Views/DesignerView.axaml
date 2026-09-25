@@ -75,12 +75,14 @@
                            TextWrapping="Wrap" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Font height ({0})'}"
                            IsVisible="{Binding IsScalableFont}" />
-                <NumericUpDown Value="{Binding FontHeight}" Minimum="{Binding MinFontHeight}" Maximum="{Binding MaxFontSize}"
+                <NumericUpDown Value="{Binding FontHeight}" Tag="{Binding FontHeight, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="{Binding MinFontHeight}" Maximum="{Binding MaxFontSize}"
                                Increment="{Binding FineIncrement}" FormatString="{Binding PositionFormat}"
                                IsVisible="{Binding IsScalableFont}" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Font width ({0})'}" ToolTip.Tip="0 lets the printer choose the width"
                            IsVisible="{Binding IsScalableFont}" />
-                <NumericUpDown Value="{Binding FontWidth}" Minimum="0" Maximum="{Binding MaxFontSize}"
+                <NumericUpDown Value="{Binding FontWidth}" Tag="{Binding FontWidth, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxFontSize}"
                                Increment="{Binding FineIncrement}" FormatString="{Binding PositionFormat}"
                                IsVisible="{Binding IsScalableFont}" />
                 <TextBlock Classes="propLabel" Text="Size (times the font's own cell)"
@@ -90,7 +92,8 @@
                                IsVisible="{Binding !IsScalableFont}" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Block width ({0})'}" ToolTip.Tip="0 keeps the text on one line"
                            Margin="0,8,0,0" />
-                <NumericUpDown Value="{Binding BlockWidth}" Minimum="0" Maximum="{Binding MaxBlockWidth}"
+                <NumericUpDown Value="{Binding BlockWidth}" Tag="{Binding BlockWidth, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxBlockWidth}"
                                Increment="{Binding SizeIncrement}" FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="Alignment" IsVisible="{Binding IsBlock}" />
                 <ComboBox ItemsSource="{Binding Justifications}"
@@ -103,10 +106,12 @@
                            IsVisible="{Binding IsBlock}" Foreground="#D97706"
                            TextWrapping="Wrap" FontSize="12" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Line spacing ({0})'}" IsVisible="{Binding IsBlock}" />
-                <NumericUpDown Value="{Binding BlockLineSpacing}" Minimum="{Binding MinLineSpacing}" Maximum="{Binding MaxLineSpacing}"
+                <NumericUpDown Value="{Binding BlockLineSpacing}" Tag="{Binding BlockLineSpacing, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="{Binding MinLineSpacing}" Maximum="{Binding MaxLineSpacing}"
                                Increment="{Binding FineIncrement}" FormatString="{Binding PositionFormat}" IsVisible="{Binding IsBlock}" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Hanging indent ({0})'}" IsVisible="{Binding IsBlock}" />
-                <NumericUpDown Value="{Binding BlockHangingIndent}" Minimum="0" Maximum="{Binding MaxBlockWidth}"
+                <NumericUpDown Value="{Binding BlockHangingIndent}" Tag="{Binding BlockHangingIndent, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxBlockWidth}"
                                Increment="{Binding SizeIncrement}" FormatString="{Binding PositionFormat}" IsVisible="{Binding IsBlock}" />
             </StackPanel>
         </DataTemplate>
@@ -137,7 +142,8 @@
                           SelectedItem="{Binding Symbology}"
                           HorizontalAlignment="Stretch" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Height ({0})'}" />
-                <NumericUpDown Value="{Binding Height}" Minimum="{Binding MinBarcodeHeight}" Maximum="{Binding MaxBarcodeHeight}"
+                <NumericUpDown Value="{Binding Height}" Tag="{Binding Height, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="{Binding MinBarcodeHeight}" Maximum="{Binding MaxBarcodeHeight}"
                                Increment="{Binding SizeIncrement}" FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="Module width (dots, 1-10)" />
                 <NumericUpDown Value="{Binding ModuleWidth}" Minimum="1" Maximum="10"
@@ -203,7 +209,8 @@
                 <NumericUpDown Value="{Binding ModuleWidth}" Minimum="1" Maximum="10"
                                Increment="1" FormatString="0" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Row height ({0})'}" />
-                <NumericUpDown Value="{Binding RowHeight}" Minimum="{Binding MinOneDot}" Maximum="{Binding MaxThickness}"
+                <NumericUpDown Value="{Binding RowHeight}" Tag="{Binding RowHeight, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="{Binding MinOneDot}" Maximum="{Binding MaxThickness}"
                                Increment="{Binding FineIncrement}" FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="Error correction level (0-8)" />
                 <NumericUpDown Value="{Binding SecurityLevel}" Minimum="0" Maximum="8"
@@ -218,11 +225,13 @@
             <StackPanel Spacing="4">
                 <TextBlock Text="{Binding SourceInfo}" Opacity="0.6" FontSize="12" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Width ({0})'}" />
-                <NumericUpDown Value="{Binding ImageWidth}" Minimum="0" Maximum="{Binding MaxShapeSize}"
+                <NumericUpDown Value="{Binding ImageWidth}" Tag="{Binding ImageWidth, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxShapeSize}"
                                Increment="{Binding SizeIncrement}"
                                FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Height ({0})'}" />
-                <NumericUpDown Value="{Binding ImageHeight}" Minimum="0" Maximum="{Binding MaxShapeSize}"
+                <NumericUpDown Value="{Binding ImageHeight}" Tag="{Binding ImageHeight, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxShapeSize}"
                                Increment="{Binding SizeIncrement}"
                                FormatString="{Binding PositionFormat}" />
                 <Button Content="Restore aspect ratio" Command="{Binding RestoreAspectCommand}"
@@ -239,11 +248,13 @@
         <DataTemplate DataType="vm:LinePropertiesViewModel">
             <StackPanel Spacing="4">
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Length ({0})'}" />
-                <NumericUpDown Value="{Binding Length}" Minimum="0" Maximum="{Binding MaxShapeSize}"
+                <NumericUpDown Value="{Binding Length}" Tag="{Binding Length, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxShapeSize}"
                                Increment="{Binding SizeIncrement}"
                                FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Thickness ({0})'}" />
-                <NumericUpDown Value="{Binding Thickness}" Minimum="{Binding MinOneDot}" Maximum="{Binding MaxThickness}"
+                <NumericUpDown Value="{Binding Thickness}" Tag="{Binding Thickness, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="{Binding MinOneDot}" Maximum="{Binding MaxThickness}"
                                Increment="{Binding FineIncrement}" FormatString="{Binding PositionFormat}" />
                 <CheckBox Content="White (erase)" IsChecked="{Binding IsWhite}"
                           ToolTip.Tip="Draws in white, which clears whatever was drawn under it. Over blank stock it prints nothing." />
@@ -253,15 +264,18 @@
         <DataTemplate DataType="vm:BoxPropertiesViewModel">
             <StackPanel Spacing="4">
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Width ({0})'}" />
-                <NumericUpDown Value="{Binding BoxWidth}" Minimum="0" Maximum="{Binding MaxShapeSize}"
+                <NumericUpDown Value="{Binding BoxWidth}" Tag="{Binding BoxWidth, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxShapeSize}"
                                Increment="{Binding SizeIncrement}"
                                FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Height ({0})'}" />
-                <NumericUpDown Value="{Binding BoxHeight}" Minimum="0" Maximum="{Binding MaxShapeSize}"
+                <NumericUpDown Value="{Binding BoxHeight}" Tag="{Binding BoxHeight, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxShapeSize}"
                                Increment="{Binding SizeIncrement}"
                                FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Border thickness ({0})'}" />
-                <NumericUpDown Value="{Binding Thickness}" Minimum="{Binding MinOneDot}" Maximum="{Binding MaxThickness}"
+                <NumericUpDown Value="{Binding Thickness}" Tag="{Binding Thickness, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="{Binding MinOneDot}" Maximum="{Binding MaxThickness}"
                                Increment="{Binding FineIncrement}" FormatString="{Binding PositionFormat}" />
                 <CheckBox Content="White (erase)" IsChecked="{Binding IsWhite}" Margin="0,4,0,0"
                           ToolTip.Tip="Draws in white, which clears whatever was drawn under it. Over blank stock it prints nothing." />
@@ -275,18 +289,21 @@
         <DataTemplate DataType="vm:EllipsePropertiesViewModel">
             <StackPanel Spacing="4">
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Width ({0})'}" />
-                <NumericUpDown Value="{Binding EllipseWidth}" Minimum="0" Maximum="{Binding MaxEllipseSize}"
+                <NumericUpDown Value="{Binding EllipseWidth}" Tag="{Binding EllipseWidth, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxEllipseSize}"
                                Increment="{Binding SizeIncrement}"
                                FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Height ({0})'}" />
-                <NumericUpDown Value="{Binding EllipseHeight}" Minimum="0" Maximum="{Binding MaxEllipseSize}"
+                <NumericUpDown Value="{Binding EllipseHeight}" Tag="{Binding EllipseHeight, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxEllipseSize}"
                                Increment="{Binding SizeIncrement}"
                                FormatString="{Binding PositionFormat}" />
                 <Button Content="Make it a circle" Command="{Binding MakeCircleCommand}"
                         HorizontalAlignment="Stretch"
                         ToolTip.Tip="Matches the height to the width. A circle is an ellipse with equal sides; ZPL's own ^GC draws exactly that." />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Border thickness ({0})'}" />
-                <NumericUpDown Value="{Binding Thickness}" Minimum="{Binding MinOneDot}" Maximum="{Binding MaxThickness}"
+                <NumericUpDown Value="{Binding Thickness}" Tag="{Binding Thickness, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="{Binding MinOneDot}" Maximum="{Binding MaxThickness}"
                                Increment="{Binding FineIncrement}" FormatString="{Binding PositionFormat}"
                                ToolTip.Tip="Grows inward from the outline. At half the shorter side the shape is solid." />
                 <CheckBox Content="White (erase)" IsChecked="{Binding IsWhite}" Margin="0,4,0,0"
@@ -299,15 +316,18 @@
         <DataTemplate DataType="vm:DiagonalPropertiesViewModel">
             <StackPanel Spacing="4">
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Width ({0})'}" />
-                <NumericUpDown Value="{Binding DiagonalWidth}" Minimum="0" Maximum="{Binding MaxShapeSize}"
+                <NumericUpDown Value="{Binding DiagonalWidth}" Tag="{Binding DiagonalWidth, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxShapeSize}"
                                Increment="{Binding SizeIncrement}"
                                FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Height ({0})'}" />
-                <NumericUpDown Value="{Binding DiagonalHeight}" Minimum="0" Maximum="{Binding MaxShapeSize}"
+                <NumericUpDown Value="{Binding DiagonalHeight}" Tag="{Binding DiagonalHeight, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="0" Maximum="{Binding MaxShapeSize}"
                                Increment="{Binding SizeIncrement}"
                                FormatString="{Binding PositionFormat}" />
                 <TextBlock Classes="propLabel" Text="{Binding UnitSuffix, StringFormat='Thickness ({0})'}" />
-                <NumericUpDown Value="{Binding Thickness}" Minimum="{Binding MinOneDot}" Maximum="{Binding MaxThickness}"
+                <NumericUpDown Value="{Binding Thickness}" Tag="{Binding Thickness, Mode=OneWay}"
+                               LostFocus="OnMeasuredInputLostFocus" Minimum="{Binding MinOneDot}" Maximum="{Binding MaxThickness}"
                                Increment="{Binding FineIncrement}" FormatString="{Binding PositionFormat}" />
                 <TextBlock Text="{Binding ThicknessNote}" IsVisible="{Binding HasThicknessNote}"
                            Foreground="#D97706" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />

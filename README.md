@@ -174,8 +174,8 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 - Element types: text, linear barcode (Code 128, Code 39, EAN-13, UPC-A, Interleaved 2 of 5 and so
   ITF-14), QR code, Data Matrix, PDF417, image, line, box, ellipse, diagonal line, with a per-type
   properties panel and measured positions and dimensions typed in centimeters by default.
-  X and Y round to printable dots; after leaving either input, its centimeter value reflects
-  the stored position. The Use printer dots switch shows exact dot values when needed;
+  Positions and dimensions round to printable dots; after leaving an input, its centimeter
+  value reflects the stored measure. The Use printer dots switch shows exact dot values when needed;
   switching units keeps the physical size. Barcode data is validated
   against its symbology with a clear warning when it cannot be encoded. A PDF417 states the shape
   its settings produce, and says so when the column count is left automatic, because that hands the

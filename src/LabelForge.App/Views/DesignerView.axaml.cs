@@ -94,6 +94,21 @@ public partial class DesignerView : UserControl
         }, DispatcherPriority.Background);
     }
 
+    private void OnMeasuredInputLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not NumericUpDown input) return;
+        object? selection = input.DataContext;
+
+        // Tag follows the stored measure one-way. If a typed value rounds to the
+        // current printer dot, Value can keep that typed value until focus leaves.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!ReferenceEquals(input.DataContext, selection) || input.Tag is not decimal stored) return;
+            if (input.Value != stored)
+                input.SetCurrentValue(NumericUpDown.ValueProperty, stored);
+        }, DispatcherPriority.Background);
+    }
+
     /// <summary>
     /// Builds the canvas context menu for whatever the pointer was over.
     ///
