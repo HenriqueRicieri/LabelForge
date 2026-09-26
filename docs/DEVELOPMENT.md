@@ -121,6 +121,25 @@ when behavior changes. Status must distinguish inspected CI evidence from local 
 
 ## Windows packaging
 
+User data lives in `%LocalAppData%/LabelForge.UserData`, outside the Velopack
+installation directory `%LocalAppData%/LabelForge`. Normal startup migrates known
+legacy JSON files and abandoned recovery snapshots without replacing newer data.
+Live recovery sessions are left alone; close all instances before upgrading.
+
+Before upgrading a build that stores data inside the installation directory,
+back up that directory's user JSON files and recovery folder. Run the corrected
+portable app once, or run its migration-only command before running Setup:
+
+```powershell
+& '<portable-folder>/current/LabelForge.App.exe' --migrate-user-data
+if ($LASTEXITCODE -ne 0) { throw 'Resolve the migration errors before installing.' }
+```
+
+The command exits without opening a window. Verify that the expected user files
+are present under `LabelForge.UserData`. An incoming installer cannot retroactively
+protect data erased by an older executable; migration must precede that installer.
+Future installs/reinstalls use the separated data directory.
+
 The script uses a self-contained win-x64 publish with trimming disabled. Install
 the Velopack CLI once if absent, then pass the intended release version:
 

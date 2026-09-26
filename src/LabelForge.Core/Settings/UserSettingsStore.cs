@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+using LabelForge.Core.Io;
+
 namespace LabelForge.Core.Settings;
 
 /// <summary>
@@ -35,9 +37,7 @@ public sealed record UserSettings
 /// </summary>
 public sealed class UserSettingsStore
 {
-    public static string DefaultFilePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LabelForge", "user-settings.json");
+    public static string DefaultFilePath => UserDataPaths.FilePath("user-settings.json");
 
     private static readonly JsonSerializerOptions Options = new()
     {

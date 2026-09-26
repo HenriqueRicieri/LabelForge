@@ -50,9 +50,7 @@ public sealed class RecoveryStore : IDisposable
     private FileStream? _lock;
     private bool _disposed;
 
-    public static string DefaultDirectory => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LabelForge", "recovery");
+    public static string DefaultDirectory => UserDataPaths.FilePath("recovery");
 
     /// <param name="directory">Override for tests; defaults to the per-user location.</param>
     /// <param name="sessionId">Names this session's files. Defaults to a fresh identity,

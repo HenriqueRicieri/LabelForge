@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 
+using LabelForge.Core.Io;
+
 namespace LabelForge.App.Services;
 
 /// <summary>
@@ -15,9 +17,7 @@ public static class RecentFilesStore
 {
     private const int MaxEntries = 10;
 
-    private static string FilePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LabelForge", "recent-files.json");
+    private static string FilePath => UserDataPaths.FilePath("recent-files.json");
 
     public static IReadOnlyList<string> Load()
     {

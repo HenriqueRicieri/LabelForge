@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+using LabelForge.Core.Io;
+
 namespace LabelForge.Core.Media;
 
 /// <summary>The result of changing the saved presets.</summary>
@@ -22,9 +24,7 @@ public readonly record struct UserMediaResult(IReadOnlyList<StockMedia> Entries,
 /// </summary>
 public sealed class UserMediaStore
 {
-    public static string DefaultFilePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LabelForge", "user-media.json");
+    public static string DefaultFilePath => UserDataPaths.FilePath("user-media.json");
 
     private static readonly JsonSerializerOptions Options = new()
     {

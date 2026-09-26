@@ -2,6 +2,7 @@
 using System;
 using LabelForge.App.Services;
 using Velopack;
+using LabelForge.Core.Io;
 
 namespace LabelForge.App;
 
@@ -13,6 +14,16 @@ sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        if (Array.Exists(args, argument => argument == "--migrate-user-data"))
+        {
+            var errors = UserDataPaths.MigrateLegacy();
+            foreach (string error in errors)
+            {
+                Console.Error.WriteLine(error);
+            }
+            Environment.ExitCode = errors.Count == 0 ? 0 : 1;
+            return;
+        }
         // Velopack installer hooks (install/update/uninstall) must run first;
         // on a normal launch none of these fire. UpdateManager integration comes
         // once the app has a public distribution feed.
@@ -40,6 +51,7 @@ sealed class Program
 
         velopack.Run();
 
+        UserDataPaths.MigrateLegacy();
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

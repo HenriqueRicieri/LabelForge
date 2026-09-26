@@ -1,5 +1,7 @@
 ﻿using System.Text.Json;
 
+using LabelForge.Core.Io;
+
 namespace LabelForge.Core.Fields;
 
 /// <param name="Catalogs">The catalogs after the change, sorted by name.</param>
@@ -26,9 +28,7 @@ public readonly record struct FieldCatalogResult(IReadOnlyList<FieldCatalog> Cat
 /// </summary>
 public sealed class FieldCatalogStore
 {
-    public static string DefaultFilePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LabelForge", "field-catalogs.json");
+    public static string DefaultFilePath => UserDataPaths.FilePath("field-catalogs.json");
 
     private static readonly JsonSerializerOptions Options = new()
     {

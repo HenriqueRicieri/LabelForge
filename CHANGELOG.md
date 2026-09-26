@@ -63,6 +63,9 @@ not yet been published as a release.
 
 ### Release preparation
 
+- Moved user preferences, media, catalogs, recent files and recovery snapshots to
+  a separate data directory so installer cleanup cannot remove them. Added legacy
+  migration and a migration-only command for use before upgrading older installers.
 - Guarded E2E shell-association checks by Windows platform, resolving 11 CA1416 warnings.
 - Added viewport/theme/overlay and allocation percentile diagnostics for the paint
   budget assertion without raising its 70 KB limit.
