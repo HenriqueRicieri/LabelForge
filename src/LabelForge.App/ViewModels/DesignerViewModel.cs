@@ -59,6 +59,7 @@ public partial class DesignerViewModel : ViewModelBase
     private readonly Core.Fields.FieldCatalogStore _fieldCatalogStore;
     private readonly RecoveryStore _recovery;
     private readonly UserSettingsStore _settingsStore;
+    private readonly string? _recentFilesPath;
     private UserSettings _settings = new();
 
     /// <summary>Backing the toggle directly: it is read in the constructor before the
@@ -353,7 +354,7 @@ public partial class DesignerViewModel : ViewModelBase
     public bool HasVariables => Variables.Count > 0;
 
     /// <summary>Recently opened or saved .lfl paths, newest first.</summary>
-    public ObservableCollection<string> RecentFiles { get; } = new(Services.RecentFilesStore.Load());
+    public ObservableCollection<string> RecentFiles { get; }
 
     public bool HasRecentFiles => RecentFiles.Count > 0;
 
@@ -1000,9 +1001,12 @@ public partial class DesignerViewModel : ViewModelBase
         Core.Fields.FieldCatalogStore? fieldCatalogStore = null,
         RecoveryStore? recoveryStore = null,
         UserSettingsStore? userSettingsStore = null,
-        Services.IElementClipboard? clipboard = null)
+        Services.IElementClipboard? clipboard = null,
+        string? recentFilesPath = null)
     {
         _clipboard = clipboard;
+        _recentFilesPath = recentFilesPath;
+        RecentFiles = new(Services.RecentFilesStore.Load(recentFilesPath));
         // A different window can copy at any time; paste reads the clipboard on demand.
         CanPaste = clipboard is not null;
         _renderQueue = new RenderQueue<RenderRequest, RenderPass>(Render);
@@ -2923,7 +2927,7 @@ public partial class DesignerViewModel : ViewModelBase
     /// <summary>Moves (or adds) a path to the top of the recent files list.</summary>
     public void RegisterRecentFile(string path)
     {
-        SyncRecentFiles(Services.RecentFilesStore.Add(path));
+        SyncRecentFiles(Services.RecentFilesStore.Add(path, _recentFilesPath));
     }
 
     [RelayCommand]
@@ -2960,7 +2964,7 @@ public partial class DesignerViewModel : ViewModelBase
 
             // A path that no longer opens has no business in a menu of paths to open.
             // Harmless for one that was never in the list.
-            SyncRecentFiles(Services.RecentFilesStore.Remove(path));
+            SyncRecentFiles(Services.RecentFilesStore.Remove(path, _recentFilesPath));
             return false;
         }
     }

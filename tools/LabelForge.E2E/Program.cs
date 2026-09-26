@@ -78,7 +78,8 @@ var vm = new MainViewModel(
     new LabelForge.Core.Fields.FieldCatalogStore(catalogsPath),
     new LabelForge.Core.Io.RecoveryStore(recoveryDir, "e2e"),
     () => new LabelForge.Core.Rendering.BinaryKitsRenderer(),
-    new LabelForge.Core.Settings.UserSettingsStore(settingsPath));
+    new LabelForge.Core.Settings.UserSettingsStore(settingsPath),
+    recentFilesPath: Path.Combine(scratchRoot, "e2e-recent-files.json"));
 var window = new MainWindow { DataContext = vm };
 window.Show();
 

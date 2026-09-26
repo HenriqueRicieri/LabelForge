@@ -18,6 +18,7 @@ public partial class MainViewModel : ViewModelBase
     /// <param name="comparisonRenderer">What the viewer's compare mode measures against.</param>
     /// <param name="userSettingsStore">Where per-machine editing preferences live.</param>
     /// <param name="clipboard">The platform element clipboard; null keeps copies within this designer.</param>
+    /// <param name="recentFilesPath">Scratch recent-file storage for QA; null uses the per-user file.</param>
     /// <remarks>Inject scratch stores and an offline comparison renderer in the harness.
     /// Clipboard checks use Avalonia's headless clipboard, never the user's OS clipboard.</remarks>
     public MainViewModel(
@@ -26,10 +27,11 @@ public partial class MainViewModel : ViewModelBase
         LabelForge.Core.Io.RecoveryStore? recoveryStore = null,
         Func<LabelForge.Core.Rendering.IZplRenderer>? comparisonRenderer = null,
         LabelForge.Core.Settings.UserSettingsStore? userSettingsStore = null,
-        Services.IElementClipboard? clipboard = null)
+        Services.IElementClipboard? clipboard = null,
+        string? recentFilesPath = null)
     {
         Designer = new DesignerViewModel(
-            userMediaStore, fieldCatalogStore, recoveryStore, userSettingsStore, clipboard);
+            userMediaStore, fieldCatalogStore, recoveryStore, userSettingsStore, clipboard, recentFilesPath);
         Viewer = new ViewerViewModel(comparisonRenderer);
     }
 

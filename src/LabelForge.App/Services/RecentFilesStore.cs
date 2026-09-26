@@ -19,12 +19,13 @@ public static class RecentFilesStore
 
     private static string FilePath => UserDataPaths.FilePath("recent-files.json");
 
-    public static IReadOnlyList<string> Load()
+    public static IReadOnlyList<string> Load(string? storagePath = null)
     {
         try
         {
-            return File.Exists(FilePath)
-                ? JsonSerializer.Deserialize<List<string>>(File.ReadAllText(FilePath)) ?? []
+            string file = storagePath ?? FilePath;
+            return File.Exists(file)
+                ? JsonSerializer.Deserialize<List<string>>(File.ReadAllText(file)) ?? []
                 : [];
         }
         catch (Exception)
@@ -33,35 +34,36 @@ public static class RecentFilesStore
         }
     }
 
-    public static IReadOnlyList<string> Add(string path)
+    public static IReadOnlyList<string> Add(string path, string? storagePath = null)
     {
-        List<string> entries = Load().Where(e => !PathEquals(e, path)).ToList();
+        List<string> entries = Load(storagePath).Where(e => !PathEquals(e, path)).ToList();
         entries.Insert(0, path);
         if (entries.Count > MaxEntries)
         {
             entries.RemoveRange(MaxEntries, entries.Count - MaxEntries);
         }
 
-        Save(entries);
+        Save(entries, storagePath);
         return entries;
     }
 
-    public static IReadOnlyList<string> Remove(string path)
+    public static IReadOnlyList<string> Remove(string path, string? storagePath = null)
     {
-        List<string> entries = Load().Where(e => !PathEquals(e, path)).ToList();
-        Save(entries);
+        List<string> entries = Load(storagePath).Where(e => !PathEquals(e, path)).ToList();
+        Save(entries, storagePath);
         return entries;
     }
 
     private static bool PathEquals(string a, string b) =>
         string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
-    private static void Save(List<string> entries)
+    private static void Save(List<string> entries, string? storagePath)
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(entries));
+            string file = storagePath ?? FilePath;
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllText(file, JsonSerializer.Serialize(entries));
         }
         catch (Exception)
         {

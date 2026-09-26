@@ -28,6 +28,9 @@ jobs:
       - name: Test
         run: dotnet test --no-build --configuration Release --verbosity normal
 
+      - name: Check native QA bootstrap and storage isolation
+        run: dotnet run --project tools/LabelForge.NativeQA --configuration Release -- --self-check
+
   ui-regression:
     name: UI (${{ matrix.scenario }})
     runs-on: windows-latest
