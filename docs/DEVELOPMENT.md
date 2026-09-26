@@ -160,7 +160,16 @@ powershell -ExecutionPolicy Bypass -File scripts/pack-windows.ps1 -Version x.y.z
 Replace `x.y.z` with the chosen version. Output goes to `artifacts/publish/win-x64`
 and `artifacts/releases`. Omitting `-Version` uses the app project's version, currently
 `0.4.0`. An override is applied to both the app publish and package. The publish includes
-the existing project, dependency and font notices. Their full review remains a release check.
+the project license, font OFL and the `licenses` directory. Packaging checks the
+published dependency versions against [the reviewed inventory](../licenses/manifest.json)
+and verifies the original notice bytes before running Velopack. To check an existing
+publish, run `scripts/check-third-party-notices.ps1 -PublishDirectory <publish-folder>`.
+Update the inventory and source texts when a dependency changes. Git preserves the
+upstream text bytes; avoid line-ending conversion when editing those files.
+
+The current inventory covers 28 runtime packages, including the self-contained .NET
+runtime, and two embedded fonts. The separate native Velopack Setup/stub/Update.exe
+dependency review remains a release check. See [third-party notices](../THIRD-PARTY-NOTICES.md).
 
 Velopack rejects versions already present in its output directory. To rebuild a local
 candidate, use a fresh folder with `-OutputDirectory artifacts/releases/candidate-name`.

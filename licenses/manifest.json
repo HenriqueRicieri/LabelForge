@@ -1,0 +1,408 @@
+{
+  "schemaVersion": 1,
+  "runtimeIdentifier": "win-x64",
+  "reviewed": "2026-09-26",
+  "packages": [
+    {
+      "id": "Microsoft.NETCore.App.Runtime.win-x64",
+      "version": "10.0.1",
+      "kind": "runtimepack",
+      "license": "MIT",
+      "notices": [
+        "DotNet-LICENSE.txt",
+        "DotNet-NOTICES.txt"
+      ]
+    },
+    {
+      "id": "Avalonia",
+      "version": "12.1.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Avalonia-LICENSE.txt",
+        "Avalonia-NOTICE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Angle.Windows.Natives",
+      "version": "2.1.27548.20260419",
+      "kind": "package",
+      "license": "BSD-3-Clause",
+      "notices": [
+        "ANGLE-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.AvaloniaEdit",
+      "version": "12.0.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "AvaloniaEdit-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Desktop",
+      "version": "12.1.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Avalonia-LICENSE.txt",
+        "Avalonia-NOTICE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Fonts.Inter",
+      "version": "12.1.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Avalonia-LICENSE.txt",
+        "Avalonia-NOTICE.txt",
+        "Inter-OFL.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.FreeDesktop",
+      "version": "12.1.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Avalonia-LICENSE.txt",
+        "Avalonia-NOTICE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.FreeDesktop.AtSpi",
+      "version": "12.1.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Avalonia-LICENSE.txt",
+        "Avalonia-NOTICE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.HarfBuzz",
+      "version": "12.1.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Avalonia-LICENSE.txt",
+        "Avalonia-NOTICE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Native",
+      "version": "12.1.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Avalonia-LICENSE.txt",
+        "Avalonia-NOTICE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Remote.Protocol",
+      "version": "12.1.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Avalonia-LICENSE.txt",
+        "Avalonia-NOTICE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Skia",
+      "version": "12.1.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Avalonia-LICENSE.txt",
+        "Avalonia-NOTICE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Themes.Fluent",
+      "version": "12.1.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Avalonia-LICENSE.txt",
+        "Avalonia-NOTICE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Win32",
+      "version": "12.1.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Avalonia-LICENSE.txt",
+        "Avalonia-NOTICE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.X11",
+      "version": "12.1.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Avalonia-LICENSE.txt",
+        "Avalonia-NOTICE.txt"
+      ]
+    },
+    {
+      "id": "BinaryKits.Zpl.Label",
+      "version": "3.3.1",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "BinaryKits-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "BinaryKits.Zpl.Viewer",
+      "version": "1.3.1",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "BinaryKits-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "CommunityToolkit.Mvvm",
+      "version": "8.4.2",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "CommunityToolkit-LICENSE.txt",
+        "CommunityToolkit-NOTICES.txt"
+      ]
+    },
+    {
+      "id": "HarfBuzzSharp",
+      "version": "8.3.1.3",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "HarfBuzzSharp-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "HarfBuzzSharp.NativeAssets.Win32",
+      "version": "8.3.1.3",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "HarfBuzzSharp-LICENSE.txt",
+        "HarfBuzzSharp-NOTICES.txt"
+      ]
+    },
+    {
+      "id": "MicroCom.Runtime",
+      "version": "0.11.6",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "MicroCom-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "SixLabors.ImageSharp",
+      "version": "3.1.12",
+      "kind": "package",
+      "license": "Apache-2.0",
+      "notices": [
+        "Apache-2.0.txt",
+        "ImageSharp-UPSTREAM-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "SkiaSharp",
+      "version": "3.119.4",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "SkiaSharp-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "SkiaSharp.HarfBuzz",
+      "version": "3.119.1",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "SkiaSharp-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "SkiaSharp.NativeAssets.Win32",
+      "version": "3.119.4",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "SkiaSharp-LICENSE.txt",
+        "SkiaSharp-NOTICES.txt"
+      ]
+    },
+    {
+      "id": "Tmds.DBus.Protocol",
+      "version": "0.94.1",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Tmds.DBus-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "Velopack",
+      "version": "1.2.0",
+      "kind": "package",
+      "license": "MIT",
+      "notices": [
+        "Velopack-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "ZXing.Net",
+      "version": "0.16.11",
+      "kind": "package",
+      "license": "Apache-2.0",
+      "notices": [
+        "ZXing-LICENSE.txt",
+        "ZXing-COPYRIGHT.txt"
+      ]
+    }
+  ],
+  "fonts": [
+    {
+      "id": "Roboto Condensed Regular",
+      "notices": [
+        "RobotoCondensed-OFL.txt"
+      ]
+    },
+    {
+      "id": "Inter",
+      "version": "3.019",
+      "notices": [
+        "Inter-OFL.txt"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "Avalonia-LICENSE.txt",
+      "sha256": "213814d306090074d234d760239ff0f67eb9b8d20eefb4d5631bb39dbe0b769b",
+      "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/12.1.0/licence.md"
+    },
+    {
+      "path": "Avalonia-NOTICE.txt",
+      "sha256": "dd6f80852d16320c865a2e403ffd1a8b07a0e34c5b37122c0bc2343639ff68e6",
+      "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/12.1.0/NOTICE.md"
+    },
+    {
+      "path": "AvaloniaEdit-LICENSE.txt",
+      "sha256": "8a13531b616df7e9cd5d58bd8588da2288e14fab9e6785d1aead5c87e0a507d0",
+      "source": "https://raw.githubusercontent.com/AvaloniaUI/AvaloniaEdit/86fdebec4cff7affb0e14c7885df71d28edce777/LICENSE"
+    },
+    {
+      "path": "MicroCom-LICENSE.txt",
+      "sha256": "6ee769c9ac4dac9abb16b98b1341e9528ff9f4ab685481410d3376d14148f3a9",
+      "source": "https://raw.githubusercontent.com/kekekeks/MicroCom/76785efcafd91b5902fd19dd11145f6dd655b7b4/LICENSE"
+    },
+    {
+      "path": "Tmds.DBus-LICENSE.txt",
+      "sha256": "aca3b49277abcc7886ccb2f115603a9f5b15fc3f96019a10c00f2974098b210c",
+      "source": "https://raw.githubusercontent.com/tmds/Tmds.DBus/b4a7fed0b878f74cb54f7cca84d2889af4e596ba/COPYING"
+    },
+    {
+      "path": "Velopack-LICENSE.txt",
+      "sha256": "91845db83551c877ebbb1118e0fb92e4e527290d23b995c55dcd438b3293943f",
+      "source": "https://raw.githubusercontent.com/velopack/velopack/1.2.0/LICENSE"
+    },
+    {
+      "path": "ZXing-LICENSE.txt",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "source": "https://raw.githubusercontent.com/micjahn/ZXing.Net/v0.16.11.0/COPYING"
+    },
+    {
+      "path": "Inter-OFL.txt",
+      "sha256": "4d7d9c95e7d7f2f0ebf76d5e0b344826b74e903a34028ee18ab54bb639e45906",
+      "source": "https://raw.githubusercontent.com/rsms/inter/v3.19/LICENSE.txt"
+    },
+    {
+      "path": "Apache-2.0.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+    },
+    {
+      "path": "ANGLE-LICENSE.txt",
+      "sha256": "54aff7276217df9f6b5181613999d208c9e40d2b1d51bf55217837e6871a4a63",
+      "source": "https://api.nuget.org/v3-flatcontainer/avalonia.angle.windows.natives/2.1.27548.20260419/avalonia.angle.windows.natives.2.1.27548.20260419.nupkg#LICENSE"
+    },
+    {
+      "path": "BinaryKits-LICENSE.txt",
+      "sha256": "afb11426e09da40a1ae4f8fa17ddcc6b6a52d14df04c29bc5bcd06eb8730624d",
+      "source": "https://api.nuget.org/v3-flatcontainer/binarykits.zpl.viewer/1.3.1/binarykits.zpl.viewer.1.3.1.nupkg#LICENSE/LICENSE"
+    },
+    {
+      "path": "CommunityToolkit-LICENSE.txt",
+      "sha256": "651997ef19dbb9ecb8dd660dbc86444a65af21f18cfe08daa69bf201cd5cfdfc",
+      "source": "https://api.nuget.org/v3-flatcontainer/communitytoolkit.mvvm/8.4.2/communitytoolkit.mvvm.8.4.2.nupkg#License.md"
+    },
+    {
+      "path": "CommunityToolkit-NOTICES.txt",
+      "sha256": "7774f8b0ab66bfb47ec154ce24a2d6d574febc44a74d940b8a037d1c56756163",
+      "source": "https://api.nuget.org/v3-flatcontainer/communitytoolkit.mvvm/8.4.2/communitytoolkit.mvvm.8.4.2.nupkg#ThirdPartyNotices.txt"
+    },
+    {
+      "path": "SkiaSharp-LICENSE.txt",
+      "sha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938",
+      "source": "https://api.nuget.org/v3-flatcontainer/skiasharp/3.119.4/skiasharp.3.119.4.nupkg#LICENSE.txt"
+    },
+    {
+      "path": "HarfBuzzSharp-LICENSE.txt",
+      "sha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938",
+      "source": "https://api.nuget.org/v3-flatcontainer/harfbuzzsharp/8.3.1.3/harfbuzzsharp.8.3.1.3.nupkg#LICENSE.txt"
+    },
+    {
+      "path": "SkiaSharp-NOTICES.txt",
+      "sha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5",
+      "source": "https://api.nuget.org/v3-flatcontainer/skiasharp.nativeassets.win32/3.119.4/skiasharp.nativeassets.win32.3.119.4.nupkg#THIRD-PARTY-NOTICES.txt"
+    },
+    {
+      "path": "HarfBuzzSharp-NOTICES.txt",
+      "sha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5",
+      "source": "https://api.nuget.org/v3-flatcontainer/harfbuzzsharp.nativeassets.win32/8.3.1.3/harfbuzzsharp.nativeassets.win32.8.3.1.3.nupkg#THIRD-PARTY-NOTICES.txt"
+    },
+    {
+      "path": "ImageSharp-UPSTREAM-LICENSE.txt",
+      "sha256": "fdb7f24db8a6838eba1477242d2457bf6db2f3682b7cb3a16824e9f2f07936c2",
+      "source": "https://api.nuget.org/v3-flatcontainer/sixlabors.imagesharp/3.1.12/sixlabors.imagesharp.3.1.12.nupkg#LICENSE"
+    },
+    {
+      "path": "DotNet-LICENSE.txt",
+      "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.runtime.win-x64/10.0.1/microsoft.netcore.app.runtime.win-x64.10.0.1.nupkg#LICENSE.TXT"
+    },
+    {
+      "path": "DotNet-NOTICES.txt",
+      "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.runtime.win-x64/10.0.1/microsoft.netcore.app.runtime.win-x64.10.0.1.nupkg#THIRD-PARTY-NOTICES.TXT"
+    },
+    {
+      "path": "RobotoCondensed-OFL.txt",
+      "sha256": "061402327a96aadb0bfb694a960ed289ecd38d383e396243831ab81feb109c41",
+      "source": "https://github.com/HenriqueRicieri/LabelForge/blob/main/src/LabelForge.Core/Rendering/Fonts/OFL.txt"
+    },
+    {
+      "path": "ZXing-COPYRIGHT.txt",
+      "sha256": "6995bda3d9af1d6e50055b6527312c7a4c248d22fa52c77af18aa6d2f7a0b019",
+      "source": "https://github.com/micjahn/ZXing.Net/blob/v0.16.11.0/Source/lib/BarcodeWriterGeneric.cs"
+    }
+  ],
+  "remainingReview": [
+    "Native Velopack Setup, stub and Update.exe Rust dependencies; these are not described by the app deps.json."
+  ]
+}

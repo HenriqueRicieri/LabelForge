@@ -1,3 +1,6 @@
 # ZPL fixtures are label data, not source code. GitHub Linguist has no ZPL grammar and
 # files *.zpl under "Zimpl", so keep them out of the repository language statistics.
 *.zpl linguist-detectable=false
+
+# Preserve upstream notice bytes used by the license inventory.
+licenses/*.txt -text linguist-vendored=true

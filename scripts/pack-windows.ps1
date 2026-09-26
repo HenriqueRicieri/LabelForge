@@ -35,6 +35,8 @@ dotnet publish $projectPath `
     -c Release -r win-x64 --self-contained true -p:Version=$Version -o $publishDir
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 
+& (Join-Path $PSScriptRoot 'check-third-party-notices.ps1') -PublishDirectory $publishDir
+
 Write-Host "Packing installer with Velopack..."
 vpk pack --packId LabelForge --packVersion $Version --packDir $publishDir `
     --mainExe LabelForge.App.exe --packTitle "LabelForge" --outputDir $releaseDir
