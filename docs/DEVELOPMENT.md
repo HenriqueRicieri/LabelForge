@@ -70,6 +70,7 @@ Build the harness separately and run the relevant scenarios:
 ```powershell
 dotnet build tools/LabelForge.E2E --configuration Release
 dotnet run --project tools/LabelForge.E2E --no-build --configuration Release -- ui-layout
+dotnet run --project tools/LabelForge.E2E --no-build --configuration Release -- recovery-ui
 dotnet run --project tools/LabelForge.E2E --no-build --configuration Release -- transform-gestures
 dotnet run --project tools/LabelForge.E2E --no-build --configuration Release -- cm-units
 dotnet run --project tools/LabelForge.E2E --no-build --configuration Release -- viewer-size
@@ -79,7 +80,8 @@ dotnet run --project tools/LabelForge.E2E --no-build --configuration Release -- 
 dotnet run --project tools/LabelForge.E2E --no-build --configuration Release -- designer dark synthetic
 ```
 
-These are CI's eight UI jobs, alongside build-and-test. The workflow runs on pushes
+CI runs eight UI jobs alongside build-and-test. The recovery contrast checks are
+included in ui-layout; recovery-ui runs just those six checks. The workflow runs on pushes
 to `main` and PRs targeting `main`; failed UI logs/screenshots are kept for seven days.
 Focused clipboard, selection, spacing, printer-status and canvas modes also exist;
 see `Program.cs`.

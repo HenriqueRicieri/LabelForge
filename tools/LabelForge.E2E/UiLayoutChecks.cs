@@ -27,6 +27,7 @@ internal static class UiLayoutChecks
         foreach (var theme in new[] { ThemeVariant.Light, ThemeVariant.Dark })
         {
             Application.Current!.RequestedThemeVariant = theme;
+            RecoveryContrastChecks.Run(window, main, Check);
             foreach (var size in new[] { (1024, 640), (1200, 760), (1440, 900) })
             {
                 window.Width = size.Item1;

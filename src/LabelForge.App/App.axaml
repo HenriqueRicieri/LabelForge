@@ -19,6 +19,8 @@
                     <SolidColorBrush x:Key="AppSeparator" Color="#C9C9C9" />
                     <SolidColorBrush x:Key="AppCanvasSurface" Color="#D9D9D9" />
                     <SolidColorBrush x:Key="AppPreviewSurface" Color="#D9D9D9" />
+                    <SolidColorBrush x:Key="AppRecoveryBackground" Color="#FEF3C7" />
+                    <SolidColorBrush x:Key="AppRecoveryForeground" Color="#78350F" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="AppBarBackground" Color="#272727" />
@@ -27,6 +29,8 @@
                     <SolidColorBrush x:Key="AppSeparator" Color="#4F4F4F" />
                     <SolidColorBrush x:Key="AppCanvasSurface" Color="#3C3C3C" />
                     <SolidColorBrush x:Key="AppPreviewSurface" Color="#3C3C3C" />
+                    <SolidColorBrush x:Key="AppRecoveryBackground" Color="#5C3D0A" />
+                    <SolidColorBrush x:Key="AppRecoveryForeground" Color="#FEF3C7" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>

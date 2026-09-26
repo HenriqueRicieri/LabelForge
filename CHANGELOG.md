@@ -8,6 +8,8 @@ not yet been published as a release.
 
 ### Editing and workspace
 
+- Fixed recovery buttons becoming unreadable in the dark theme. The recovery
+  banner now follows the selected theme.
 - Added labeled tools, a resizable/collapsible inspector with Properties, Elements
   and Data tabs, compact layouts and a separate label-setup dialog.
 - Added place-and-type, repeat placement, field search, F2, quick content editing

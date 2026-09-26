@@ -551,7 +551,7 @@
         </Border>
 
         <!-- Recovery offer: only after a session that did not shut down -->
-        <Border Grid.Row="1" Padding="10,6" Background="#FEF3C7"
+        <Border Name="RecoveryBanner" Grid.Row="1" Padding="10,6" Background="{DynamicResource AppRecoveryBackground}"
                 IsVisible="{Binding HasRecoveryOffer}">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Content="Discard" Margin="6,0,0,0"
@@ -559,7 +559,7 @@
                 <Button DockPanel.Dock="Right" Content="Recover"
                         Command="{Binding RecoverDocumentCommand}" />
                 <TextBlock Text="{Binding RecoveryOffer}" VerticalAlignment="Center"
-                           Foreground="#78350F" TextWrapping="Wrap" />
+                           Foreground="{DynamicResource AppRecoveryForeground}" TextWrapping="Wrap" />
             </DockPanel>
         </Border>
 
