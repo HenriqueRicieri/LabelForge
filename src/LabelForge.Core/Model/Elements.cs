@@ -34,7 +34,8 @@ public sealed class TextElement : Element
     /// down to a whole multiple of the font's cell.</summary>
     public int FontHeightDots { get; set; } = 30;
 
-    /// <summary>Character width in dots. If 0, the printer derives it from the height.</summary>
+    /// <summary>Character width in dots. If 0, ^A omits the width and the printer
+    /// uses its font default; the preview estimates width from height.</summary>
     public int FontWidthDots { get; set; }
 
     /// <summary>

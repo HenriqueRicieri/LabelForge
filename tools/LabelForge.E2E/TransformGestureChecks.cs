@@ -78,6 +78,14 @@ internal static class TransformGestureChecks
                 resizedText.FontHeightDots > 60 && resizedText.FontWidthDots == 0 &&
                 textAfter.Width > textBefore.Width && textAfter.Height > textBefore.Height);
 
+            resizedText = LoadText(fontWidthDots: 60);
+            textBefore = textBounds.GetBounds(resizedText);
+            DragTextHandle(textBefore.X + textBefore.Width, textBefore.Y + textBefore.Height,
+                textBefore.X + textBefore.Width + 40, textBefore.Y + textBefore.Height + 30);
+            check("Corner keeps a newly explicit font width proportional",
+                resizedText.FontHeightDots > 60 &&
+                resizedText.FontWidthDots == resizedText.FontHeightDots);
+
             resizedText = LoadText(blockWidthDots: 320);
             textBefore = textBounds.GetBounds(resizedText);
             DragTextHandle(
@@ -421,12 +429,14 @@ internal static class TransformGestureChecks
             Pump(150);
         }
 
-        TextElement LoadText(Orientation orientation = Orientation.Normal, int blockWidthDots = 0)
+        TextElement LoadText(Orientation orientation = Orientation.Normal,
+            int blockWidthDots = 0, int fontWidthDots = 0)
         {
             var document = new LabelDocument { WidthMm = 100, HeightMm = 80, Dpmm = 8,
                 CheckQuietZones = false };
             var text = new TextElement { X = 200, Y = 160, Text = "Scale me",
-                FontHeightDots = 60, Orientation = orientation, BlockWidthDots = blockWidthDots };
+                FontHeightDots = 60, FontWidthDots = fontWidthDots,
+                Orientation = orientation, BlockWidthDots = blockWidthDots };
             document.Elements.Add(text);
             designer.LoadDocument(document, path: null);
             designer.Selection.Set(text);

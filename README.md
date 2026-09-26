@@ -71,10 +71,11 @@ labels, and the designer, viewer, printing, and export paths are implemented and
   movement, leaving a press on the selection free to drag the whole group.
 - Text uses Zebra's scalable font 0 by default. Its height and character width change one
   printer dot at a time, so centimeter entries round to the nearest printable dot. Bitmap
-  fonts A-H use whole multiples of their character cells. Automatic character width
-  follows the height; the inspector shows that effective width and lets you turn automatic
-  sizing off. For a single text field, top and bottom handles change font height, left and
-  right handles change character width, and corners scale both proportionally. On rotated
+  fonts A-H use whole multiples of their character cells. New text starts with an
+  explicit character width matching its height, so ZPL and the preview agree. Auto omits
+  width from ZPL; the printer then uses its font default, and the inspector shows a
+  preview estimate. For a single text field, top and bottom handles change font height;
+  left and right handles change character width, and corners scale both proportionally. On rotated
   text, a handle follows the visual axis under the pointer. On a text block, horizontal
   resizing also changes the wrapping width so the selected box follows the handle.
 - Resize several selected fields or a group with the outer selection handles. Corners

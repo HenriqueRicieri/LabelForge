@@ -46,6 +46,7 @@ internal sealed class StarterSheet
             X = Dots(xMm),
             Y = Dots(yMm),
             FontHeightDots = Dots(heightMm),
+            FontWidthDots = Dots(heightMm),
             Text = text,
         });
 

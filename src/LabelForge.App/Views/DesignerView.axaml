@@ -93,7 +93,7 @@
                                IsVisible="{Binding !IsScalableFont}" />
                     <CheckBox Grid.Column="1" Name="FontWidthAutoInput" Content="Auto"
                               IsChecked="{Binding IsFontWidthAutomatic}"
-                              ToolTip.Tip="The printer derives character width from height when width is omitted from ^A." />
+                              ToolTip.Tip="Auto omits width from ^A. The printer uses its font default, which may differ from the preview estimate." />
                 </Grid>
                 <NumericUpDown Name="FontWidthInput" Value="{Binding FontWidth}" Tag="{Binding FontWidth, Mode=OneWay}"
                                LostFocus="OnMeasuredInputLostFocus" Minimum="{Binding MinFontWidth}" Maximum="{Binding MaxFontSize}"

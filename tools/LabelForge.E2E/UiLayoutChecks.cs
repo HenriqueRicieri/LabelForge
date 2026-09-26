@@ -12,6 +12,7 @@ using Avalonia.VisualTree;
 using LabelForge.App.ViewModels;
 using LabelForge.App.Views;
 using LabelForge.Core.Model;
+using LabelForge.Core.Zpl;
 
 internal static class UiLayoutChecks
 {
@@ -241,6 +242,10 @@ internal static class UiLayoutChecks
             window.KeyTextInput("a");
             Pump(100);
             Check("typing replaces starter text", ((TextElement)d.SelectedElement!).Text == "a");
+            Check("new text declares the width shown in the preview",
+                ((TextElement)d.SelectedElement!).FontWidthDots == 40 &&
+                new ZplGenerator().Generate(d.Document).Contains(
+                    "^A0N,40,40^FDa", StringComparison.Ordinal));
             using (var placementFrame = window.CaptureRenderedFrame())
                 placementFrame?.Save(Path.Combine(output, "place-and-type.png"), PngBitmapEncoderOptions.Default);
 
@@ -290,7 +295,7 @@ internal static class UiLayoutChecks
             var autoWidth = view.FindControl<ContentControl>("PropertiesContent")!
                 .GetVisualDescendants().OfType<CheckBox>()
                 .FirstOrDefault(box => box.Name == "FontWidthAutoInput");
-            Check("text shows its effective width instead of zero",
+            Check("automatic text shows a preview width instead of zero",
                 fontWidthInput?.Value == 0.5m && !fontWidthInput.IsEnabled && autoWidth?.IsChecked == true);
             if (autoWidth is not null && fontWidthInput is not null)
             {

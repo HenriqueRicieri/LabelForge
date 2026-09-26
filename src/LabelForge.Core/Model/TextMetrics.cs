@@ -162,9 +162,9 @@ public static class TextMetrics
             return WidthDots(element.Text, element.FontHeightDots, element.FontWidthDots);
         }
 
-        // A bitmapped font prints in whole multiples of its cell, so the requested size
-        // is read back as the multiple the printer will actually use. The width follows
-        // the height when no width was asked for, which is what ^A does.
+        // A bitmapped font prints in whole multiples of its cell. If ZPL omitted
+        // width, estimate it from the height for the preview; the printer may use
+        // a different ^CF default.
         int requested = element.FontWidthDots > 0
             ? element.FontWidthDots
             : cell.WidthDots * ZplFont.Magnification(
@@ -186,8 +186,8 @@ public static class TextMetrics
     /// Width of a string in the scalable font, in dots.
     /// </summary>
     /// <param name="fontHeightDots">The ^A0 character height.</param>
-    /// <param name="fontWidthDots">The ^A0 character width, or 0 to let it follow the
-    /// height. Either way it scales every advance by the same factor: measured at widths
+    /// <param name="fontWidthDots">The ^A0 character width, or 0 to estimate it from
+    /// height in the preview. Either way it scales every advance by the same factor: measured at widths
     /// of 20, 40 and 60 against a height of 40, each glyph kept its proportion exactly,
     /// so the font stretches rather than becoming fixed pitch.</param>
     public static int WidthDots(string text, int fontHeightDots, int fontWidthDots)

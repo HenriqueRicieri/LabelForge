@@ -401,6 +401,7 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
             OnPropertyChanged(nameof(IsFontWidthAutomatic));
             OnPropertyChanged(nameof(FontWidth));
             OnPropertyChanged(nameof(MinFontWidth));
+            OnPropertyChanged(nameof(FontNote));
         }
     }
 
@@ -414,11 +415,15 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
             char font = char.ToUpperInvariant(_text.Font);
             if (ZplFont.Cell(font, Document.Dpmm) is not { } cell)
             {
-                return "Smooth font 0 scales one printer dot at a time. Automatic width follows height.";
+                return IsFontWidthAutomatic
+                    ? "Smooth font 0 scales by printer dot. Auto uses the printer font default; the width shown is a preview estimate."
+                    : "Smooth font 0 scales one printer dot at a time.";
             }
 
             string size = $"Fixed pitch, {cell.HeightDots} x {cell.WidthDots} dots per "
                           + $"character at 1x, up to {ZplFont.MaxMagnification}x.";
+            if (IsFontWidthAutomatic)
+                size += " Auto width uses the printer font default; the preview estimates it.";
             return ZplFont.RendersFaithfully(font)
                 ? size
                 : size + " The preview draws this font at a slightly different width than"
@@ -444,7 +449,7 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
         });
     }
 
-    /// <summary>The panel shows the effective width, including when ^A0 omits it.</summary>
+    /// <summary>The panel estimates width from height when ZPL omits it.</summary>
     public decimal FontWidth
     {
         get => FromDots(_text.FontWidthDots > 0 ? _text.FontWidthDots : _text.FontHeightDots);
@@ -453,6 +458,7 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
             Edit(_text.FontWidthDots, Math.Max(ToDots(value), 10), v => _text.FontWidthDots = v);
             OnPropertyChanged(nameof(IsFontWidthAutomatic));
             OnPropertyChanged(nameof(MinFontWidth));
+            OnPropertyChanged(nameof(FontNote));
         }
     }
 
@@ -474,6 +480,7 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
             OnPropertyChanged(nameof(FontWidth));
             OnPropertyChanged(nameof(BitmapWidthMagnification));
             OnPropertyChanged(nameof(MinFontWidth));
+            OnPropertyChanged(nameof(FontNote));
         }
     }
 

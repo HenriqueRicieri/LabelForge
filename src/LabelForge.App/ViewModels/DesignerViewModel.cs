@@ -1670,7 +1670,7 @@ public partial class DesignerViewModel : ViewModelBase
 
     [RelayCommand]
     private void AddText() => ArmInsert("Text",
-        () => new TextElement { Text = "New text", FontHeightDots = 40 });
+        () => new TextElement { Text = "New text", FontHeightDots = 40, FontWidthDots = 40 });
 
     [RelayCommand]
     private void AddBox() => ArmInsert("Box",

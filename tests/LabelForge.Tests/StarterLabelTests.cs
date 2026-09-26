@@ -83,6 +83,15 @@ public sealed class StarterLabelTests
         Assert.NotEmpty(document.Elements);
     }
 
+    [Theory]
+    [MemberData(nameof(EveryStarter))]
+    public void FreshStarterTextHasExplicitPrintableWidth(string name)
+    {
+        LabelDocument document = Find(name).Create(8);
+        Assert.All(document.Elements.OfType<TextElement>(), text =>
+            Assert.Equal(text.FontHeightDots, text.FontWidthDots));
+    }
+
     /// <summary>
     /// A fresh document every call, with fresh element identities. The designer edits
     /// whatever it is handed, so a shared instance would carry one session's edits into the
