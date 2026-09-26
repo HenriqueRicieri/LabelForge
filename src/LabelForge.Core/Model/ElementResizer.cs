@@ -62,15 +62,19 @@ public static class ElementResizer
 
         if (ZplFont.Cell(text.Font, dpmm) is { } bitmap)
         {
-            height = Math.Clamp(Round((double)height / bitmap.HeightDots), 1,
-                ZplFont.MaxMagnification) * bitmap.HeightDots;
-            width = Math.Clamp(Round((double)width / bitmap.WidthDots), 1,
-                ZplFont.MaxMagnification) * bitmap.WidthDots;
+            if (mode != TextResizeMode.Width)
+                height = Math.Clamp(Round((double)height / bitmap.HeightDots), 1,
+                    ZplFont.MaxMagnification) * bitmap.HeightDots;
+            if (mode != TextResizeMode.Height)
+                width = Math.Clamp(Round((double)width / bitmap.WidthDots), 1,
+                    ZplFont.MaxMagnification) * bitmap.WidthDots;
         }
         else
         {
-            height = Math.Clamp(height, 10, 32_000);
-            width = Math.Clamp(width, 10, 32_000);
+            if (mode != TextResizeMode.Width)
+                height = Math.Clamp(height, 10, 32_000);
+            if (mode != TextResizeMode.Height)
+                width = Math.Clamp(width, 10, 32_000);
         }
 
         bool keepAutomaticWidth = start.WidthDots == 0 &&
@@ -90,7 +94,8 @@ public static class ElementResizer
                 _ => Round(start.BlockWidthDots * (double)targetWidth /
                     Math.Max(start.BoundsWidthDots, 1)),
             };
-            text.BlockWidthDots = Math.Clamp(blockWidth, 1, 9999);
+            text.BlockWidthDots = mode == TextResizeMode.Height
+                ? start.BlockWidthDots : Math.Clamp(blockWidth, 1, 9999);
         }
     }
 

@@ -73,6 +73,44 @@ public sealed class ElementResizerTests
         Assert.Equal((40, 0), (text.FontHeightDots, text.FontWidthDots));
     }
 
+    [Theory]
+    [InlineData('0', 6, 4)]
+    [InlineData('0', 40_000, 35_000)]
+    [InlineData('A', 19, 11)]
+    public void TextEdgeResizePreservesTheUnchangedImportedDimension(char font, int height, int width)
+    {
+        var text = new TextElement { Text = "Imported", Font = font,
+            FontHeightDots = height, FontWidthDots = width };
+        TextResizeStart start = ElementResizer.CaptureText(text);
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots * 2,
+            start.BoundsHeightDots, TextResizeMode.Width);
+        Assert.Equal(height, text.FontHeightDots);
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots,
+            start.BoundsHeightDots * 2, TextResizeMode.Height);
+        Assert.Equal(width, text.FontWidthDots);
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots,
+            start.BoundsHeightDots, TextResizeMode.Height);
+        Assert.Equal((height, width), (text.FontHeightDots, text.FontWidthDots));
+    }
+
+    [Fact]
+    public void TextHeightResizePreservesAnImportedBlockWidthAboveTheEditorLimit()
+    {
+        var text = new TextElement { Text = "Imported block", FontHeightDots = 40,
+            FontWidthDots = 30, BlockWidthDots = 12_000 };
+        TextResizeStart start = ElementResizer.CaptureText(text);
+
+        ElementResizer.ResizeText(text, start, start.BoundsWidthDots,
+            start.BoundsHeightDots * 2, TextResizeMode.Height);
+
+        Assert.Equal(80, text.FontHeightDots);
+        Assert.Equal(30, text.FontWidthDots);
+        Assert.Equal(12_000, text.BlockWidthDots);
+    }
+
     [Fact]
     public void Text_CornerPreservesAutomaticWidth_AndShiftAllowsFreeAxes()
     {

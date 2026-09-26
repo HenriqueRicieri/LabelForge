@@ -52,6 +52,8 @@ the authority for package versions; planning-era versions are historical.
   settings and document guides belong to the document.
 - Cancelling a gesture restores its captured start. A press or return to the start
   creates no change. Text blocks restore font dimensions and wrapping width.
+  Text edge handles apply size limits only to the resized dimension; they preserve
+  untouched imported values even outside the inspector's editing range.
 - `FontWidthDots = 0` omits width from ZPL; the printer chooses its default and the
   preview estimates it. New fields/starters specify width; old saved values stay intact.
   Font 0's pinned preview typeface remains a substitute.

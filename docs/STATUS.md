@@ -9,6 +9,21 @@ contrast defect was fixed in `d63901b` on 2026-09-26; 1,326 local tests and 400 
 checks passed. Actual native DPI coverage and installed-app tests remain open. See the
 [validation record](RELEASE-VALIDATION.md) for evidence and remaining gates.
 
+## Text resize follow-up (2026-09-26)
+
+Text edge handles now apply font limits only to the dimension being resized.
+They preserve the untouched height, character width and wrapping width from an
+imported label, including values outside the inspector's editing range. Four unit
+regressions and one canvas drag failed before the fix and pass afterward. Local
+validation passed 1,330 unit tests, 34 transform checks and 31 selection-scale
+checks; the Release solution build has zero warnings and errors. The focused
+before/after transcripts differ only in the new regression result and summary.
+
+This source change is newer than the packaged `d63901b` candidate. The native DPI
+and installer checks in the roadmap remain open.
+
+## Baseline source audit (2026-09-25)
+
 Verified on 2026-09-25 in America/Sao_Paulo. Source baseline:
 [`e78aa0d`](https://github.com/HenriqueRicieri/LabelForge/commit/e78aa0d38075cc43f244bb00906d7d433b1f41aa).
 Its CI ran on 2026-09-26 UTC.

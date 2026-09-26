@@ -97,6 +97,16 @@ internal static class TransformGestureChecks
                 resizedText.BlockWidthDots == 360 && textAfter.Width == 360 &&
                 textAfter.Height == textBefore.Height && textAfter.X == textBefore.X);
 
+            resizedText = LoadText(blockWidthDots: 320, fontWidthDots: 4);
+            textBefore = textBounds.GetBounds(resizedText);
+            DragTextHandle(textBefore.X + textBefore.Width / 2.0,
+                textBefore.Y + textBefore.Height,
+                textBefore.X + textBefore.Width / 2.0,
+                textBefore.Y + textBefore.Height + 30);
+            check("Height handle preserves an imported narrow character width",
+                resizedText.FontHeightDots == 90 && resizedText.FontWidthDots == 4 &&
+                resizedText.BlockWidthDots == 320);
+
             resizedText = LoadText(Orientation.Rotated90);
             textBefore = textBounds.GetBounds(resizedText);
             DragTextHandle(textBefore.X + textBefore.Width / 2.0,
