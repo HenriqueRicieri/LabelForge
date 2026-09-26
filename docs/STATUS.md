@@ -1,5 +1,12 @@
 # Project status
 
+Current work after the baseline below: real-printer validation was removed from
+the active plan by the maintainer for cost reasons. The candidate version is `0.4.0`;
+packaging now uses the app version by default. The E2E platform warnings are resolved;
+allocation diagnostics are added without changing the 70 KB budget. Native validation
+remains open after the automation runtime failed to start. See the
+[validation record](RELEASE-VALIDATION.md) for evidence and remaining gates.
+
 Verified on 2026-09-25 in America/Sao_Paulo. Source baseline:
 [`e78aa0d`](https://github.com/HenriqueRicieri/LabelForge/commit/e78aa0d38075cc43f244bb00906d7d433b1f41aa).
 Its CI ran on 2026-09-26 UTC.
@@ -59,9 +66,10 @@ Those totals therefore differ. The harness grades explicit assertions; other tra
 lines still require inspection when behavior changes. Headless checks do not establish
 native display scaling or physical printer behavior.
 
-Separate CI builds of the E2E harness report 11 existing CA1416 warnings around
+At the baseline, separate CI builds of the E2E harness reported 11 CA1416 warnings around
 Windows registry/file-association calls. The harness is outside `LabelForge.sln`,
-so a clean solution build does not cover those warnings.
+so a clean solution build did not cover those warnings. The current OS guard resolves
+them; the fresh separate build has zero warnings and errors.
 
 The older [F31 run](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36169382263)
 failed one dark-designer allocation assertion: the 78-element scene exceeded its
@@ -75,13 +83,14 @@ At the source audit, `main` and `origin/main` pointed to `e78aa0d`, the working 
 was clean, and the remote had only `main`. No open PRs or issues were listed. These
 are dated observations; remaining work is recorded in the roadmap.
 
-The app declares `0.3.0`. Tags `v0.2.0` and `v0.3.0` exist; `v0.3.0` dates to
+The original audit app declared `0.3.0`; the current release candidate is `0.4.0`.
+Tags `v0.2.0` and `v0.3.0` exist; `v0.3.0` dates to
 2026-07-13 and is 147 commits behind this baseline. The GitHub releases API lists
 no releases. A tag, packaging code and a tested published installer are separate
 deliverables.
 
 `scripts/pack-windows.ps1` builds self-contained win-x64 Velopack packages. Its
-default package version is still `0.1.0`; pass the intended release version explicitly.
+default now comes from the app project; an override also sets the published app version.
 Installation, upgrade, file association and recovery need fresh validation before the
 next release. The script does not establish an update feed.
 
@@ -96,8 +105,9 @@ next release. The script does not establish an update feed.
   behavior have renderer limitations. Auto character width is an estimate; the printer
   chooses its default when width is omitted. New fields use explicit width.
 - A successful network send confirms byte delivery, not physical printing. Status
-  readback is a snapshot. Printer and scanner checks remain a release gate.
+  readback is a snapshot. Physical printer/scanner checks are outside the current plan
+  by the maintainer's decision and do not block release.
 - Native Windows display scaling at 100%, 125% and 150% remains unverified.
 
-Recommended next work: native editing validation, physical output checks, CI reliability,
+Recommended next work: native editing validation, CI reliability,
 then a tested Windows release. See [Roadmap](ROADMAP.md).

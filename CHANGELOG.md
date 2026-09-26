@@ -1,8 +1,8 @@
 # Changelog
 
 User-visible changes on `main` since `v0.3.0`, reconciled with source baseline
-`e78aa0d` on 2026-09-25. The app still declares `0.3.0`; the changes below have
-not been assigned a new released version.
+`e78aa0d` on 2026-09-25. The current candidate targets `0.4.0`; these changes have
+not yet been published as a release.
 
 ## Unreleased
 
@@ -53,6 +53,18 @@ not been assigned a new released version.
 
 - Added a public index, verified status, prioritized roadmap and development guide.
   Reconciled local plans with current source and CI history.
+- Removed real-printer validation from the active plan at the maintainer's request;
+  retained the documented limit that physical output is unverified.
+
+### Release preparation
+
+- Guarded E2E shell-association checks by Windows platform, resolving 11 CA1416 warnings.
+- Added viewport/theme/overlay and allocation percentile diagnostics for the paint
+  budget assertion without raising its 70 KB limit.
+- Set the candidate app version to `0.4.0`. Packaging reads that version by default
+  and applies explicit overrides to both app and package.
+- Added an output-directory option for rebuilding a candidate without replacing
+  earlier packages, and included the existing project, dependency and font notices.
 
 ## Tagged versions
 

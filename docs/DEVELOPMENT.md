@@ -121,7 +121,14 @@ powershell -ExecutionPolicy Bypass -File scripts/pack-windows.ps1 -Version x.y.z
 ```
 
 Replace `x.y.z` with the chosen version. Output goes to `artifacts/publish/win-x64`
-and `artifacts/releases`. The package default remains `0.1.0`; the app declares
-`0.3.0`. Align versions during release work. Building packages does not validate
+and `artifacts/releases`. Omitting `-Version` uses the app project's version, currently
+`0.4.0`. An override is applied to both the app publish and package. The publish includes
+the existing project, dependency and font notices. Their full review remains a release check.
+
+Velopack rejects versions already present in its output directory. To rebuild a local
+candidate, use a fresh folder with `-OutputDirectory artifacts/releases/candidate-name`.
+Relative output paths resolve from the repository root; previous packages are preserved.
+Record the source commit and checksums in [release validation](RELEASE-VALIDATION.md).
+Building packages does not validate
 installation/upgrade or configure an update feed. Follow the [roadmap](ROADMAP.md)
 before describing a build as a distributed release.

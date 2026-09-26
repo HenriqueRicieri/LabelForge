@@ -2,8 +2,13 @@
 
 Proposed work order after the verified `e78aa0d` baseline, reviewed 2026-09-25.
 The original feature milestones are implemented. The next batch should establish
-reliable use on the target desktop and printers, then make that version easy to install.
+reliable use on the target desktop, then make that version easy to install.
 This documentation audit did not perform native/hardware validation or publish a release.
+
+Scope update, 2026-09-25: the maintainer removed real-printer validation because
+hardware is currently unaffordable. G9 is outside the active plan and is no longer
+a release gate. Physical output remains unverified; software transport/status tests
+continue using fake printers and synthetic jobs.
 
 ## 1. Validate native editing on Windows [P1, TODO]
 
@@ -17,20 +22,12 @@ Complete when a matrix records commit, OS, scaling, theme, window size and pass/
 evidence; controls remain reachable; reopened documents and ZPL preserve the edits.
 Reproduce discovered defects in focused regressions before fixing them. Local backlog: G8.
 
-## 2. Validate physical printing and status [P1, TODO]
+Current attempt: desktop automation failed while starting its JavaScript runtime,
+before launching LabelForge. Resetting the runtime did not recover it. The installed
+Node executable works independently. The native matrix remains TODO; headless tests
+do not close it. See [Validation record](RELEASE-VALIDATION.md).
 
-Print synthetic labels through TCP 9100 and, where hardware is available, the Windows
-RAW spooler. Cover available 8/12/24 dpmm printers and record missing combinations.
-Check size, accents, explicit/Auto widths, rotation, text blocks, graphics, barcode
-scanning, counters and dates. Compare exported print-job bytes with the sent job.
-Exercise pause, paper-out and head-open where supported.
-
-Complete when tested printer/driver/stock combinations have recorded output and
-scan/readback evidence, limitations are documented, and uncertain sends give clear
-guidance before retrying. A TCP write or rendered image does not establish physical
-output. Local backlog: G9.
-
-## 3. Investigate CI variability and warnings [P1, TODO]
+## 2. Investigate CI variability and warnings [P1, IN PROGRESS]
 
 Compare the dark-designer allocation failure at `1351a07` with passing runs. Determine
 whether scene state, warmup, runtime or actual allocation growth explains the 70 KB
@@ -42,17 +39,23 @@ Complete when the failure has a reproducible explanation or a bounded documented
 measurement method, the check still catches a regression, and a fresh harness build
 resolves the 11 known platform warnings. Local backlog: G10.
 
-## 4. Prepare the next Windows release [P1, TODO]
+The Windows association block now has an OS guard and the separate harness builds
+without warnings. Paint logs now report viewport, theme, overlays and allocation
+median/p95/max at 1x. The 70 KB threshold is unchanged. Historical variability is
+not yet explained; keep the investigation open until comparable failing data exists.
+
+## 3. Prepare the next Windows release [P1, IN PROGRESS]
 
 Choose a version from the changes since `v0.3.0`, align app/package versions and build
-an installer from a recorded commit. The packaging default `0.1.0` must not silently
-identify the next build; pass an explicit version until the process is aligned.
+an installer from a recorded commit. The candidate version is now `0.4.0`.
+Packaging reads the app version by default; an explicit override applies to both
+the published app and the Velopack package.
 
 Test clean install, upgrade, `.lfl` launch, uninstall, save/reopen, recovery and the
 offline viewer. Review bundled licenses, write installation/update instructions and
 prepare release notes from the changelog.
 
-Complete when the candidate passes the native/printer checks above, all CI jobs pass,
+Complete when the candidate passes the native checks above, all CI jobs pass,
 versions agree, and installer smoke results/checksums are recorded. Publishing the
 release and choosing a distribution/update feed are separate actions after that evidence
 exists. Local backlog: G11.
@@ -77,4 +80,4 @@ before adding features to match another label editor.
 For each item, record the problem, commit, relevant regression results and remaining
 limits. Update [status](STATUS.md), [changelog](../CHANGELOG.md) and roadmap when their
 conclusions change. Local planning records retain detailed history. Do not close work
-from CI alone when acceptance requires native UI, an installer or hardware.
+from CI alone when acceptance requires native UI or an installer.

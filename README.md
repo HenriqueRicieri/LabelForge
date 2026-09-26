@@ -12,11 +12,14 @@ dependency.
 Working application under active development. The rendering stack is proven against a corpus of real
 labels, and the designer, viewer, printing, and export paths are implemented and tested.
 
-The latest verified source baseline is `e78aa0d` (2026-09-25): all nine CI jobs passed,
+The documentation audit baseline is `e78aa0d` (2026-09-25): all nine CI jobs passed,
 including 1,297 unit/fixture tests and 569 graded designer checks in each theme.
-The app version remains `0.3.0`; current `main` includes changes after that tag.
-Native display scaling, physical printer validation and the next Windows release are
+The next Windows release candidate targets `0.4.0`; the last source tag is `v0.3.0`.
+Native display scaling, CI reliability and the next Windows release are
 the recommended next batch.
+
+Real-printer validation is outside the current plan because hardware is unavailable.
+Physical output remains unverified. See the [validation record](docs/RELEASE-VALIDATION.md).
 
 See [Project status](docs/STATUS.md) for evidence and limits, [Roadmap](docs/ROADMAP.md)
 for the work order, [Changelog](CHANGELOG.md) for changes, and
