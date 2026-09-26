@@ -2,6 +2,7 @@
 # files *.zpl under "Zimpl", so keep them out of the repository language statistics.
 *.zpl linguist-detectable=false
 
-# Preserve upstream notice bytes used by the license inventory.
+# Preserve upstream notice and reviewed inventory bytes.
 licenses/*.txt -text linguist-vendored=true
 licenses/*.html -text linguist-vendored=true
+licenses/*.json -text whitespace=cr-at-eol

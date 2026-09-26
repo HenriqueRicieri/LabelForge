@@ -67,15 +67,22 @@ installed the recorded `0.4.0+1baaa76` version in the normal per-user directory.
 Explorer opened a synthetic `.lfl` directly in the installed app; the dense QA
 label survived in recent files and reopened after Setup. The previous version
 in that native directory was not independently observed, so legacy upgrade and
-pristine install remain unverified. Uninstall and full notice review are also
+pristine install remain unverified. Uninstall and exact Rust notice provenance are also
 open. Earlier candidates supply dense editing/export/recovery evidence.
 
-The new `12847fc` candidate includes 22 original license/notice texts, inventoried
+The preceding `12847fc` candidate includes 22 original license/notice texts, inventoried
 against 28 published runtime packages and both embedded fonts. Packaging verifies
 exact dependency versions and notice bytes before running Velopack. The positive
 check and three negative cases passed; ZIP/nupkg contents matched the sources.
 This closes the app runtime/font inventory work. Native Setup/stub/Update.exe
-dependency review remains open, and the new candidate has not been installed.
+dependency review continued in `eec7557`: it adds 493 original text segments for
+277 conservative Windows dependency entries and byte-matched WebView2 loader
+notices. Input hashes pin the vpk packer and three x86 helpers; negative checks
+reject changed/missing inputs and unreviewed versions. The new ZIP/nupkg carry
+33 verified notice/inventory files, and Setup embeds the exact reviewed nupkg.
+Only the exact Rust compiler/standard-library provenance remains open in the native
+notice review; release-date Rust notices are supplemental. The new candidate has
+not been installed.
 
 A loopback receive timeout in the packaging-source CI was addressed by test-only
 `8b8eb40`, removing extra scheduling without changing production transport. The

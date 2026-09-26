@@ -76,7 +76,7 @@ not yet been published as a release.
 - Included complete upstream license and vendor notice texts for 28 runtime
   packages and both embedded fonts. Packaging now rejects missing or altered
   texts and dependency versions absent from the reviewed inventory. Native
-  Velopack helper dependency review remains open.
+  Rust compiler/standard-library provenance remains open.
 - Moved user preferences, media, catalogs, recent files and recovery snapshots to
   a separate data directory so installer cleanup cannot remove them. Added legacy
   migration and a migration-only command for use before upgrading older installers.

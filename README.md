@@ -24,14 +24,17 @@ the install directory. The current source passes 1,345 local tests and paints th
 78-element fixture at 6,360 bytes per frame locally, retaining the 70 KB limit.
 All nine source CI jobs passed. The corrected Setup passed installation from
 ordinary Explorer, direct `.lfl` opening and preservation of the synthetic recent
-entry. Actual native DPI, legacy upgrade, pristine install, uninstall and the full
-dependency notice review remain open. See the dated
+entry. Actual native DPI, legacy upgrade, pristine install, uninstall and exact
+Rust standard-library notice provenance remain open. See the dated
 [candidate record](docs/RELEASE-VALIDATION.md) for scope and package hashes.
 
 The latest `0.4.0` package adds original license/notice texts for 28 runtime
 packages and both embedded fonts, with an inventory check before packaging.
-Native Velopack helper notice review remains open. Native installation results
-above refer to the preceding paint candidate; the new package has not been installed.
+The `eec7557` candidate also adds 493 original native text segments for a conservative
+277-entry Windows dependency inventory, plus the exact WebView2 loader notices.
+Packaging verifies the pinned packer/helper inputs. Exact Rust standard-library
+provenance remains open. Native installation results above refer to the preceding
+paint candidate; the new package has not been installed.
 
 Real-printer validation is outside the current plan because hardware is unavailable.
 Physical output remains unverified. See the [validation record](docs/RELEASE-VALIDATION.md).

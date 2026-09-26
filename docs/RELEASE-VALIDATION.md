@@ -3,9 +3,10 @@
 Updated 2026-09-26. Candidate version: `0.4.0`. Native workflow evidence was
 collected on `450b1df`; recovery contrast was validated on `d63901b`. The current
 candidate includes text resize, user-data and paint corrections plus the runtime
-notice inventory in [`12847fc`](https://github.com/HenriqueRicieri/LabelForge/commit/12847fc46db63f5d19a4cb675e3fb19692cadff6).
+and native notice inventories in
+[`eec7557`](https://github.com/HenriqueRicieri/LabelForge/commit/eec7557f2ada254d9be175e72902c080686358cf).
 Native installation and association passed on the preceding `1baaa76` candidate;
-the new runtime-notice package has not been installed.
+the new native-notice package has not been installed.
 These are local unsigned packages. No release or update feed has been published.
 
 Real-printer validation is excluded at the maintainer's request because hardware
@@ -158,7 +159,7 @@ refer to `12847fc`; packaging changes do not establish native installation resul
 | Package integrity | ZIP/nupkg CRC checks passed; app exe/dll bytes matched publish; app and package declare 0.4.0 |
 | Runtime notices on `12847fc` | 28 runtime packages and two fonts inventoried; 22 upstream texts plus manifest and root notices copied and byte-verified in both archives |
 | Packaging inventory guard | Passed on the publish; rejected missing Inter OFL, altered ANGLE notice and synthetic unreviewed package |
-| Native helper notices | Velopack managed MIT text included; Windows Setup/stub/Update.exe Rust dependency review remains open |
+| Native helper notices on `eec7557` | 277 conservative Windows entries, 493 original text segments, byte-matched WebView2 loader notices and supplemental Rust snapshot included; exact Rust compiler/library provenance remains open |
 | Install and `.lfl` association | Corrected Setup passed from ordinary Explorer; installed source version confirmed; synthetic file opened directly and known recent entry survived |
 | Legacy upgrade/clean install/uninstall | Earlier Codex-view upgrade exposed recent-list loss; restored/migrated exactly. Native legacy upgrade, pristine install and uninstall remain unverified |
 
@@ -182,6 +183,46 @@ locally. The candidate remains built from `12847fc`; the following commit change
 only the test, not app source or package contents.
 
 ## Current candidate files
+
+Built from `eec7557f2ada254d9be175e72902c080686358cf` into
+`artifacts/releases/candidate-0.4.0-native-notices`. App informational version is
+`0.4.0+eec7557f2ada254d9be175e72902c080686358cf`; app/package version is 0.4.0.
+The self-contained publish completed with zero warnings/errors. ZIP and nupkg
+passed CRC, app-byte and all 33 notice/inventory-file comparisons, with 267 and
+269 entries respectively. The Setup contains the exact reviewed nupkg.
+
+[CI on `eec7557`](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36266926091)
+passed all nine jobs.
+
+The [native inventory](../licenses/native-manifest.json) covers 277 conservative
+Windows normal/build dependency entries and 493 original text segments. It
+includes build/procedural-macro dependencies and workspace feature unification,
+so it is not a binary SBOM. All crate archive checksums matched the upstream lock.
+The WebView2 x86 static loader matched SDK 1.0.3800.47 byte-for-byte; its original
+license and notice are included. The WebView2 browser runtime is not bundled.
+
+The packaging guard passed reviewed inputs and rejected an altered helper, a
+missing helper and an unreviewed tool version. The notice guard rejected a missing
+Rust license. Update.exe matched the pinned input exactly; launcher code/data
+sections matched apart from resource customization. Setup code/data sections
+matched apart from resources and its verified 16-byte bundle offset/length header.
+
+Exact Rust compiler/standard-library provenance remains open. The upstream build
+used an unpinned nightly; its old logs are unavailable (GitHub HTTP 410). Notices
+from the official release-date nightly distribution are supplemental coverage,
+not evidence that the helper used that revision. Metadata-analysis tool versions
+are recorded separately. See the [notice index](../THIRD-PARTY-NOTICES.md).
+
+This new unsigned Setup has not been executed. Native installation evidence is
+still from `1baaa76`; legacy upgrade, pristine install and uninstall remain open.
+
+| File | SHA-256 |
+| --- | --- |
+| LabelForge-win-Setup.exe | `cd777ba9d3fef05342339eb3b510dd2b270e4fa5665043816467a4968ddccf55` |
+| LabelForge-win-Portable.zip | `a6ee549029eaa8972a6f596b74680a51bdfaecd1ff204f19f4d0b7f14aff8da1` |
+| LabelForge-0.4.0-full.nupkg | `73398840dab1baef6e70153774ab7da64993c47805fa95edf83ea793e95207bb` |
+
+### Previous runtime-notice candidate
 
 Built from `12847fc46db63f5d19a4cb675e3fb19692cadff6` into
 `artifacts/releases/candidate-0.4.0-runtime-notices`. App informational version is
@@ -258,6 +299,6 @@ earlier packages and never replace packages already distributed to users.
 
 1. Measure actual app scaling and finish the native workflow matrix (G8).
 2. Validate legacy upgrade, pristine clean install and uninstall;
-   review native Velopack Setup/stub/Update.exe dependency notices (G11).
+   establish exact native Rust compiler/standard-library notice provenance (G11).
 3. Publish after those checks have evidence; choose a distribution/update feed
    as a separate release decision.
