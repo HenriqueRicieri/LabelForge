@@ -3423,25 +3423,28 @@ if (mode == "designer")
     // The .lfl shell association. Pointed at a scratch classes root for the same reason
     // the media, catalog and recovery stores are pointed at scratch files: this is
     // per-machine state, and a harness run must not touch what the user has.
-    const string scratchClasses = @"Software\LabelForge.E2E\Classes";
-    var association = new LabelForge.App.Services.FileAssociation(scratchClasses);
-    association.Register(@"C:\Program Files\LabelForge\LabelForge.App.exe");
-    string? handler = Microsoft.Win32.Registry.GetValue(
-        $@"HKEY_CURRENT_USER\{scratchClasses}\.lfl", null, null) as string;
-    string? verb = Microsoft.Win32.Registry.GetValue(
-        $@"HKEY_CURRENT_USER\{scratchClasses}\{LabelForge.App.Services.FileAssociation.ProgId}\shell\open\command",
-        null,
-        null) as string;
-    Console.WriteLine(
-        $"association: .lfl -> {handler ?? "none"}, command quotes the path="
-        + $"{verb == "\"C:\\Program Files\\LabelForge\\LabelForge.App.exe\" \"%1\""} "
-        + "(expected LabelForge.Label, True)");
+    if (OperatingSystem.IsWindows())
+    {
+        const string scratchClasses = @"Software\LabelForge.E2E\Classes";
+        var association = new LabelForge.App.Services.FileAssociation(scratchClasses);
+        association.Register(@"C:\Program Files\LabelForge\LabelForge.App.exe");
+        string? handler = Microsoft.Win32.Registry.GetValue(
+            $@"HKEY_CURRENT_USER\{scratchClasses}\.lfl", null, null) as string;
+        string? verb = Microsoft.Win32.Registry.GetValue(
+            $@"HKEY_CURRENT_USER\{scratchClasses}\{LabelForge.App.Services.FileAssociation.ProgId}\shell\open\command",
+            null,
+            null) as string;
+        Console.WriteLine(
+            $"association: .lfl -> {handler ?? "none"}, command quotes the path="
+            + $"{verb == "\"C:\\Program Files\\LabelForge\\LabelForge.App.exe\" \"%1\""} "
+            + "(expected LabelForge.Label, True)");
 
-    association.Unregister();
-    bool gone = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(scratchClasses) is not { } left
-        || left.GetSubKeyNames().Length == 0;
-    Console.WriteLine($"association removed on uninstall: {gone} (expected True)");
-    Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\LabelForge.E2E", false);
+        association.Unregister();
+        bool gone = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(scratchClasses) is not { } left
+            || left.GetSubKeyNames().Length == 0;
+        Console.WriteLine($"association removed on uninstall: {gone} (expected True)");
+        Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\LabelForge.E2E", false);
+    }
 
     // The starter gallery. Every card has to come back with a picture: a starter that
     // renders empty is exactly what the gallery exists to show, and a name alone would

@@ -66,7 +66,12 @@ internal static class CanvasPaintChecks
             times.Sort();
             allocations.Sort();
             if (reportTimings) Console.WriteLine(FormattableString.Invariant($"Paint 78 elements at {zoom}x: median={times[20]:0.000} ms, p95={times[37]:0.000} ms, allocated={allocations[20]} B"));
-            if (zoom == 1) check("78-element paint at 1x allocates under 70 KB", allocations[20] < 70_000);
+            if (zoom == 1)
+            {
+                Console.WriteLine(FormattableString.Invariant(
+                    $"Paint allocation sample: canvas={canvas.Bounds.Width:0.##}x{canvas.Bounds.Height:0.##} DIPs, theme={Application.Current!.ActualThemeVariant}, outlines={canvas.ShowElementOutlines}, dot-grid={canvas.ShowPrinterDotGrid}, median={allocations[20]} B, p95={allocations[37]} B, max={allocations[^1]} B, samples={allocations.Count}"));
+                check("78-element paint at 1x allocates under 70 KB", allocations[20] < 70_000);
+            }
             check(FormattableString.Invariant($"Paint at {zoom}x measures each frame"), canvas.MeasuredPaintCount == paints + 40);
         }
         check("Canvas measurements preserve document and undo", json == designer.SerializeDocument() && undo == designer.CanUndo);
