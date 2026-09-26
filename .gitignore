@@ -9,7 +9,8 @@
 # Real Atak label corpus: local-only test fixtures, never published
 exemplos zpl/
 
-# Local development context, not part of the app
+# Local planning history and private development context.
+# Public docs/README.md, STATUS.md, ROADMAP.md, DEVELOPMENT.md and CHANGELOG.md are tracked.
 CLAUDE.md
 .claudeignore
 docs/PLAN.md

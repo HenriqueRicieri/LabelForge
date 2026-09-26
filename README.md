@@ -1,5 +1,7 @@
 ﻿# LabelForge
 
+[![CI](https://github.com/HenriqueRicieri/LabelForge/actions/workflows/ci.yml/badge.svg)](https://github.com/HenriqueRicieri/LabelForge/actions/workflows/ci.yml)
+
 LabelForge is a desktop application for designing Zebra labels visually and generating ZPL (Zebra
 Programming Language) code. It also works the other way around: a live viewer where you edit ZPL and
 watch the rendered label update in real time, fully offline. No cloud service, no Labelary
@@ -9,6 +11,16 @@ dependency.
 
 Working application under active development. The rendering stack is proven against a corpus of real
 labels, and the designer, viewer, printing, and export paths are implemented and tested.
+
+The latest verified source baseline is `e78aa0d` (2026-09-25): all nine CI jobs passed,
+including 1,297 unit/fixture tests and 569 graded designer checks in each theme.
+The app version remains `0.3.0`; current `main` includes changes after that tag.
+Native display scaling, physical printer validation and the next Windows release are
+the recommended next batch.
+
+See [Project status](docs/STATUS.md) for evidence and limits, [Roadmap](docs/ROADMAP.md)
+for the work order, [Changelog](CHANGELOG.md) for changes, and
+[Documentation](docs/README.md) for the full index.
 
 ## What works today
 
@@ -324,11 +336,17 @@ an interface so it can be fixed, forked, or replaced without touching the rest o
 
 ## Build and run
 
-```
-dotnet build
+Requires the .NET 10 SDK. From the repository root:
+
+```powershell
+dotnet build LabelForge.sln
 dotnet run --project src/LabelForge.App
-dotnet test
+dotnet test LabelForge.sln
 ```
+
+Use `--project src/LabelForge.App` to launch the desktop app. The
+[development guide](docs/DEVELOPMENT.md) covers Release builds, the separate UI
+harness, architecture and Windows packaging.
 
 ## Testing
 
@@ -338,9 +356,14 @@ round-trips, printer validation, and a corpus smoke test that renders a committe
 ZPL fixtures (and, when present, a local private corpus of real labels) without crashing. A headless
 Avalonia harness under `tools/LabelForge.E2E` drives the designer end to end, including simulated
 pointer input on the rulers and snap drags, and captures screenshots in both themes. CI runs build
-and unit tests, the full designer harness in both themes, and workspace layout checks on pushes
+and unit tests, the full designer harness in both themes, workspace layout, transform gestures,
+centimeter units, viewer sizing, viewer layout and offline comparison checks on pushes
 to main and pull requests targeting main. Failed UI runs retain their transcript and screenshots
 for seven days.
+
+Headless checks do not establish native display scaling or physical output.
+The optional private corpus adds local cases, so CI and local totals differ.
+See [Project status](docs/STATUS.md) for the dated verification baseline.
 
 ## License
 
