@@ -28,6 +28,11 @@ entry. Actual native DPI, legacy upgrade, pristine install, uninstall and the fu
 dependency notice review remain open. See the dated
 [candidate record](docs/RELEASE-VALIDATION.md) for scope and package hashes.
 
+The latest `0.4.0` package adds original license/notice texts for 28 runtime
+packages and both embedded fonts, with an inventory check before packaging.
+Native Velopack helper notice review remains open. Native installation results
+above refer to the preceding paint candidate; the new package has not been installed.
+
 Real-printer validation is outside the current plan because hardware is unavailable.
 Physical output remains unverified. See the [validation record](docs/RELEASE-VALIDATION.md).
 

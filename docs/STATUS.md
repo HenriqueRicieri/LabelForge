@@ -1,6 +1,19 @@
 # Project status
 
-Current source correction: `1baaa76` caches the ruler text layouts and queries
+Current packaging correction: `12847fc` includes 22 original license/notice
+texts for 28 runtime packages and two embedded fonts. The inventory check passed
+on the self-contained publish and rejected missing, altered and unreviewed cases.
+The ZIP and nupkg passed CRC, version and notice-byte checks. Native Velopack
+Setup/stub/Update.exe dependency review remains open. The new unsigned candidate
+has not been installed; native installation/association evidence below is from
+the preceding `1baaa76` candidate.
+
+The following test-only correction, `8b8eb40`, removed extra scheduling from the
+loopback receiver after a CI timeout. Six focused and all 1,345 local tests passed;
+[the corrected CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36264994459)
+passed all nine jobs. Production network printing is unchanged.
+
+Paint correction: `1baaa76` caches the ruler text layouts and queries
 quiet-zone warnings only for selected symbols during paint. Local allocation fell
 from 55,960 to 6,360 bytes at 1x, with the 70 KB budget unchanged. All 1,345 local
 unit tests and 30 focused paint checks per theme passed. Sixteen before/after
@@ -8,10 +21,10 @@ ruler captures matched pixel-for-pixel. The source CI passed all nine jobs.
 
 Installer testing previously exposed recent-file loss. `54a0be9` separates and
 migrates user data; the original recent list was restored and migrated exactly.
-The current `0.4.0` candidate includes that fix, text resizing and the paint
-correction. Setup from ordinary Explorer installed the recorded version; direct
+Both `0.4.0` candidates include that fix, text resizing and the paint
+correction. The `1baaa76` Setup from ordinary Explorer installed its recorded version; direct
 `.lfl` opening and preservation of the synthetic recent entry passed. Actual
-native DPI, legacy upgrade, pristine install, uninstall and full notice review
+native DPI, legacy upgrade, pristine install, uninstall and native helper notice review
 remain open.
 Real-printer validation remains outside the active plan for cost reasons.
 See the [validation record](RELEASE-VALIDATION.md) for evidence and remaining gates.
@@ -26,7 +39,7 @@ validation passed 1,330 unit tests, 34 transform checks and 31 selection-scale
 checks; the Release solution build has zero warnings and errors. The focused
 before/after transcripts differ only in the new regression result and summary.
 
-This change is included in the current `1baaa76` candidate. The native DPI and
+This change is included in both the paint and runtime-notice candidates. The native DPI and
 installer checks in the roadmap remain open.
 
 ## Baseline source audit (2026-09-25)
@@ -141,12 +154,13 @@ Portable launch and reopening the 78-element synthetic label passed on `1baaa76`
 recovery evidence comes from earlier candidates.
 Installer testing exposed recent-file loss and a differing Codex/Explorer association
 view. The recent list was restored and migrated to the separated data directory.
-The corrected Setup installed from ordinary Explorer into the normal per-user
+The `1baaa76` Setup installed from ordinary Explorer into the normal per-user
 directory. Windows file properties confirmed the `0.4.0+1baaa76` source version;
 Explorer opened a synthetic `.lfl` directly in that installed app. The dense QA
 label remained in recent files and reopened after Setup. Legacy upgrade,
 pristine install and uninstall remain unverified. The script does not establish
-an update feed. See the [candidate record](RELEASE-VALIDATION.md)
+an update feed. A fresh `12847fc` candidate adds the runtime license inventory and
+complete upstream texts; its native Setup has not been run. See the [candidate record](RELEASE-VALIDATION.md)
 for package hashes and the distinction between old/new candidate evidence.
 
 ## Known limits
@@ -165,7 +179,8 @@ for package hashes and the distinction between old/new candidate evidence.
 - Native Windows display scaling at 100%, 125% and 150% remains unverified.
 
 Recommended next work: confirm actual native DPI and complete the workflow matrix,
-validate legacy upgrade, pristine install and uninstall, then review dependency
-notices. The paint budget correction (G10)
+validate legacy upgrade, pristine install and uninstall, then review native
+Velopack helper dependencies. The app runtime notice inventory is checked; G11
+remains in progress. The paint budget correction (G10)
 is confirmed in the source CI.
 See [Roadmap](ROADMAP.md).

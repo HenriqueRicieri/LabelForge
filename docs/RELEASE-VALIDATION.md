@@ -2,8 +2,10 @@
 
 Updated 2026-09-26. Candidate version: `0.4.0`. Native workflow evidence was
 collected on `450b1df`; recovery contrast was validated on `d63901b`. The current
-candidate includes text resize, user-data and paint corrections through
-[`1baaa76`](https://github.com/HenriqueRicieri/LabelForge/commit/1baaa765b39b005f9cfbeb04f9266c924a36688f).
+candidate includes text resize, user-data and paint corrections plus the runtime
+notice inventory in [`12847fc`](https://github.com/HenriqueRicieri/LabelForge/commit/12847fc46db63f5d19a4cb675e3fb19692cadff6).
+Native installation and association passed on the preceding `1baaa76` candidate;
+the new runtime-notice package has not been installed.
 These are local unsigned packages. No release or update feed has been published.
 
 Real-printer validation is excluded at the maintainer's request because hardware
@@ -141,6 +143,9 @@ was not isolated; repeated text formatting was removed from the measured path.
 
 ## Software and packaging evidence
 
+Behavior measurements below refer to `1baaa76`. The runtime-notice package checks
+refer to `12847fc`; packaging changes do not establish native installation results.
+
 | Check | Result |
 | --- | --- |
 | Release solution build | Passed, zero warnings/errors on `1baaa76` |
@@ -151,14 +156,53 @@ was not isolated; repeated text formatting was removed from the measured path.
 | Allocation remediation | Ruler layout cache and selected-warning query validated locally; old runtime/pool variability remains unisolated |
 | Fresh CI | [Source-matched run](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36258915331) passed all nine jobs: 1,316 public unit cases, 570 designer checks per theme, 400 layout, 34 transform, 29 cm and viewer 15/36/15 |
 | Package integrity | ZIP/nupkg CRC checks passed; app exe/dll bytes matched publish; app and package declare 0.4.0 |
-| Bundled notices | LICENSE, THIRD-PARTY-NOTICES.md and font OFL.txt byte-matched to source; full dependency notice review remains open |
+| Runtime notices on `12847fc` | 28 runtime packages and two fonts inventoried; 22 upstream texts plus manifest and root notices copied and byte-verified in both archives |
+| Packaging inventory guard | Passed on the publish; rejected missing Inter OFL, altered ANGLE notice and synthetic unreviewed package |
+| Native helper notices | Velopack managed MIT text included; Windows Setup/stub/Update.exe Rust dependency review remains open |
 | Install and `.lfl` association | Corrected Setup passed from ordinary Explorer; installed source version confirmed; synthetic file opened directly and known recent entry survived |
 | Legacy upgrade/clean install/uninstall | Earlier Codex-view upgrade exposed recent-list loss; restored/migrated exactly. Native legacy upgrade, pristine install and uninstall remain unverified |
 
 Raw screenshots, synthetic files, export comparisons, matrix entries and logs
 remain in ignored local artifacts. Public records omit machine paths and user state.
 
+### Loopback test timeout during notice validation
+
+[CI on `12847fc`](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36264674101)
+passed compilation but failed the loopback UTF-8 delivery test at the receiver's
+five-second wait after `SendAsync` returned. The receiver ran inside `Task.Run`.
+`8b8eb40` starts accepting before sending, then reads the accepted socket on the
+test's own asynchronous flow. It preserves exact byte comparison, EOF receipt
+and bounded waits. Production transport and timeout values are unchanged.
+
+All six focused network tests and 1,345 local unit tests passed after the change.
+[CI on `8b8eb40`](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36264994459)
+passed all nine jobs, including both designer themes.
+The exact scheduling condition behind the earlier timeout was not reproduced
+locally. The candidate remains built from `12847fc`; the following commit changes
+only the test, not app source or package contents.
+
 ## Current candidate files
+
+Built from `12847fc46db63f5d19a4cb675e3fb19692cadff6` into
+`artifacts/releases/candidate-0.4.0-runtime-notices`. App informational version is
+`0.4.0+12847fc46db63f5d19a4cb675e3fb19692cadff6`. The self-contained publish
+passed with zero warnings/errors. The inventory check covered 28 runtime packages
+and two fonts; three negative cases were rejected. Both archives passed CRC,
+app-byte and all 26 notice/inventory-file comparisons. The ZIP contains 260
+entries and the nupkg 262; app/package versions agree at 0.4.0.
+
+The [notice index](../THIRD-PARTY-NOTICES.md) and [inventory](../licenses/manifest.json)
+record original texts, package versions and source hashes. Git preserves the
+upstream notice bytes. Native Velopack helper dependency review remains open.
+This new Setup has not been run; earlier installation evidence is retained below.
+
+| File | SHA-256 |
+| --- | --- |
+| LabelForge-win-Setup.exe | `6295f0cee68ae9a4bdba4b727c120baf74bc42b9a7828c099593f218e624c620` |
+| LabelForge-win-Portable.zip | `ad56f1c0f1daa721263ff2e666a392f726f283e8d01a429ca90a726ae12a6509` |
+| LabelForge-0.4.0-full.nupkg | `6d2642c6b87e688cf2534d38c5b941cce12447ad9afcbb86e5209b3b15792641` |
+
+### Previous paint candidate, native installation
 
 Built from `1baaa765b39b005f9cfbeb04f9266c924a36688f` into
 `artifacts/releases/candidate-0.4.0-paint`. App informational version is
@@ -214,6 +258,6 @@ earlier packages and never replace packages already distributed to users.
 
 1. Measure actual app scaling and finish the native workflow matrix (G8).
 2. Validate legacy upgrade, pristine clean install and uninstall;
-   complete the dependency notice review (G11).
+   review native Velopack Setup/stub/Update.exe dependency notices (G11).
 3. Publish after those checks have evidence; choose a distribution/update feed
    as a separate release decision.

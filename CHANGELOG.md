@@ -66,6 +66,9 @@ not yet been published as a release.
 
 ### Release preparation
 
+- Removed extra thread-pool scheduling from the loopback delivery test after
+  a CI receive timeout. Exact UTF-8 bytes, connection closure and receive
+  deadlines remain checked; production network printing is unchanged.
 - Included complete upstream license and vendor notice texts for 28 runtime
   packages and both embedded fonts. Packaging now rejects missing or altered
   texts and dependency versions absent from the reviewed inventory. Native

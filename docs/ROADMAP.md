@@ -58,7 +58,7 @@ Test clean install, upgrade, `.lfl` launch, uninstall, save/reopen, recovery and
 offline viewer. Review bundled licenses, write installation/update instructions and
 prepare release notes from the changelog.
 
-The current `1baaa76` candidate passed integrity/version/notice-byte checks,
+The `1baaa76` paint candidate passed integrity/version/notice-byte checks,
 portable launch and reopening the dense synthetic label. It includes the paint,
 text resize and user-data separation fixes after the `d63901b`
 installer removed recent files in Codex's view. The original recent list was
@@ -69,6 +69,17 @@ label survived in recent files and reopened after Setup. The previous version
 in that native directory was not independently observed, so legacy upgrade and
 pristine install remain unverified. Uninstall and full notice review are also
 open. Earlier candidates supply dense editing/export/recovery evidence.
+
+The new `12847fc` candidate includes 22 original license/notice texts, inventoried
+against 28 published runtime packages and both embedded fonts. Packaging verifies
+exact dependency versions and notice bytes before running Velopack. The positive
+check and three negative cases passed; ZIP/nupkg contents matched the sources.
+This closes the app runtime/font inventory work. Native Setup/stub/Update.exe
+dependency review remains open, and the new candidate has not been installed.
+
+A loopback receive timeout in the packaging-source CI was addressed by test-only
+`8b8eb40`, removing extra scheduling without changing production transport. The
+following CI passed all nine jobs; all 1,345 local unit cases also passed.
 
 Complete when the candidate passes the native checks above, all CI jobs pass,
 versions agree, and installer smoke results/checksums are recorded. Publishing the
