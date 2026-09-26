@@ -4,3 +4,4 @@
 
 # Preserve upstream notice bytes used by the license inventory.
 licenses/*.txt -text linguist-vendored=true
+licenses/*.html -text linguist-vendored=true

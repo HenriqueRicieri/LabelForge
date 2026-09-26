@@ -55,6 +55,27 @@ foreach ($component in @($manifest.packages) + @($manifest.fonts)) {
     }
 }
 
+$native = Get-Content -LiteralPath (Join-Path $root "licenses\$($manifest.nativeInventory)") -Raw | ConvertFrom-Json
+$bundleBytes = [System.IO.File]::ReadAllBytes((Join-Path $root "licenses\$($native.bundle)"))
+$hasher = [System.Security.Cryptography.SHA256]::Create()
+try {
+    foreach ($package in $native.packages) {
+        if (@($package.notices).Count -eq 0) { throw "No native notices for $($package.id)" }
+        foreach ($notice in $package.notices) {
+            $hash = [System.BitConverter]::ToString($hasher.ComputeHash($bundleBytes, $notice.offset, $notice.bytes)).Replace('-', '')
+            if ($hash -ne $notice.sha256) { throw "Native notice bytes differ: $($package.id)/$($notice.name)" }
+        }
+        if ($package.standardLicense -and -not $files.ContainsKey($package.standardLicense)) {
+            throw "Unlisted standard license for $($package.id)"
+        }
+    }
+} finally { $hasher.Dispose() }
+foreach ($component in @($native.webview2Loader, $native.rustStandardLibrary)) {
+    foreach ($notice in $component.notices) {
+        if (-not $files.ContainsKey($notice)) { throw "Unlisted supplemental native notice: $notice" }
+    }
+}
+
 foreach ($name in @('LICENSE', 'THIRD-PARTY-NOTICES.md', 'licenses\manifest.json')) {
     $source = Join-Path $root $name
     $published = Join-Path $PublishDirectory $name
@@ -69,5 +90,5 @@ if ((Get-FileHash -LiteralPath $fontLicense -Algorithm SHA256).Hash -ne
     throw 'Published Roboto font license differs from source.'
 }
 
-Write-Host "Verified $($actual.Count) runtime packages, $($manifest.fonts.Count) fonts and $($files.Count) original license/notice files."
+Write-Host "Verified $($actual.Count) runtime packages, $($manifest.fonts.Count) fonts, $($native.packages.Count) native inventory entries and $($files.Count) notice/inventory files."
 foreach ($remaining in $manifest.remainingReview) { Write-Host "Remaining release review: $remaining" }

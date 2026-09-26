@@ -9,9 +9,46 @@ URLs and SHA-256 hashes for those texts.
 `scripts/check-third-party-notices.ps1` compares that inventory with the published
 `LabelForge.App.deps.json` and checks copied notice bytes. Packaging runs this check
 before creating the installer; dependency/version changes require another review.
-This covers the app's runtime packages and embedded fonts. The separate native
-Velopack Setup, stub and Update.exe dependency review is still open; these helpers
-are added by the packaging tool and are not in the app's dependency manifest.
+The native helpers added by Velopack have a separate inventory described below.
+Their exact Rust standard-library revision remains a release review item.
+
+## Native Windows installer helpers
+
+The packer is pinned to Velopack 1.2.0, source commit
+`f2edcbcafb81da5b3c884aaea330e225ad91d8b6`. Its default Setup, launcher stub and
+Update.exe are x86 helpers, including when the application targets Windows x64.
+[The native inventory](licenses/native-manifest.json) records the packer/helper
+input hashes, the locked source graph and the origins of 493 original text segments
+in [Velopack-NATIVE-NOTICES.txt](licenses/Velopack-NATIVE-NOTICES.txt).
+
+The 277 entries form a conservative Windows normal/build dependency closure,
+including build tools, procedural macros and workspace feature unification.
+This is not a claim that every entry is linked into every executable. Original
+license alternatives remain in the bundle; their presence does not change
+LabelForge's license. `fs_at` and `simd_helpers` do not supply separate license
+files in their crates or pinned repositories. Their original author/license
+metadata is retained alongside the standard Apache/MIT texts, without inventing
+an upstream copyright statement.
+
+The x86 static WebView2 loader in `webview2-com-sys` 0.39.1 matches Microsoft's
+WebView2 SDK 1.0.3800.47 byte-for-byte. Its original
+[license](licenses/WebView2Loader-LICENSE.txt) and
+[notice](licenses/WebView2Loader-NOTICE.txt) are included. LabelForge does not
+bundle the WebView2 browser runtime.
+
+[Rust library notices](licenses/Rust-COPYRIGHT-library.html),
+[MIT](licenses/Rust-LICENSE-MIT.txt) and [Apache](licenses/Rust-LICENSE-APACHE.txt)
+come from the official 2026-06-03 nightly distribution, the Velopack release date.
+This is supplemental coverage, not proof of the compiler used for the prebuilt
+helpers. The upstream build used an unpinned nightly and its logs have expired.
+Establishing the actual compiler/library revision and reconciling its notices
+remains open. The Rust 1.98.1 tools used for metadata analysis are unrelated to
+that original compilation.
+
+`scripts/check-velopack-notices.ps1` rejects changes to the pinned packer or any
+of the three helper inputs. Packaging calls the verified packer entry point
+directly. The runtime notice check also verifies every original native text
+segment and the supplemental notice files before packing.
 
 ## Runtime packages
 

@@ -66,6 +66,10 @@ not yet been published as a release.
 
 ### Release preparation
 
+- Added native Velopack dependency notices and the byte-matched WebView2 loader
+  license/notice. Packaging verifies the pinned packer and helper binaries;
+  changed inputs require notice review. Exact Rust standard-library provenance
+  remains open; release-date Rust notices provide supplemental coverage.
 - Removed extra thread-pool scheduling from the loopback delivery test after
   a CI receive timeout. Exact UTF-8 bytes, connection closure and receive
   deadlines remain checked; production network printing is unchanged.

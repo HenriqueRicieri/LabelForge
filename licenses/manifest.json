@@ -400,9 +400,45 @@
       "path": "ZXing-COPYRIGHT.txt",
       "sha256": "6995bda3d9af1d6e50055b6527312c7a4c248d22fa52c77af18aa6d2f7a0b019",
       "source": "https://github.com/micjahn/ZXing.Net/blob/v0.16.11.0/Source/lib/BarcodeWriterGeneric.cs"
+    },
+    {
+      "path": "WebView2Loader-LICENSE.txt",
+      "sha256": "0af8f1b807512aae39c2ac1aa4d0cae65cabecb6fd554b8439a5162a0d6eca55",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.3800.47/microsoft.web.webview2.1.0.3800.47.nupkg#LICENSE.txt"
+    },
+    {
+      "path": "WebView2Loader-NOTICE.txt",
+      "sha256": "106423785c5b7eba0a8e61d1837f2132e9c828e20ad530f565d981c1df60dd90",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.3800.47/microsoft.web.webview2.1.0.3800.47.nupkg#NOTICE.txt"
+    },
+    {
+      "path": "Rust-COPYRIGHT-library.html",
+      "sha256": "8c20a011e08e8fd4583ce28f59af0d86d92258bdbf5b196e36c1c369d0bd442e",
+      "source": "https://static.rust-lang.org/dist/2026-06-03/rustc-nightly-x86_64-pc-windows-msvc.tar.xz#rustc-nightly-x86_64-pc-windows-msvc/rustc/share/doc/rust/COPYRIGHT-library.html"
+    },
+    {
+      "path": "Rust-LICENSE-APACHE.txt",
+      "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+      "source": "https://static.rust-lang.org/dist/2026-06-03/rustc-nightly-x86_64-pc-windows-msvc.tar.xz#rustc-nightly-x86_64-pc-windows-msvc/LICENSE-APACHE"
+    },
+    {
+      "path": "Rust-LICENSE-MIT.txt",
+      "sha256": "b71bd43a069ca0641a9ecfe585ca7b3c53b5cc1608f8b68321168698e28b5ea1",
+      "source": "https://static.rust-lang.org/dist/2026-06-03/rustc-nightly-x86_64-pc-windows-msvc.tar.xz#rustc-nightly-x86_64-pc-windows-msvc/LICENSE-MIT"
+    },
+    {
+      "path": "Velopack-NATIVE-NOTICES.txt",
+      "sha256": "4db9d68e0c74d7eb5cb953230fb1f2d1fb540dd16829d5531cf2331de8c51281",
+      "source": "Native inventory from pinned Velopack 1.2.0 source; per-component origins and original byte hashes in native-manifest.json."
+    },
+    {
+      "path": "native-manifest.json",
+      "sha256": "42b2dc16620259616bc37e9ea3e83b4cff091f830056bfc700b50f368c1c06a4",
+      "source": "Native inventory from pinned Velopack 1.2.0 source; per-component origins and original byte hashes in native-manifest.json."
     }
   ],
   "remainingReview": [
-    "Native Velopack Setup, stub and Update.exe Rust dependencies; these are not described by the app deps.json."
-  ]
+    "Establish the Rust compiler/standard-library revision used for the prebuilt Velopack 1.2.0 helpers and reconcile its exact notices; the release-date snapshot is supplemental."
+  ],
+  "nativeInventory": "native-manifest.json"
 }

@@ -153,7 +153,7 @@ The script uses a self-contained win-x64 publish with trimming disabled. Install
 the Velopack CLI once if absent, then pass the intended release version:
 
 ```powershell
-dotnet tool install --global vpk
+dotnet tool install --global vpk --version 1.2.0
 powershell -ExecutionPolicy Bypass -File scripts/pack-windows.ps1 -Version x.y.z
 ```
 
@@ -168,8 +168,13 @@ Update the inventory and source texts when a dependency changes. Git preserves t
 upstream text bytes; avoid line-ending conversion when editing those files.
 
 The current inventory covers 28 runtime packages, including the self-contained .NET
-runtime, and two embedded fonts. The separate native Velopack Setup/stub/Update.exe
-dependency review remains a release check. See [third-party notices](../THIRD-PARTY-NOTICES.md).
+runtime, and two embedded fonts. A separate native inventory covers 277 locked
+Windows dependency entries and the exact WebView2 static loader. Packaging verifies
+the pinned vpk 1.2.0 packer and its three x86 helper inputs, then calls that verified
+entry point directly; a newer global shim does not select a different packer.
+`-VelopackDirectory` accepts an extracted reviewed tool package when needed.
+The exact Rust compiler/standard-library provenance remains a release check;
+release-date Rust notices are supplemental. See [third-party notices](../THIRD-PARTY-NOTICES.md).
 
 Velopack rejects versions already present in its output directory. To rebuild a local
 candidate, use a fresh folder with `-OutputDirectory artifacts/releases/candidate-name`.

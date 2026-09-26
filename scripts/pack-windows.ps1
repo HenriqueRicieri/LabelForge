@@ -1,7 +1,7 @@
 # Builds the Windows installer with Velopack.
 #
 # Prerequisites (one time):
-#   dotnet tool install --global vpk
+#   dotnet tool install --global vpk --version 1.2.0
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File scripts\pack-windows.ps1 [-Version x.y.z] [-OutputDirectory path]
@@ -9,10 +9,11 @@
 # Output: artifacts\releases\LabelForge-win-Setup.exe (plus the update packages
 # Velopack uses for delta auto-updates once a distribution feed exists).
 
-param([string]$Version, [string]$OutputDirectory)
+param([string]$Version, [string]$OutputDirectory, [string]$VelopackDirectory)
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
+$velopackEntryPoint = & (Join-Path $PSScriptRoot 'check-velopack-notices.ps1') -VelopackDirectory $VelopackDirectory
 $projectPath = Join-Path $root "src\LabelForge.App\LabelForge.App.csproj"
 if ([string]::IsNullOrWhiteSpace($Version)) {
     [xml]$project = Get-Content -LiteralPath $projectPath
@@ -38,7 +39,7 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 & (Join-Path $PSScriptRoot 'check-third-party-notices.ps1') -PublishDirectory $publishDir
 
 Write-Host "Packing installer with Velopack..."
-vpk pack --packId LabelForge --packVersion $Version --packDir $publishDir `
+dotnet $velopackEntryPoint pack --packId LabelForge --packVersion $Version --packDir $publishDir `
     --mainExe LabelForge.App.exe --packTitle "LabelForge" --outputDir $releaseDir
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
 
