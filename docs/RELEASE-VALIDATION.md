@@ -42,6 +42,49 @@ every workflow at every scale/theme/window combination.
 
 ### Scaling matrix remains incomplete
 
+The `adb1178` developer tool opens the production editor/styles on Avalonia's
+native desktop backend with separate media, catalogs, preferences, recovery and
+recent-file storage. It supplements the existing headless E2E runner by recording
+actual `TopLevel.RenderScaling`, monitor scaling, client DIPs, theme, source and
+matching document/ZPL snapshots. It does not test a packaged installer.
+
+On Windows build 26200, a 1920 x 1080 monitor and a synthetic 78-element label,
+native captures recorded:
+
+| App / monitor scaling | Theme | Actual client DIPs | Verified scope |
+| --- | --- | --- | --- |
+| 1.0 / 1.0 | Light | 1200 x 780 | Dense layout |
+| 1.0 / 1.0 | Dark | 1200 x 780 | Dense layout |
+| 1.0 / 1.0 | Light | 720 x 630 | Dense layout, inspector overlay, F2, text edit, save/reopen |
+| 1.0 / 1.0 | Dark | 720 x 630 | Dense layout |
+| 1.25 / 1.25 | Light | 1200 x 780 | Dense layout, partly obscured by an external notification |
+| 1.25 / 1.25 | Dark | 1536 x 792.8, maximized | Dense layout, partly obscured by an external notification |
+| 1.25 / 1.25 | Light and Dark | 720 x 630.4 each | Dense layout with inspector overlay |
+| 1.5 / 1.5 | Light and Dark | 1200 x 640.67 each | Dense layout, height constrained by the desktop; notification overlap |
+| 1.5 / 1.5 | Light and Dark | 720 x 630 each | Dense layout, inspector collapsed |
+
+The compact Light reopened model matched the complete edited model, and generated
+ZPL matched byte-for-byte. Screenshots, accessibility observations, measured JSON
+and model/ZPL records are retained in local QA artifacts. None of these cases
+completes the full workflow matrix. All eight higher-scale model snapshots matched
+the reopened edited model, and their generated ZPL matched byte-for-byte.
+
+Direct Settings launch returned no targetable window. A normal Control Panel link
+opened Settings successfully. The desktop has three monitors: the primary display
+is number 2, matching the app's recorded 0,0,1920,1080 monitor bounds. Initial 125%
+selections on the other monitors left the app at 1.0 and were not counted as DPI
+passes. Those monitors returned to their observed 100% scale; changing the primary
+produced measured 1.25 and 1.5. The primary also returned to 100%, confirmed by a
+native 1.0 record. Some broad captures have an external notification over lower
+controls; repeat those captures unobscured before closing the reachability check.
+
+The Release tool build had zero warnings/errors; 15 headless bootstrap/storage
+checks and all 1,345 local unit tests passed. [Source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36276142352)
+passed all nine jobs, including bootstrap/storage checks. Those automated checks
+do not count as native DPI evidence. See the [tool guide](../tools/LabelForge.NativeQA/README.md).
+
+The following observations are historical, from earlier candidates:
+
 Layout and field-focus checks ran in both themes at selected Windows scales of
 100%, 125% and 150%. At 100%, regular captures were 1202 x 792 logical pixels and
 compact captures were 722 x 792. At higher selected scales, compact captures were
@@ -297,7 +340,8 @@ earlier packages and never replace packages already distributed to users.
 
 ## Remaining work
 
-1. Measure actual app scaling and finish the native workflow matrix (G8).
+1. Finish the native workflow matrix and unobscured broad captures (G8). Actual
+   1.0/1.25/1.5 measurements across 12 combinations are recorded above.
 2. Validate legacy upgrade, pristine clean install and uninstall;
    establish exact native Rust compiler/standard-library notice provenance (G11).
 3. Publish after those checks have evidence; choose a distribution/update feed

@@ -1,5 +1,19 @@
 # Project status
 
+Current QA source: `adb1178` adds an isolated native measurement tool using the
+production editor and styles. Local validation passed all 1,345 unit tests and
+15 headless bootstrap/storage checks. [Its CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36276142352)
+passed all nine jobs, including the new storage check.
+
+Native Windows build 26200 recorded actual app/monitor scaling of 1.0, 1.25 and 1.5
+for the 78-element synthetic label in Light/Dark and broad/compact windows: 12 cases.
+Actual client dimensions are in the validation record. The complete model and ZPL
+remained unchanged across all eight higher-scale captures. Original OS scales were restored.
+The compact Light smoke passed inspector access, F2, text editing and save/reopen;
+the complete reopened model and generated ZPL matched. The complete workflow per
+combination and unobscured broad captures remain open. This is developer-editor evidence;
+the packaged candidate below remains `eec7557`.
+
 Current packaging correction: `eec7557` adds 493 original native text segments
 for a conservative 277-entry Windows dependency inventory, plus byte-matched
 WebView2 loader notices and supplemental release-date Rust notices. Packaging
@@ -33,8 +47,9 @@ Installer testing previously exposed recent-file loss. `54a0be9` separates and
 migrates user data; the original recent list was restored and migrated exactly.
 The paint, runtime-notice and native-notice candidates include that fix, text resizing and the paint
 correction. The `1baaa76` Setup from ordinary Explorer installed its recorded version; direct
-`.lfl` opening and preservation of the synthetic recent entry passed. Actual
-native DPI, legacy upgrade, pristine install, uninstall and exact Rust notice provenance
+`.lfl` opening and preservation of the synthetic recent entry passed. The
+complete native workflow matrix, legacy upgrade, pristine install,
+uninstall and exact Rust notice provenance
 remain open.
 Real-printer validation remains outside the active plan for cost reasons.
 See the [validation record](RELEASE-VALIDATION.md) for evidence and remaining gates.
@@ -49,7 +64,7 @@ validation passed 1,330 unit tests, 34 transform checks and 31 selection-scale
 checks; the Release solution build has zero warnings and errors. The focused
 before/after transcripts differ only in the new regression result and summary.
 
-This change is included in the paint, runtime-notice and native-notice candidates. The native DPI and
+This change is included in the paint, runtime-notice and native-notice candidates. The native workflow and
 installer checks in the roadmap remain open.
 
 ## Baseline source audit (2026-09-25)
@@ -84,6 +99,7 @@ See the [README](../README.md) for the feature reference and
 
 | Date | Commit | Result |
 | --- | --- | --- |
+| 2026-09-26 | `adb1178` | Isolated native scaling measurements; all nine CI jobs passed; 12 measured scale/theme/window cases recorded |
 | 2026-09-26 | `1baaa76` | Cached ruler layouts; selected-symbol quiet-zone query; 6,360-byte local paint samples |
 | 2026-09-26 | `54a0be9` | User data separated from installer cleanup; legacy migration and eight regressions |
 | 2026-09-26 | `3a134c8` | Text edge resize preserves untouched imported dimensions |
@@ -187,9 +203,11 @@ for package hashes and the distinction between old/new candidate evidence.
 - A successful network send confirms byte delivery, not physical printing. Status
   readback is a snapshot. Physical printer/scanner checks are outside the current plan
   by the maintainer's decision and do not block release.
-- Native Windows display scaling at 100%, 125% and 150% remains unverified.
+- Native scaling 1.0/1.25/1.5 is measured across 12 developer-editor layouts. The
+  complete per-combination workflow remains unverified; external notifications
+  partly obscured some broad captures.
 
-Recommended next work: confirm actual native DPI and complete the workflow matrix,
+Recommended next work: complete the native workflow matrix and unobscured broad captures,
 validate legacy upgrade, pristine install and uninstall, and establish the native
 Rust compiler/standard-library notice revision. Runtime/native crate and WebView2
 notice inventories are checked; G11

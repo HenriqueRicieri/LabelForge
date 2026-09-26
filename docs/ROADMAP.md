@@ -25,8 +25,12 @@ Reproduce discovered defects in focused regressions before fixing them. Local ba
 A fresh automation session worked; the earlier failure's cause remains unknown.
 Native dense editing, grouping, clipboard, undo/redo, text-block transforms,
 save/reopen, exports and offline viewing were exercised. Layout checks covered both
-themes and selected 100/125/150% Windows scales; actual app RenderScaling and every
-workflow combination remain unverified. A recovery banner contrast defect was
+themes and selected 100/125/150% Windows scales; those older captures did not measure
+actual app scaling. The `adb1178` native tool now records RenderScaling/monitor scaling
+1.0, 1.25 and 1.5 in both themes and broad/compact windows: 12 cases with actual client
+dimensions. Compact Light editing, F2 and save/reopen passed with identical reopened
+model/ZPL; all eight higher-scale captures retained those values. Every full workflow
+combination and unobscured broad captures remain open. A recovery banner contrast defect was
 reproduced and fixed. See the [validation record](RELEASE-VALIDATION.md).
 
 ## 2. Reduce paint allocation and resolve warnings [P1, DONE 2026-09-26]

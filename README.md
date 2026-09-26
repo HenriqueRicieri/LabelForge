@@ -15,7 +15,7 @@ labels, and the designer, viewer, printing, and export paths are implemented and
 The documentation audit baseline is `e78aa0d` (2026-09-25): all nine CI jobs passed,
 including 1,297 unit/fixture tests and 569 graded designer checks in each theme.
 The next Windows release candidate targets `0.4.0`; the last source tag is `v0.3.0`.
-Native display scaling and Windows installer validation are the remaining
+Native workflow coverage and Windows installer validation are the remaining
 release-preparation work.
 
 Native editing, exports, offline viewing and portable crash recovery have been
@@ -24,9 +24,16 @@ the install directory. The current source passes 1,345 local tests and paints th
 78-element fixture at 6,360 bytes per frame locally, retaining the 70 KB limit.
 All nine source CI jobs passed. The corrected Setup passed installation from
 ordinary Explorer, direct `.lfl` opening and preservation of the synthetic recent
-entry. Actual native DPI, legacy upgrade, pristine install, uninstall and exact
+entry. The complete native workflow matrix, legacy upgrade,
+pristine install, uninstall and exact
 Rust standard-library notice provenance remain open. See the dated
 [candidate record](docs/RELEASE-VALIDATION.md) for scope and package hashes.
+
+The `adb1178` developer QA tool measured actual app/monitor scaling 1.0, 1.25 and
+1.5 in both themes and broad/compact windows: 12 cases. Compact Light text editing
+and save/reopen preserved the complete model and generated ZPL; higher-scale captures
+retained those values. All nine source CI jobs passed. The full native workflow
+matrix remains open, and the packaged candidate below is unchanged.
 
 The latest `0.4.0` package adds original license/notice texts for 28 runtime
 packages and both embedded fonts, with an inventory check before packaging.

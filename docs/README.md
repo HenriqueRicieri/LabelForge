@@ -12,6 +12,7 @@ baseline. Read [Roadmap](ROADMAP.md) for the proposed work order and completion 
 | [Validation record](RELEASE-VALIDATION.md) | Native/package results, checksums and remaining release gates |
 | [Application README](../README.md) | Features and quick start |
 | [Third-party notices](../THIRD-PARTY-NOTICES.md) | Bundled dependency and font licenses |
+| [Native QA guide](../tools/LabelForge.NativeQA/README.md) | Isolated native editor, actual display-scaling records and bootstrap checks |
 
 ## Documentation policy
 

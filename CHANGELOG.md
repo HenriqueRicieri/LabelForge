@@ -66,6 +66,12 @@ not yet been published as a release.
 
 ### Release preparation
 
+- Added an isolated native QA tool using the production editor/styles to record
+  actual display scaling and document/ZPL snapshots. Twelve scale/theme/window
+  combinations recorded actual 1.0/1.25/1.5. Compact Light editing/save/reopen
+  preserved model/ZPL; the complete native workflow matrix remains open.
+  Recent-file storage is now injectable for both native QA and the existing E2E
+  runner. CI checks bootstrap/storage isolation alongside the existing suites.
 - Added native Velopack dependency notices and the byte-matched WebView2 loader
   license/notice. Packaging verifies the pinned packer and helper binaries;
   changed inputs require notice review. Exact Rust standard-library provenance

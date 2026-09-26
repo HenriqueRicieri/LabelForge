@@ -12,8 +12,8 @@ dotnet test LabelForge.sln --configuration Release --no-build --verbosity minima
 dotnet run --project src/LabelForge.App
 ```
 
-The solution contains Core, App and unit tests. The E2E harness and benchmark
-tool live outside the solution and need separate builds.
+The solution contains Core, App and unit tests. The E2E harness, native QA and
+benchmark tools live outside the solution and need separate builds.
 
 ## Code map
 
@@ -31,6 +31,7 @@ tool live outside the solution and need separate builds.
 | `src/LabelForge.App/Services` | Settings, recovery, clipboard and file association |
 | `tests/LabelForge.Tests` | Unit tests, golden output, serialization and corpus fixtures |
 | `tools/LabelForge.E2E` | Headless UI assertions and screenshots |
+| `tools/LabelForge.NativeQA` | Native production editor with isolated stores and actual display-scaling records |
 | `tools/LabelForge.Bench` | Rendering measurements |
 | `scripts` | Packaging, catalog export and driver fixture capture |
 
@@ -107,6 +108,15 @@ Native DPI evidence must record the app's actual RenderScaling alongside the
 Windows scale selection and window dimensions. A Windows setting or a headless
 layout pass alone does not establish coverage at 125% or 150%. Record which
 workflow ran in each combination rather than applying one session to the matrix.
+
+The existing E2E runner remains the automated UI regression suite. For native
+measurements, build `tools/LabelForge.NativeQA` in Release and open its executable
+through the desktop. The tool uses the production UI with isolated stores and a
+measurement panel; it does not automate the full editing matrix or install the app.
+Its `--self-check` mode runs 15 headless bootstrap/storage checks in build-and-test.
+Those checks verify the tool, not native scaling. Rebuild after committing so
+recorded source versions identify the tested commit. See the
+[native QA guide](../tools/LabelForge.NativeQA/README.md) for records and usage.
 
 ## Git and documentation
 
