@@ -16,19 +16,14 @@ public sealed class RawNetworkPrinterTests
 
         const string zpl = "^XA^CI28^FO10,10^A0N,30^FDAcentuação ##VAR##^FS^XZ";
 
-        Task<byte[]> receive = Task.Run(async () =>
-        {
-            using TcpClient client = await listener.AcceptTcpClientAsync();
-            await using NetworkStream stream = client.GetStream();
-            using var buffer = new MemoryStream();
-            await stream.CopyToAsync(buffer);
-            return buffer.ToArray();
-        });
-
+        Task<TcpClient> accept = listener.AcceptTcpClientAsync();
         await RawNetworkPrinter.SendAsync("127.0.0.1", port, zpl);
-        byte[] received = await receive.WaitAsync(TimeSpan.FromSeconds(5));
+        using TcpClient client = await accept.WaitAsync(TimeSpan.FromSeconds(5));
+        await using NetworkStream stream = client.GetStream();
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer).WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(Encoding.UTF8.GetBytes(zpl), received);
+        Assert.Equal(Encoding.UTF8.GetBytes(zpl), buffer.ToArray());
     }
 
     [Fact]
