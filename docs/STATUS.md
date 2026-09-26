@@ -1,13 +1,17 @@
 # Project status
 
-Current work after the baseline below: real-printer validation was removed from
-the active plan by the maintainer for cost reasons. The candidate version is `0.4.0`;
-packaging now uses the app version by default. The E2E platform warnings are resolved;
-allocation diagnostics are added without changing the 70 KB budget. Native editing,
-exports, offline viewing and portable recovery have now been exercised. A recovery
-contrast defect was fixed in `d63901b` on 2026-09-26; 1,326 local tests and 400 layout
-checks passed. Actual native DPI coverage and installed-app tests remain open. See the
-[validation record](RELEASE-VALIDATION.md) for evidence and remaining gates.
+Current source correction: `1baaa76` caches the ruler text layouts and queries
+quiet-zone warnings only for selected symbols during paint. Local allocation fell
+from 55,960 to 6,360 bytes at 1x, with the 70 KB budget unchanged. All 1,345 local
+unit tests and 30 focused paint checks per theme passed. Sixteen before/after
+ruler captures matched pixel-for-pixel. The source CI passed all nine jobs.
+
+Installer testing previously exposed recent-file loss. `54a0be9` separates and
+migrates user data; the original recent list was restored and migrated exactly.
+The current `0.4.0` candidate includes that fix, text resizing and the paint
+correction. Native DPI and global installer/association checks remain open.
+Real-printer validation remains outside the active plan for cost reasons.
+See the [validation record](RELEASE-VALIDATION.md) for evidence and remaining gates.
 
 ## Text resize follow-up (2026-09-26)
 
@@ -19,8 +23,8 @@ validation passed 1,330 unit tests, 34 transform checks and 31 selection-scale
 checks; the Release solution build has zero warnings and errors. The focused
 before/after transcripts differ only in the new regression result and summary.
 
-This source change is newer than the packaged `d63901b` candidate. The native DPI
-and installer checks in the roadmap remain open.
+This change is included in the current `1baaa76` candidate. The native DPI and
+installer checks in the roadmap remain open.
 
 ## Baseline source audit (2026-09-25)
 
@@ -54,6 +58,9 @@ See the [README](../README.md) for the feature reference and
 
 | Date | Commit | Result |
 | --- | --- | --- |
+| 2026-09-26 | `1baaa76` | Cached ruler layouts; selected-symbol quiet-zone query; 6,360-byte local paint samples |
+| 2026-09-26 | `54a0be9` | User data separated from installer cleanup; legacy migration and eight regressions |
+| 2026-09-26 | `3a134c8` | Text edge resize preserves untouched imported dimensions |
 | 2026-09-26 | `d63901b` | Theme-aware recovery banner; six contrast checks pass after two failures on the original dark buttons |
 | 2026-09-25 | `e78aa0d` | New text and starters specify width; Auto explains the printer-default behavior |
 | 2026-09-25 | `ab281bf` | Text-block wrapping width follows font resize and restores on cancellation |
@@ -65,7 +72,19 @@ See the [README](../README.md) for the feature reference and
 
 ## Verification
 
-The current [`d63901b` CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36215947181)
+The [source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36258915331)
+passed all nine jobs for `1baaa76`: 1,316 public unit cases, 570 designer checks
+per theme, 400 layout, 34 transform, 29 centimeter and viewer 15/36/15 checks.
+Both themes measured 6,360 bytes for median/p95/max at 1x.
+The preceding [`54a0be9` run](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36257098525)
+failed both designer allocation checks: median 74,536 bytes, p95/max 77,288 bytes,
+with the same 776 x 477-DIP viewport and overlay flags. All other jobs passed.
+The correction removes repeated ruler text formatting; local samples now use
+6,360 bytes, confirmed in both CI themes. G10 is complete under the unchanged
+measured-scene budget. The exact runtime/pool condition behind the earlier variable totals
+was not isolated. The original budget and sample method remain in place.
+
+The earlier [`d63901b` CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36215947181)
 passed all nine jobs on 2026-09-26: 1,297 tests, 569 designer checks per theme,
 400 layout, 33 transform, 29 cm and viewer 15/36/15. Its layout count includes the
 six recovery contrast checks. Local validation passed 1,326 tests and 400 layout
@@ -115,8 +134,11 @@ deliverables.
 
 `scripts/pack-windows.ps1` builds self-contained win-x64 Velopack packages. Its
 default now comes from the app project; an override also sets the published app version.
-Portable launch and synthetic recovery were validated on the new candidate.
-Installation, upgrade, native file association and uninstall remain open. The script
+Portable launch and reopening the 78-element synthetic label passed on `1baaa76`;
+recovery evidence comes from earlier candidates.
+Installer testing exposed recent-file loss and a differing Codex/Explorer association
+view. The recent list was restored and migrated to the separated data directory.
+The corrected installer, global association, clean install and uninstall remain open. The script
 does not establish an update feed. See the [candidate record](RELEASE-VALIDATION.md)
 for package hashes and the distinction between old/new candidate evidence.
 
@@ -136,5 +158,6 @@ for package hashes and the distinction between old/new candidate evidence.
 - Native Windows display scaling at 100%, 125% and 150% remains unverified.
 
 Recommended next work: confirm actual native DPI and complete the workflow matrix,
-explain allocation variability, then validate the installer and dependency notices.
+validate the installer and dependency notices. The paint budget correction (G10)
+is confirmed in the source CI.
 See [Roadmap](ROADMAP.md).

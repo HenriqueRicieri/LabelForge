@@ -29,22 +29,23 @@ themes and selected 100/125/150% Windows scales; actual app RenderScaling and ev
 workflow combination remain unverified. A recovery banner contrast defect was
 reproduced and fixed. See the [validation record](RELEASE-VALIDATION.md).
 
-## 2. Investigate CI variability and warnings [P1, IN PROGRESS]
+## 2. Reduce paint allocation and resolve warnings [P1, DONE 2026-09-26]
 
-Compare the dark-designer allocation failure at `1351a07` with passing runs. Determine
-whether scene state, warmup, runtime or actual allocation growth explains the 70 KB
-budget crossings. Preserve a meaningful regression assertion; changing the budget
-needs measurements. Address CA1416 around E2E Windows registry/file-association calls
-with appropriate platform guards or annotations.
+The allocation check now passes with substantial margin under its original
+70 KB budget. The documented 78-element scene, warmup and 40-frame sampling
+remain unchanged; platform guards resolve the 11 CA1416 warnings. Local backlog: G10.
 
-Complete when the failure has a reproducible explanation or a bounded documented
-measurement method, the check still catches a regression, and a fresh harness build
-resolves the 11 known platform warnings. Local backlog: G10.
+The Windows association block has an OS guard and the separate harness builds
+without warnings. CI `54a0be9` failed in both themes at a 74,536-byte median and
+77,288-byte p95/max. Profiling placed 97% of local paint allocation in rulers:
+cached `FormattedText` objects still reformatted their lines when drawn.
 
-The Windows association block now has an OS guard and the separate harness builds
-without warnings. Paint logs now report viewport, theme, overlays and allocation
-median/p95/max at 1x. The 70 KB threshold is unchanged. Historical variability is
-not yet explained; keep the investigation open until comparable failing data exists.
+`1baaa76` caches bounded `TextLayout` objects, disposes them on eviction/detachment,
+and avoids the complete quiet-zone report during selected-symbol painting.
+Local samples dropped from 55,960 to 6,360 bytes; 30 checks per theme and all
+1,345 unit tests passed. Ruler pixels matched across 16 before/after captures.
+The 70 KB assertion, warmup and 40-frame sampling are unchanged. Source CI
+passed all nine jobs; both themes measured 6,360 bytes for median/p95/max. The exact prior runtime/pool variation was not isolated.
 
 ## 3. Prepare the next Windows release [P1, IN PROGRESS]
 
@@ -57,10 +58,15 @@ Test clean install, upgrade, `.lfl` launch, uninstall, save/reopen, recovery and
 offline viewer. Review bundled licenses, write installation/update instructions and
 prepare release notes from the changelog.
 
-The `d63901b` candidate passed integrity/version/notice-byte checks and native
-portable recovery. The earlier `450b1df` candidate supplies dense editing/export
-evidence. Installed 0.2.1 remains unchanged; upgrade, clean install, native
-association and uninstall are pending. Full notice review remains open.
+The current `1baaa76` candidate passed integrity/version/notice-byte checks,
+portable launch and reopening the dense synthetic label. It includes the paint,
+text resize and user-data separation fixes after the `d63901b`
+installer removed recent files in Codex's view. The original recent list was
+restored/migrated exactly. Explorer showed an Open With chooser despite the
+association in Codex's registry view. Repeat the corrected installation from
+ordinary Explorer; global upgrade/association, clean install and uninstall remain
+open. Earlier candidates supply dense editing/export/recovery evidence. Full
+notice review remains open.
 
 Complete when the candidate passes the native checks above, all CI jobs pass,
 versions agree, and installer smoke results/checksums are recorded. Publishing the
