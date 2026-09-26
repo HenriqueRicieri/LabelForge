@@ -1,16 +1,16 @@
 # Roadmap
 
-Proposed work order after the verified `e78aa0d` baseline, reviewed 2026-09-25.
+Work order after the verified `e78aa0d` baseline, updated 2026-09-26.
 The original feature milestones are implemented. The next batch should establish
 reliable use on the target desktop, then make that version easy to install.
-This documentation audit did not perform native/hardware validation or publish a release.
+Native validation is now in progress. No release has been published.
 
 Scope update, 2026-09-25: the maintainer removed real-printer validation because
 hardware is currently unaffordable. G9 is outside the active plan and is no longer
 a release gate. Physical output remains unverified; software transport/status tests
 continue using fake printers and synthetic jobs.
 
-## 1. Validate native editing on Windows [P1, TODO]
+## 1. Validate native editing on Windows [P1, IN PROGRESS]
 
 Run the app at 100%, 125% and 150% display scaling, in both themes and regular/compact
 windows. Exercise a synthetic dense label through creation, save/reopen and export.
@@ -22,10 +22,12 @@ Complete when a matrix records commit, OS, scaling, theme, window size and pass/
 evidence; controls remain reachable; reopened documents and ZPL preserve the edits.
 Reproduce discovered defects in focused regressions before fixing them. Local backlog: G8.
 
-Current attempt: desktop automation failed while starting its JavaScript runtime,
-before launching LabelForge. Resetting the runtime did not recover it. The installed
-Node executable works independently. The native matrix remains TODO; headless tests
-do not close it. See [Validation record](RELEASE-VALIDATION.md).
+A fresh automation session worked; the earlier failure's cause remains unknown.
+Native dense editing, grouping, clipboard, undo/redo, text-block transforms,
+save/reopen, exports and offline viewing were exercised. Layout checks covered both
+themes and selected 100/125/150% Windows scales; actual app RenderScaling and every
+workflow combination remain unverified. A recovery banner contrast defect was
+reproduced and fixed. See the [validation record](RELEASE-VALIDATION.md).
 
 ## 2. Investigate CI variability and warnings [P1, IN PROGRESS]
 
@@ -54,6 +56,11 @@ the published app and the Velopack package.
 Test clean install, upgrade, `.lfl` launch, uninstall, save/reopen, recovery and the
 offline viewer. Review bundled licenses, write installation/update instructions and
 prepare release notes from the changelog.
+
+The `d63901b` candidate passed integrity/version/notice-byte checks and native
+portable recovery. The earlier `450b1df` candidate supplies dense editing/export
+evidence. Installed 0.2.1 remains unchanged; upgrade, clean install, native
+association and uninstall are pending. Full notice review remains open.
 
 Complete when the candidate passes the native checks above, all CI jobs pass,
 versions agree, and installer smoke results/checksums are recorded. Publishing the

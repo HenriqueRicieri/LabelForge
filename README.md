@@ -18,6 +18,11 @@ The next Windows release candidate targets `0.4.0`; the last source tag is `v0.3
 Native display scaling, CI reliability and the next Windows release are
 the recommended next batch.
 
+Native editing, exports, offline viewing and portable crash recovery have now been
+exercised. The recovery banner contrast fix passed 1,326 local tests and 400 layout
+checks. Actual native DPI coverage and installer validation remain open; see the
+dated [candidate record](docs/RELEASE-VALIDATION.md) for scope and package hashes.
+
 Real-printer validation is outside the current plan because hardware is unavailable.
 Physical output remains unverified. See the [validation record](docs/RELEASE-VALIDATION.md).
 

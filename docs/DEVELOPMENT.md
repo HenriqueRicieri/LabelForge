@@ -97,6 +97,11 @@ Unit tests always use committed synthetic fixtures; an optional private corpus a
 local cases, so CI/local counts differ. Designer `synthetic` mode forces the public
 fixture. Comparison checks inject the offline engine; tests do not require Labelary.
 
+Native DPI evidence must record the app's actual RenderScaling alongside the
+Windows scale selection and window dimensions. A Windows setting or a headless
+layout pass alone does not establish coverage at 125% or 150%. Record which
+workflow ran in each combination rather than applying one session to the matrix.
+
 ## Git and documentation
 
 Validated completed improvements go directly to `main` under the maintainer's current

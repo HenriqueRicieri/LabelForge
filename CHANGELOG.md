@@ -1,7 +1,8 @@
 # Changelog
 
 User-visible changes on `main` since `v0.3.0`, reconciled with source baseline
-`e78aa0d` on 2026-09-25. The current candidate targets `0.4.0`; these changes have
+`e78aa0d` on 2026-09-25, updated through `d63901b` on 2026-09-26. The current
+candidate targets `0.4.0`; these changes have
 not yet been published as a release.
 
 ## Unreleased
@@ -67,6 +68,8 @@ not yet been published as a release.
   and applies explicit overrides to both app and package.
 - Added an output-directory option for rebuilding a candidate without replacing
   earlier packages, and included the existing project, dependency and font notices.
+- Recorded native editing/export/viewer and portable recovery evidence. The new
+  candidate includes the recovery contrast fix; DPI and installed-app checks remain open.
 
 ## Tagged versions
 

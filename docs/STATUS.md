@@ -3,8 +3,10 @@
 Current work after the baseline below: real-printer validation was removed from
 the active plan by the maintainer for cost reasons. The candidate version is `0.4.0`;
 packaging now uses the app version by default. The E2E platform warnings are resolved;
-allocation diagnostics are added without changing the 70 KB budget. Native validation
-remains open after the automation runtime failed to start. See the
+allocation diagnostics are added without changing the 70 KB budget. Native editing,
+exports, offline viewing and portable recovery have now been exercised. A recovery
+contrast defect was fixed in `d63901b` on 2026-09-26; 1,326 local tests and 400 layout
+checks passed. Actual native DPI coverage and installed-app tests remain open. See the
 [validation record](RELEASE-VALIDATION.md) for evidence and remaining gates.
 
 Verified on 2026-09-25 in America/Sao_Paulo. Source baseline:
@@ -37,6 +39,7 @@ See the [README](../README.md) for the feature reference and
 
 | Date | Commit | Result |
 | --- | --- | --- |
+| 2026-09-26 | `d63901b` | Theme-aware recovery banner; six contrast checks pass after two failures on the original dark buttons |
 | 2026-09-25 | `e78aa0d` | New text and starters specify width; Auto explains the printer-default behavior |
 | 2026-09-25 | `ab281bf` | Text-block wrapping width follows font resize and restores on cancellation |
 | 2026-09-25 | `be97995` | Printable font sizing and text resize handles following the visual axis |
@@ -46,6 +49,12 @@ See the [README](../README.md) for the feature reference and
 | 2026-09-24 | `e9388e7`, `5aaed97` | Predictable transform release/cancellation and preserved field settings on deselection |
 
 ## Verification
+
+The current [`d63901b` CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36215947181)
+passed all nine jobs on 2026-09-26: 1,297 tests, 569 designer checks per theme,
+400 layout, 33 transform, 29 cm and viewer 15/36/15. Its layout count includes the
+six recovery contrast checks. Local validation passed 1,326 tests and 400 layout
+checks. The older audit counts below remain a dated comparison.
 
 The [baseline CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36207618441)
 passed all nine jobs. Counts below come from its logs.
@@ -91,8 +100,10 @@ deliverables.
 
 `scripts/pack-windows.ps1` builds self-contained win-x64 Velopack packages. Its
 default now comes from the app project; an override also sets the published app version.
-Installation, upgrade, file association and recovery need fresh validation before the
-next release. The script does not establish an update feed.
+Portable launch and synthetic recovery were validated on the new candidate.
+Installation, upgrade, native file association and uninstall remain open. The script
+does not establish an update feed. See the [candidate record](RELEASE-VALIDATION.md)
+for package hashes and the distinction between old/new candidate evidence.
 
 ## Known limits
 
@@ -109,5 +120,6 @@ next release. The script does not establish an update feed.
   by the maintainer's decision and do not block release.
 - Native Windows display scaling at 100%, 125% and 150% remains unverified.
 
-Recommended next work: native editing validation, CI reliability,
-then a tested Windows release. See [Roadmap](ROADMAP.md).
+Recommended next work: confirm actual native DPI and complete the workflow matrix,
+explain allocation variability, then validate the installer and dependency notices.
+See [Roadmap](ROADMAP.md).
