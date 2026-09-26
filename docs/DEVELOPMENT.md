@@ -63,6 +63,10 @@ the authority for package versions; planning-era versions are historical.
   contents through import/encoding/export. Output is UTF-8 without a BOM.
 - Printing and print-job export share a builder. TCP readback is a status snapshot;
   successful byte delivery is not confirmation that a physical label printed.
+- Ruler labels cache `TextLayout` objects, bounded to 128 entries with disposal on
+  eviction and canvas detachment. Caching `FormattedText` alone still reformats
+  its lines during drawing. Canvas quiet-zone outlines query selected symbols;
+  the warning list retains the complete report.
 - Harness stores must be injectable and use scratch paths.
 
 ## UI regressions

@@ -872,7 +872,6 @@ public sealed partial class DesignerCanvas : Control
         // being laid out rather than only reported after the fact.
         if (doc.CheckQuietZones && Selection is { Count: > 0 } zoneSelection)
         {
-            IReadOnlyList<QuietZoneFinding> findings = QuietZoneChecker.Check(doc);
             foreach (Element element in zoneSelection.Items.Where(QuietZone.Applies))
             {
                 QuietZoneMargin margin = QuietZone.For(element);
@@ -882,7 +881,7 @@ public sealed partial class DesignerCanvas : Control
                 }
 
                 DotRect zone = margin.Around(_bounds.GetBounds(element));
-                bool crowded = findings.Any(f => ReferenceEquals(f.Code, element));
+                bool crowded = QuietZoneChecker.IsCrowded(doc, element);
                 context.DrawRectangle(null, crowded ? QuietZoneWarnPen : QuietZonePen, new Rect(
                     origin.X + zone.X * scale,
                     origin.Y + zone.Y * scale,
@@ -1228,7 +1227,7 @@ public sealed partial class DesignerCanvas : Control
         // Corner box with the unit, and hairlines separating the bands from the canvas.
         context.FillRectangle(band, new Rect(0, 0, RulerSize, RulerSize));
         var unit = RulerLabel(null, text);
-        context.DrawText(unit, new Point(
+        unit.Draw(context, new Point(
             (RulerSize - unit.Width) / 2, (RulerSize - unit.Height) / 2));
 
         context.DrawLine(tick, new Point(0, RulerSize + 0.5), new Point(Bounds.Width, RulerSize + 0.5));
@@ -1290,7 +1289,7 @@ public sealed partial class DesignerCanvas : Control
             if (isMajor)
             {
                 var label = RulerLabel(mm, text);
-                context.DrawText(label, horizontal
+                label.Draw(context, horizontal
                     ? new Point(px + 2, 1)
                     : new Point(2, px + 1));
             }

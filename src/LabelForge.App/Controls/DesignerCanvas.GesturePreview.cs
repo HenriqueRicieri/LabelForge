@@ -57,6 +57,7 @@ public sealed partial class DesignerCanvas
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         if (_gesturePreviewActive || _marquee) CancelGesture();
+        ClearRulerLabels();
         base.OnDetachedFromVisualTree(e);
     }
 

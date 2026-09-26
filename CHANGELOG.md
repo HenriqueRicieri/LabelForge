@@ -45,6 +45,9 @@ not yet been published as a release.
 
 ### Viewer and rendering
 
+- Cached the ruler text layouts instead of reformatting each label during paint.
+  The canvas checks quiet-zone warnings only for selected symbols; the complete
+  warning report remains available. The 70 KB paint budget is unchanged.
 - Kept selected-label size tied to effective `^PW`/`^LL`, including exact dot counts.
 - Tied comparisons to one snapshot and discarded stale responses.
 - Rendered magnified `^XG` and bound imported recalls to the active download.

@@ -48,10 +48,7 @@ public static class QuietZoneChecker
 
             // Off the stock is reported once for the symbol, and only sideways when the
             // stock is continuous, where there is no bottom edge to run off.
-            bool offLabel = zone.X < 0 || zone.X + zone.Width > document.WidthDots ||
-                            (!document.IsContinuous &&
-                             (zone.Y < 0 || zone.Y + zone.Height > document.HeightDots));
-            if (offLabel)
+            if (IsOffLabel(zone, document))
             {
                 findings.Add(new QuietZoneFinding(code, null, zone));
             }
@@ -68,6 +65,35 @@ public static class QuietZoneChecker
 
         return findings;
     }
+
+    public static bool IsCrowded(LabelDocument document, Element code)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(code);
+        if (!document.CheckQuietZones || !code.IsVisible ||
+            !ElementPlacement.IsPrintable(code, document) || !document.Elements.Contains(code))
+            return false;
+
+        QuietZoneMargin margin = QuietZone.For(code);
+        if (margin.IsEmpty) return false;
+
+        var calculator = new ElementBoundsCalculator();
+        DotRect zone = margin.Around(calculator.GetBounds(code));
+        if (IsOffLabel(zone, document)) return true;
+
+        foreach (Element other in document.Elements)
+            if (!ReferenceEquals(other, code) && other.IsVisible &&
+                ElementPlacement.IsPrintable(other, document) &&
+                CrowdsZone(other, calculator.GetBounds(other), zone))
+                return true;
+
+        return false;
+    }
+
+    private static bool IsOffLabel(DotRect zone, LabelDocument document) =>
+        zone.X < 0 || zone.X + zone.Width > document.WidthDots ||
+        (!document.IsContinuous &&
+         (zone.Y < 0 || zone.Y + zone.Height > document.HeightDots));
 
     private static bool CrowdsZone(Element element, DotRect bounds, DotRect zone)
     {
