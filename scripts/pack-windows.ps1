@@ -4,12 +4,12 @@
 #   dotnet tool install --global vpk
 #
 # Usage:
-#   powershell -ExecutionPolicy Bypass -File scripts\pack-windows.ps1 [-Version x.y.z]
+#   powershell -ExecutionPolicy Bypass -File scripts\pack-windows.ps1 [-Version x.y.z] [-OutputDirectory path]
 #
 # Output: artifacts\releases\LabelForge-win-Setup.exe (plus the update packages
 # Velopack uses for delta auto-updates once a distribution feed exists).
 
-param([string]$Version)
+param([string]$Version, [string]$OutputDirectory)
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
@@ -22,7 +22,13 @@ if ($Version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
     throw "Version must use x.y.z or x.y.z-prerelease format."
 }
 $publishDir = Join-Path $root "artifacts\publish\win-x64"
-$releaseDir = Join-Path $root "artifacts\releases"
+$releaseDir = if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
+    Join-Path $root "artifacts\releases"
+} elseif ([System.IO.Path]::IsPathRooted($OutputDirectory)) {
+    $OutputDirectory
+} else {
+    Join-Path $root $OutputDirectory
+}
 
 Write-Host "Publishing self-contained win-x64 build..."
 dotnet publish $projectPath `
