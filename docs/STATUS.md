@@ -9,7 +9,10 @@ ruler captures matched pixel-for-pixel. The source CI passed all nine jobs.
 Installer testing previously exposed recent-file loss. `54a0be9` separates and
 migrates user data; the original recent list was restored and migrated exactly.
 The current `0.4.0` candidate includes that fix, text resizing and the paint
-correction. Native DPI and global installer/association checks remain open.
+correction. Setup from ordinary Explorer installed the recorded version; direct
+`.lfl` opening and preservation of the synthetic recent entry passed. Actual
+native DPI, legacy upgrade, pristine install, uninstall and full notice review
+remain open.
 Real-printer validation remains outside the active plan for cost reasons.
 See the [validation record](RELEASE-VALIDATION.md) for evidence and remaining gates.
 
@@ -138,8 +141,12 @@ Portable launch and reopening the 78-element synthetic label passed on `1baaa76`
 recovery evidence comes from earlier candidates.
 Installer testing exposed recent-file loss and a differing Codex/Explorer association
 view. The recent list was restored and migrated to the separated data directory.
-The corrected installer, global association, clean install and uninstall remain open. The script
-does not establish an update feed. See the [candidate record](RELEASE-VALIDATION.md)
+The corrected Setup installed from ordinary Explorer into the normal per-user
+directory. Windows file properties confirmed the `0.4.0+1baaa76` source version;
+Explorer opened a synthetic `.lfl` directly in that installed app. The dense QA
+label remained in recent files and reopened after Setup. Legacy upgrade,
+pristine install and uninstall remain unverified. The script does not establish
+an update feed. See the [candidate record](RELEASE-VALIDATION.md)
 for package hashes and the distinction between old/new candidate evidence.
 
 ## Known limits
@@ -158,6 +165,7 @@ for package hashes and the distinction between old/new candidate evidence.
 - Native Windows display scaling at 100%, 125% and 150% remains unverified.
 
 Recommended next work: confirm actual native DPI and complete the workflow matrix,
-validate the installer and dependency notices. The paint budget correction (G10)
+validate legacy upgrade, pristine install and uninstall, then review dependency
+notices. The paint budget correction (G10)
 is confirmed in the source CI.
 See [Roadmap](ROADMAP.md).

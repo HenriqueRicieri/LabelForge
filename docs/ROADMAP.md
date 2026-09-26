@@ -62,11 +62,13 @@ The current `1baaa76` candidate passed integrity/version/notice-byte checks,
 portable launch and reopening the dense synthetic label. It includes the paint,
 text resize and user-data separation fixes after the `d63901b`
 installer removed recent files in Codex's view. The original recent list was
-restored/migrated exactly. Explorer showed an Open With chooser despite the
-association in Codex's registry view. Repeat the corrected installation from
-ordinary Explorer; global upgrade/association, clean install and uninstall remain
-open. Earlier candidates supply dense editing/export/recovery evidence. Full
-notice review remains open.
+restored/migrated exactly. The corrected Setup ran from ordinary Explorer and
+installed the recorded `0.4.0+1baaa76` version in the normal per-user directory.
+Explorer opened a synthetic `.lfl` directly in the installed app; the dense QA
+label survived in recent files and reopened after Setup. The previous version
+in that native directory was not independently observed, so legacy upgrade and
+pristine install remain unverified. Uninstall and full notice review are also
+open. Earlier candidates supply dense editing/export/recovery evidence.
 
 Complete when the candidate passes the native checks above, all CI jobs pass,
 versions agree, and installer smoke results/checksums are recorded. Publishing the

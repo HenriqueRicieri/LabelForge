@@ -30,6 +30,7 @@ unknown; native testing can now proceed.
 | PNG/PDF | PNG verified at 960 x 800; PDF had one 340 x 283-point page for 120 x 100 mm stock; rendered PDF inspected |
 | Offline viewer | Rendered at 12 x 10 cm / 203 dpi; two known unsupported-command diagnostics for `^PW`/`^LL` remained |
 | Portable launch | Passed on `1baaa76`, including reopening the synthetic 78-element label and viewing its rulers at 100% canvas zoom; this zoom is separate from OS DPI |
+| Installed app launch and association | `1baaa76` Setup ran from ordinary Explorer; a synthetic `.lfl` opened directly in the installed app and the dense QA label reopened from recent files |
 | Forced interruption/recovery | `450b1df` recovered an unsaved synthetic label after terminating only the QA process; saved model and element ID matched |
 | Corrected recovery banner | `d63901b` Light/Dark screenshots showed readable buttons; replay of the same synthetic recovery fixture preserved the complete saved model |
 
@@ -74,21 +75,41 @@ locks. Four path checks failed before the fix; all eight pass afterward.
 
 Before upgrading older builds, use the corrected portable or its migration-only
 command and keep a backup. See [migration instructions](DEVELOPMENT.md#windows-packaging).
-The new installer has not yet been retested; the incoming app cannot rescue data
-already deleted by an older installer.
+The incoming app cannot rescue data already deleted by an older installer.
 
 The hook wrote `.lfl` and its open command in the registry view seen from Codex,
 but opening the synthetic file in Explorer produced the Open With chooser.
 This is not an association pass. The differing LocalCache and Explorer views are
 consistent with [MSIX virtualization](https://learn.microsoft.com/en-us/windows/msix/desktop/flexible-virtualization);
-that is an inference, not proof of a LabelForge association-code defect. Repeat
-install/association tests from ordinary Explorer before closing G11. No Windows
+that is an inference, not proof of a LabelForge association-code defect. The
+corrected Setup was subsequently tested from ordinary Explorer below. No Windows
 virtualization or security settings were changed.
 
 The corrected portable launched successfully through Explorer. Its recent menu
 was empty in that process context; this does not establish that it shared Codex's
-migrated recent-files view. Global installation, clean install and uninstall remain
-unverified. The earlier candidate hashes below retain the failed-upgrade provenance.
+migrated recent-files view. The earlier candidate hashes below retain the
+failed-upgrade provenance.
+
+### Corrected Setup from ordinary Explorer
+
+The approved `1baaa76` Setup, with the SHA-256 recorded below, ran from ordinary
+Explorer and launched `%LocalAppData%/LabelForge/current/LabelForge.App.exe`.
+Windows file properties showed file version `0.4.0.0` and product version
+`0.4.0+1baaa765b39b005f9cfbeb04f9266c924a36688f`. A synthetic `.lfl` opened
+directly in that installed app from Explorer, without an Open With chooser.
+
+The synthetic 78-element label remained in the recent menu after Setup and
+reopened successfully. Explorer showed `recent-files.json` and the recovery
+folder under `%LocalAppData%/LabelForge.UserData`, outside the install directory.
+The separate recent-list backup visible from Codex also retained its original
+SHA-256. These observations cover the known QA recent entry and separated paths;
+they do not establish preservation of every settings/catalog/recovery file.
+
+No upgrade prompt appeared, and the previous version in the native install
+directory was not independently observed. This passes installation, installed
+source-version verification and `.lfl` association. Legacy upgrade, a pristine
+clean install and uninstall remain unverified. Installed notice bytes were not
+independently compared; archive notice-byte checks remain the evidence for bundling.
 
 ## Paint allocation correction
 
@@ -131,7 +152,8 @@ was not isolated; repeated text formatting was removed from the measured path.
 | Fresh CI | [Source-matched run](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36258915331) passed all nine jobs: 1,316 public unit cases, 570 designer checks per theme, 400 layout, 34 transform, 29 cm and viewer 15/36/15 |
 | Package integrity | ZIP/nupkg CRC checks passed; app exe/dll bytes matched publish; app and package declare 0.4.0 |
 | Bundled notices | LICENSE, THIRD-PARTY-NOTICES.md and font OFL.txt byte-matched to source; full dependency notice review remains open |
-| Install/upgrade/association/uninstall | Upgrade attempted in Codex view; recent list restored; Explorer association failed; corrected installer and global integration await retest |
+| Install and `.lfl` association | Corrected Setup passed from ordinary Explorer; installed source version confirmed; synthetic file opened directly and known recent entry survived |
+| Legacy upgrade/clean install/uninstall | Earlier Codex-view upgrade exposed recent-list loss; restored/migrated exactly. Native legacy upgrade, pristine install and uninstall remain unverified |
 
 Raw screenshots, synthetic files, export comparisons, matrix entries and logs
 remain in ignored local artifacts. Public records omit machine paths and user state.
@@ -141,8 +163,9 @@ remain in ignored local artifacts. Public records omit machine paths and user st
 Built from `1baaa765b39b005f9cfbeb04f9266c924a36688f` into
 `artifacts/releases/candidate-0.4.0-paint`. App informational version is
 `0.4.0+1baaa765b39b005f9cfbeb04f9266c924a36688f`. Archive CRC, published app bytes,
-notices and versions passed. Native portable launch/reopen passed; corrected Setup
-has not yet been run. Existing notices are bundled; the full dependency audit is open.
+notices and versions passed. Native portable launch/reopen and corrected Setup
+installation/association passed. Existing notices are bundled; the full dependency
+audit is open.
 
 | File | SHA-256 |
 | --- | --- |
@@ -190,7 +213,7 @@ earlier packages and never replace packages already distributed to users.
 ## Remaining work
 
 1. Measure actual app scaling and finish the native workflow matrix (G8).
-2. Validate upgrade, clean install, Windows `.lfl` association and uninstall;
+2. Validate legacy upgrade, pristine clean install and uninstall;
    complete the dependency notice review (G11).
 3. Publish after those checks have evidence; choose a distribution/update feed
    as a separate release decision.

@@ -144,6 +144,11 @@ are present under `LabelForge.UserData`. An incoming installer cannot retroactiv
 protect data erased by an older executable; migration must precede that installer.
 Future installs/reinstalls use the separated data directory.
 
+Run Setup and test `.lfl` opening from ordinary Explorer. A packaged development
+host can expose a different filesystem or registry view. Confirm the installed
+app's source version in Windows file properties and record the launched process
+path. See the [candidate validation](RELEASE-VALIDATION.md) for the current results.
+
 The script uses a self-contained win-x64 publish with trimming disabled. Install
 the Velopack CLI once if absent, then pass the intended release version:
 

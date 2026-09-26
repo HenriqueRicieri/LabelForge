@@ -22,8 +22,10 @@ Native editing, exports, offline viewing and portable crash recovery have been
 exercised. Installer testing exposed recent-file loss; user data now lives outside
 the install directory. The current source passes 1,345 local tests and paints the
 78-element fixture at 6,360 bytes per frame locally, retaining the 70 KB limit.
-All nine source CI jobs passed. Actual native DPI and global installer integration
-remain open. See the dated
+All nine source CI jobs passed. The corrected Setup passed installation from
+ordinary Explorer, direct `.lfl` opening and preservation of the synthetic recent
+entry. Actual native DPI, legacy upgrade, pristine install, uninstall and the full
+dependency notice review remain open. See the dated
 [candidate record](docs/RELEASE-VALIDATION.md) for scope and package hashes.
 
 Real-printer validation is outside the current plan because hardware is unavailable.
