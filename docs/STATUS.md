@@ -1,5 +1,21 @@
 # Project status
 
+## Guide gesture reliability (2026-09-27)
+
+Permanent horizontal and vertical guides now commit the final pointer position,
+including the final decision to remove a guide on its corresponding ruler. They
+retain the initial grab offset, so a nearby click does not move the guide. Escape
+restores its original position without adding an undo step; a subsequent release
+cannot commit the cancelled drag.
+
+The focused harness reproduced 14 failures before the fix. Afterward, all 50
+transform checks and 1,345 local unit tests passed. The complete before/after
+transcripts differ only in those 14 results and the graded summary. The Release
+solution build has zero warnings and errors. This source change is newer than the
+packaged candidate below; the native workflow and installer gates remain open.
+
+## Previous QA and packaging evidence
+
 Current QA source: `adb1178` adds an isolated native measurement tool using the
 production editor and styles. Local validation passed all 1,345 unit tests and
 15 headless bootstrap/storage checks. [Its CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36276142352)

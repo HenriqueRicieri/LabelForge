@@ -313,6 +313,7 @@ public sealed partial class DesignerCanvas : Control
     private GuideAxis _dragGuideAxis;
     private int _dragGuideIndex;
     private int _dragGuideStart;
+    private double _dragGuidePointerStart;
     private bool _dragGuideDelete;
 
     // Element-drag snapping: the union of the dragged items' bounds at drag start,
@@ -1588,6 +1589,7 @@ public sealed partial class DesignerCanvas : Control
             _dragGuideStart = grabbed.Axis == GuideAxis.Vertical
                 ? doc.VerticalGuides[grabbed.Index]
                 : doc.HorizontalGuides[grabbed.Index];
+            _dragGuidePointerStart = grabbed.Axis == GuideAxis.Vertical ? dotX : dotY;
             _dragGuideDelete = false;
             Cursor = SharedCursor(grabbed.Axis == GuideAxis.Vertical
                 ? StandardCursorType.SizeWestEast
@@ -1794,6 +1796,18 @@ public sealed partial class DesignerCanvas : Control
     /// <returns>False when there was no gesture to cancel.</returns>
     private bool CancelGesture()
     {
+        if (_dragGuideAxis != GuideAxis.None && Document is { } guideDoc)
+        {
+            IList<int> guides = _dragGuideAxis == GuideAxis.Vertical
+                ? guideDoc.VerticalGuides : guideDoc.HorizontalGuides;
+            guides[_dragGuideIndex] = _dragGuideStart;
+            _dragGuideAxis = GuideAxis.None;
+            _dragGuideDelete = false;
+            Cursor = Cursor.Default;
+            InvalidateVisual();
+            return true;
+        }
+
         if (_marquee)
         {
             EndMarquee(restoreSelection: true);
@@ -2252,22 +2266,7 @@ public sealed partial class DesignerCanvas : Control
 
         if (_dragGuideAxis != GuideAxis.None && Document is { } guideDoc)
         {
-            (double viewScale, Point viewOrigin) = GetTransform();
-            int margin = PasteboardDots(guideDoc);
-            if (_dragGuideAxis == GuideAxis.Vertical)
-            {
-                int value = (int)Math.Round((p.X - viewOrigin.X) / viewScale);
-                guideDoc.VerticalGuides[_dragGuideIndex] =
-                    Math.Clamp(value, -margin, guideDoc.WidthDots + margin);
-                _dragGuideDelete = p.Y < RulerSize;
-            }
-            else
-            {
-                int value = (int)Math.Round((p.Y - viewOrigin.Y) / viewScale);
-                guideDoc.HorizontalGuides[_dragGuideIndex] =
-                    Math.Clamp(value, -margin, guideDoc.HeightDots + margin);
-                _dragGuideDelete = p.X < RulerSize;
-            }
+            ApplyGuideDrag(p, guideDoc);
 
             InvalidateVisual();
             return;
@@ -2365,6 +2364,20 @@ public sealed partial class DesignerCanvas : Control
 
         ApplyGesture(p, e.KeyModifiers);
         UpdateAutoPan(p, e.KeyModifiers);
+    }
+
+    private void ApplyGuideDrag(Point p, LabelDocument doc)
+    {
+        (double scale, Point origin) = GetTransform();
+        bool vertical = _dragGuideAxis == GuideAxis.Vertical;
+        double pointerDots = vertical ? (p.X - origin.X) / scale : (p.Y - origin.Y) / scale;
+        int delta = (int)Math.Round(pointerDots - _dragGuidePointerStart);
+        int margin = PasteboardDots(doc);
+        IList<int> guides = vertical ? doc.VerticalGuides : doc.HorizontalGuides;
+        guides[_dragGuideIndex] = delta == 0 ? _dragGuideStart :
+            Math.Clamp(_dragGuideStart + delta, -margin,
+                (vertical ? doc.WidthDots : doc.HeightDots) + margin);
+        _dragGuideDelete = vertical ? p.Y < RulerSize : p.X < RulerSize;
     }
 
     private bool ResizePointerMoved(Point p) =>
@@ -3180,6 +3193,7 @@ public sealed partial class DesignerCanvas : Control
 
         if (_dragGuideAxis != GuideAxis.None && Document is { } guideDoc)
         {
+            ApplyGuideDrag(e.GetPosition(this), guideDoc);
             bool guideChanged;
             if (_dragGuideDelete)
             {

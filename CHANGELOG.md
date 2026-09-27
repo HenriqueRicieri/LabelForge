@@ -1,7 +1,7 @@
 # Changelog
 
 User-visible changes on `main` since `v0.3.0`, reconciled with source baseline
-`e78aa0d` on 2026-09-25, updated on 2026-09-26. The current
+`e78aa0d` on 2026-09-25, updated on 2026-09-27. The current
 candidate targets `0.4.0`; these changes have
 not yet been published as a release.
 
@@ -9,6 +9,9 @@ not yet been published as a release.
 
 ### Editing and workspace
 
+- Fixed guide drags ignoring the final release position and ruler removal state.
+  Guides retain the grab offset, and Escape restores their original position
+  without adding an undo step.
 - Fixed text edge handles changing the other font dimension in imported labels.
   Height-only resizing also preserves the stored wrapping width outside editor limits.
 - Fixed recovery buttons becoming unreadable in the dark theme. The recovery

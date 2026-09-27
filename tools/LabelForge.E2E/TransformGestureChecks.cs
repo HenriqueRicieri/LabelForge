@@ -20,6 +20,59 @@ internal static class TransformGestureChecks
         designer.SnapToGrid = designer.SnapToGuides = designer.SnapToObjects = false;
         try
         {
+            foreach (bool vertical in new[] { true, false })
+            {
+                string axis = vertical ? "Vertical" : "Horizontal";
+                var guides = LoadGuide(vertical);
+                window.MouseDown(GuideAt(vertical, 200), MouseButton.Left);
+                window.MouseMove(GuideAt(vertical, 240), RawInputModifiers.LeftMouseButton);
+                window.MouseUp(GuideAt(vertical, 280), MouseButton.Left);
+                check($"{axis} guide commits the release position", guides.SequenceEqual(new[] { 280 }));
+                designer.UndoCommand.Execute(null);
+                var restored = vertical ? designer.Document.VerticalGuides : designer.Document.HorizontalGuides;
+                check($"{axis} guide drag undoes to its start", restored.SequenceEqual(new[] { 200 }));
+                designer.RedoCommand.Execute(null);
+                restored = vertical ? designer.Document.VerticalGuides : designer.Document.HorizontalGuides;
+                check($"{axis} guide drag redoes its release position", restored.SequenceEqual(new[] { 280 }));
+
+                guides = LoadGuide(vertical);
+                window.MouseDown(GuideAt(vertical, 200), MouseButton.Left);
+                window.MouseMove(GuideAt(vertical, 240), RawInputModifiers.LeftMouseButton);
+                window.MouseUp(GuideRuler(vertical, 280), MouseButton.Left);
+                check($"{axis} guide released on its ruler is removed", guides.Count == 0);
+
+                guides = LoadGuide(vertical);
+                window.MouseDown(GuideAt(vertical, 200), MouseButton.Left);
+                window.MouseMove(GuideRuler(vertical, 240), RawInputModifiers.LeftMouseButton);
+                window.MouseUp(GuideAt(vertical, 280), MouseButton.Left);
+                check($"{axis} guide released off its ruler is retained", guides.SequenceEqual(new[] { 280 }));
+
+                guides = LoadGuide(vertical);
+                string before = designer.SerializeDocument();
+                bool undoBefore = designer.CanUndo;
+                window.MouseDown(GuideAt(vertical, 204), MouseButton.Left);
+                window.MouseMove(GuideAt(vertical, 204), RawInputModifiers.LeftMouseButton);
+                window.MouseUp(GuideAt(vertical, 204), MouseButton.Left);
+                check($"{axis} guide nearby click changes neither document nor undo",
+                    designer.SerializeDocument() == before && designer.CanUndo == undoBefore);
+
+                guides = LoadGuide(vertical);
+                window.MouseDown(GuideAt(vertical, 204), MouseButton.Left);
+                window.MouseMove(GuideAt(vertical, 244), RawInputModifiers.LeftMouseButton);
+                window.MouseUp(GuideAt(vertical, 284), MouseButton.Left);
+                check($"{axis} guide drag retains its grab offset", guides.SequenceEqual(new[] { 280 }));
+
+                guides = LoadGuide(vertical);
+                before = designer.SerializeDocument();
+                undoBefore = designer.CanUndo;
+                window.MouseDown(GuideAt(vertical, 200), MouseButton.Left);
+                window.MouseMove(GuideAt(vertical, 240), RawInputModifiers.LeftMouseButton);
+                window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+                window.MouseUp(GuideAt(vertical, 280), MouseButton.Left);
+                check($"{axis} guide Escape restores document and undo before release",
+                    designer.SerializeDocument() == before && designer.CanUndo == undoBefore);
+            }
+
             BoxElement box = LoadBox();
             window.MouseDown(At(280, 190), MouseButton.Left,
                 RawInputModifiers.Control | RawInputModifiers.Alt);
@@ -437,6 +490,27 @@ internal static class TransformGestureChecks
             designer.NewDocumentCommand.Execute(null);
             canvas.ResetView();
             Pump(150);
+        }
+
+        IList<int> LoadGuide(bool vertical)
+        {
+            var document = new LabelDocument { WidthMm = 100, HeightMm = 80, Dpmm = 8,
+                CheckQuietZones = false };
+            IList<int> guides = vertical ? document.VerticalGuides : document.HorizontalGuides;
+            guides.Add(200);
+            designer.LoadDocument(document, path: null);
+            canvas.ResetView();
+            canvas.SetZoom(1);
+            Pump(100);
+            return guides;
+        }
+
+        Point GuideAt(bool vertical, int value) => vertical ? At(value, 300) : At(300, value);
+
+        Point GuideRuler(bool vertical, int value)
+        {
+            Point p = canvas.DotsToView(vertical ? value : 300, vertical ? 300 : value);
+            return canvas.TranslatePoint(vertical ? new Point(p.X, 10) : new Point(10, p.Y), window)!.Value;
         }
 
         TextElement LoadText(Orientation orientation = Orientation.Normal,

@@ -55,6 +55,9 @@ the authority for package versions; planning-era versions are historical.
   creates no change. Text blocks restore font dimensions and wrapping width.
   Text edge handles apply size limits only to the resized dimension; they preserve
   untouched imported values even outside the inspector's editing range.
+- Permanent guide drags use the captured pointer offset and final release position.
+  Release on the corresponding ruler removes the guide; Escape restores the starting
+  position without a document edit or undo step. A nearby click must not move it.
 - `FontWidthDots = 0` omits width from ZPL; the printer chooses its default and the
   preview estimates it. New fields/starters specify width; old saved values stay intact.
   Font 0's pinned preview typeface remains a substitute.
