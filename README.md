@@ -25,7 +25,8 @@ the install directory. The current source passes 1,345 local tests and paints th
 All nine source CI jobs passed. The current `cbacfd4` Setup repaired the existing
 0.4.0 installation, launched the installed app, and opened a synthetic `.lfl`
 directly from Explorer. Its saved label and ZPL export matched the validated
-references byte-for-byte; existing recent entries survived. The complete native
+references byte-for-byte; the offline viewer rendered that export, and existing
+recent entries survived. The complete native
 workflow matrix, legacy upgrade,
 pristine install, uninstall and exact
 Rust standard-library notice provenance remain open. See the dated

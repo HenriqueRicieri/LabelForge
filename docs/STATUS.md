@@ -102,8 +102,9 @@ The paint, runtime-notice and native-notice candidates include that fix, text re
 correction. The `1baaa76` Setup from ordinary Explorer installed its recorded version; direct
 `.lfl` opening and preservation of the synthetic recent entry passed. The current
 `cbacfd4` Setup repaired that 0.4.0 installation. Its installed executable matched
-the candidate ZIP byte-for-byte, and direct `.lfl` opening, save and ZPL export
-passed. Both pre-existing recent entries survived alongside the two QA files. The
+the candidate ZIP byte-for-byte, as did all 264 installed `current/` files. Direct
+`.lfl` opening, save, ZPL export and offline viewing of that export passed. Both
+pre-existing recent entries survived alongside the two QA files. The
 complete native workflow matrix, legacy upgrade, pristine install,
 uninstall and exact Rust notice provenance
 remain open.

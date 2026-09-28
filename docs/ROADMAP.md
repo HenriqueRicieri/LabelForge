@@ -108,8 +108,9 @@ and errors; ZIP/nupkg CRC, 263 packaged publish-file byte comparisons and the
 Setup's embedded nupkg passed. All nine CI jobs passed on that source. Local user
 data was backed up before native installer testing. Setup detected the existing
 0.4.0 installation and completed an in-place repair. The installed executable
-matched the ZIP; Explorer opened `.lfl` directly, and installed-app save/export
-matched prior references byte-for-byte. Pre-existing recent entries survived.
+and all 264 installed `current/` files matched the ZIP; Explorer opened `.lfl`
+directly, and installed-app save/export matched prior references byte-for-byte.
+The offline viewer rendered that ZPL without errors. Pre-existing recent entries survived.
 Legacy versioned upgrade, pristine install and uninstall remain open; hashes are in the
 [release validation record](RELEASE-VALIDATION.md).
 

@@ -320,6 +320,9 @@ and offered **Repair**. The repair completed and launched the installed app from
 `0.4.0+cbacfd4e043298bd224ac24c496e150412386cf9`. The installed executable's
 SHA-256, `6d2814fd931cd0d1e88c09436264939165ccd4fac66159da768ecce804260e93`,
 matched `current/LabelForge.App.exe` in the candidate portable ZIP exactly.
+All 264 `current/` files in that ZIP matched the installed directory byte-for-byte,
+as did the shared `Update.exe`; the portable-only marker and launcher are absent
+from the installed layout. This includes the bundled notice files.
 
 Ordinary Explorer identified the synthetic fixture as a LabelForge label and
 opened it directly in that installed executable, with no Open With chooser. The
@@ -328,6 +331,10 @@ byte-identical to the validated source fixture. Export ZPL produced the same
 3,002 bytes as the prior validated export, including `^XA`/`^XZ`. The fixture
 intentionally crowds two QR quiet zones, which the app reported; this smoke test
 does not establish scannability or physical output.
+
+The installed offline ZPL viewer opened that exported file at 12 x 10 cm / 203 dpi
+and rendered its content with no errors. It reported only the two known unsupported
+`^PW`/`^LL` diagnostics. No network comparison or printer was used.
 
 The normal desktop's recent-file history retained both entries present before
 the repair and added the two files opened/saved during the test. Its user-data
