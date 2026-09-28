@@ -9,6 +9,7 @@ baseline. Read [Roadmap](ROADMAP.md) for the proposed work order and completion 
 | [Roadmap](ROADMAP.md) | Next work, acceptance criteria and deferred features |
 | [Development guide](DEVELOPMENT.md) | Architecture, build, tests, Git workflow and packaging |
 | [Changelog](../CHANGELOG.md) | User-visible changes since the last tagged version |
+| [0.4.0 release notes draft](RELEASE-NOTES-0.4.0-DRAFT.md) | Proposed announcement and installation preflight; not published |
 | [Validation record](RELEASE-VALIDATION.md) | Native/package results, checksums and remaining release gates |
 | [Application README](../README.md) | Features and quick start |
 | [Third-party notices](../THIRD-PARTY-NOTICES.md) | Bundled dependency and font licenses |

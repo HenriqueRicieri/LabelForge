@@ -98,8 +98,11 @@ not yet been published as a release.
   and applies explicit overrides to both app and package.
 - Added an output-directory option for rebuilding a candidate without replacing
   earlier packages, and included the existing project, dependency and font notices.
-- Recorded native editing/export/viewer and portable recovery evidence. The new
-  candidate includes the recovery contrast fix; DPI and installed-app checks remain open.
+- Recorded native editing/export/viewer and portable recovery evidence. The
+  current candidate includes the recovery contrast fix; measured DPI layouts,
+  installed-app repair, `.lfl` association, save/export and offline viewer smoke
+  checks passed. The full per-layout workflow and clean-install/upgrade/uninstall
+  checks remain open.
 
 ## Tagged versions
 

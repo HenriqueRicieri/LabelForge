@@ -113,6 +113,8 @@ directly, and installed-app save/export matched prior references byte-for-byte.
 The offline viewer rendered that ZPL without errors. Pre-existing recent entries survived.
 Legacy versioned upgrade, pristine install and uninstall remain open; hashes are in the
 [release validation record](RELEASE-VALIDATION.md).
+A [0.4.0 release-notes draft](RELEASE-NOTES-0.4.0-DRAFT.md) now summarizes the
+changes and older-build migration preflight; revise it after the remaining gates.
 
 A loopback receive timeout in the packaging-source CI was addressed by test-only
 `8b8eb40`, removing extra scheduling without changing production transport. The
