@@ -33,7 +33,7 @@ The `adb1178` developer QA tool measured actual app/monitor scaling 1.0, 1.25 an
 1.5 in both themes and broad/compact windows: 12 cases. Compact Light text editing
 and save/reopen preserved the complete model and generated ZPL; higher-scale captures
 retained those values. All nine source CI jobs passed. The full native workflow
-matrix remains open, and the packaged candidate below is unchanged.
+matrix remains open.
 
 A measured 150% Light broad workflow also passed text/font/block edits, rotation,
 anchor, clipboard, grouping, save/reopen and ZPL/PNG/PDF export. Its complete model
@@ -42,15 +42,17 @@ On later source `2d4b84e`, a native 100% guide drag and save/reopen preserved th
 361-dot final position. Clear Light/Dark broad captures at measured 125% retained
 the same dense model and ZPL. With the later guide-precision fix, a native 125%
 guide moved from 248 to 419 printer dots, survived undo/redo and save/reopen.
-The per-cell workflow remains open.
+The per-cell workflow remains open. All nine CI jobs passed on the current source.
 
 The latest `0.4.0` package adds original license/notice texts for 28 runtime
 packages and both embedded fonts, with an inventory check before packaging.
-The `eec7557` candidate also adds 493 original native text segments for a conservative
+The `eec7557` packaging change also adds 493 original native text segments for a conservative
 277-entry Windows dependency inventory, plus the exact WebView2 loader notices.
-Packaging verifies the pinned packer/helper inputs. Exact Rust standard-library
-provenance remains open. Native installation results above refer to the preceding
-paint candidate; the new package has not been installed.
+Packaging verifies the pinned packer/helper inputs. A fresh unsigned `0.4.0` candidate
+was built from current source `cbacfd4`, including both guide fixes. Its archives
+passed CRC and published-file byte comparisons, and Setup embeds the exact nupkg.
+Exact Rust standard-library provenance remains open. Native installation results
+above refer to the preceding paint candidate; the current package has not been installed.
 
 Real-printer validation is outside the current plan because hardware is unavailable.
 Physical output remains unverified. See the [validation record](docs/RELEASE-VALIDATION.md).

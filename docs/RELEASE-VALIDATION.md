@@ -2,11 +2,12 @@
 
 Updated 2026-09-28. Candidate version: `0.4.0`. Native workflow evidence was
 collected on `450b1df`; recovery contrast was validated on `d63901b`. The current
-candidate includes text resize, user-data and paint corrections plus the runtime
-and native notice inventories in
-[`eec7557`](https://github.com/HenriqueRicieri/LabelForge/commit/eec7557f2ada254d9be175e72902c080686358cf).
+candidate is built from
+[`cbacfd4`](https://github.com/HenriqueRicieri/LabelForge/commit/cbacfd4e043298bd224ac24c496e150412386cf9).
+It includes text resize, user-data and paint corrections, guide gesture/precision
+fixes and the runtime/native notice inventories added by `eec7557`.
 Native installation and association passed on the preceding `1baaa76` candidate;
-the new native-notice package has not been installed.
+the current package has not been installed.
 These are local unsigned packages. No release or update feed has been published.
 
 Real-printer validation is excluded at the maintainer's request because hardware
@@ -236,8 +237,9 @@ was not isolated; repeated text formatting was removed from the measured path.
 
 ## Software and packaging evidence
 
-Behavior measurements below refer to `1baaa76`. The runtime-notice package checks
-refer to `12847fc`; packaging changes do not establish native installation results.
+Behavior measurements below refer to `1baaa76`. The earlier runtime-notice package
+checks refer to `12847fc`; the current package verification is recorded below.
+Packaging checks do not establish native installation results.
 
 | Check | Result |
 | --- | --- |
@@ -276,6 +278,30 @@ only the test, not app source or package contents.
 
 ## Current candidate files
 
+Built from `cbacfd4e043298bd224ac24c496e150412386cf9` into
+`artifacts/releases/candidate-0.4.0-current-source`. App informational version is
+`0.4.0+cbacfd4e043298bd224ac24c496e150412386cf9`; app/package version is 0.4.0.
+The self-contained win-x64 publish completed with zero warnings/errors. ZIP and
+nupkg CRC passed, and each contained 263 publish files with matching bytes.
+The packer intentionally omits `createdump.exe` and four PDBs. The existing
+runtime/font and native notice inventories remain bundled. Setup contains the exact
+reviewed nupkg. This unsigned package has not been installed or published.
+
+[CI on `cbacfd4`](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36381271617)
+passed all nine jobs. Native QA on the current source passed the 125% Light
+guide insert/drag/undo/redo/save/reopen sequence with exact saved model/ZPL;
+the full workflow in every scale/theme/window cell remains open. Local user data
+was backed up before installer testing. Installation, upgrade and uninstall still
+require native validation.
+
+| File | SHA-256 |
+| --- | --- |
+| LabelForge-win-Setup.exe | `9840597df0d9d46e8f95cded0fa0c33a26963da2bb50f3f0a9df15a697da98a3` |
+| LabelForge-win-Portable.zip | `a143c88c67fc7c70f97ba7b86ab84644d2389e88dc13634497f96c089f44061d` |
+| LabelForge-0.4.0-full.nupkg | `336856c977611c18793701b3d708ae53b55dee863de7219d24a8fe21006b8b87` |
+
+### Previous native-notice candidate
+
 Built from `eec7557f2ada254d9be175e72902c080686358cf` into
 `artifacts/releases/candidate-0.4.0-native-notices`. App informational version is
 `0.4.0+eec7557f2ada254d9be175e72902c080686358cf`; app/package version is 0.4.0.
@@ -305,7 +331,7 @@ from the official release-date nightly distribution are supplemental coverage,
 not evidence that the helper used that revision. Metadata-analysis tool versions
 are recorded separately. See the [notice index](../THIRD-PARTY-NOTICES.md).
 
-This new unsigned Setup has not been executed. Native installation evidence is
+This earlier unsigned Setup has not been executed. Native installation evidence is
 still from `1baaa76`; legacy upgrade, pristine install and uninstall remain open.
 
 | File | SHA-256 |

@@ -99,8 +99,16 @@ notices. Input hashes pin the vpk packer and three x86 helpers; negative checks
 reject changed/missing inputs and unreviewed versions. The new ZIP/nupkg carry
 33 verified notice/inventory files, and Setup embeds the exact reviewed nupkg.
 Only the exact Rust compiler/standard-library provenance remains open in the native
-notice review; release-date Rust notices are supplemental. The new candidate has
-not been installed.
+notice review; release-date Rust notices are supplemental. That earlier candidate
+was not installed.
+
+A fresh unsigned `0.4.0` candidate from `cbacfd4` now includes both guide fixes
+and the reviewed notice inventories. Its self-contained publish had zero warnings
+and errors; ZIP/nupkg CRC, 263 packaged publish-file byte comparisons and the
+Setup's embedded nupkg passed. All nine CI jobs passed on that source. Local user
+data was backed up before native installer testing. Installation, legacy upgrade,
+pristine install and uninstall remain open; hashes are in the
+[release validation record](RELEASE-VALIDATION.md).
 
 A loopback receive timeout in the packaging-source CI was addressed by test-only
 `8b8eb40`, removing extra scheduling without changing production transport. The

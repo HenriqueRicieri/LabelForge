@@ -12,7 +12,8 @@ With the later guide-precision fix, native Light 125% testing inserted a guide
 at 248 printer dots, dragged it to 419, undid/redid to the exact positions and
 saved/reopened it at 419 with matching ZPL. Monitor 2 was restored to 100%.
 The complete editing/export workflow in each scale/theme/size cell remains open.
-These checks use the source editor, not the unsigned `eec7557` installer.
+These checks use the source editor. The current unsigned `cbacfd4` installer
+includes the fixes but has not been run.
 
 ## Ruler guide precision (2026-09-28)
 
@@ -25,8 +26,8 @@ Three focused canvas checks failed before the fix and passed afterward. All 53
 transform checks, 29 centimeter checks and 1,345 local unit tests passed. The
 before/after transcript differs only in those three results and its summary.
 The complete Light designer scenario passed 589 checks. The Release solution
-build has zero warnings and errors. The existing installer candidate does not
-include this source change.
+build has zero warnings and errors. The current installer candidate includes
+this source change; installation is unverified.
 
 ## Guide gesture reliability (2026-09-27)
 
@@ -39,8 +40,8 @@ cannot commit the cancelled drag.
 The focused harness reproduced 14 failures before the fix. Afterward, all 50
 transform checks and 1,345 local unit tests passed. The complete before/after
 transcripts differ only in those 14 results and the graded summary. The Release
-solution build has zero warnings and errors. This source change is newer than the
-packaged candidate below; the native workflow and installer gates remain open.
+solution build has zero warnings and errors. The current packaged candidate
+includes this source change; the native workflow and installer gates remain open.
 
 ## Previous QA and packaging evidence
 
@@ -56,10 +57,9 @@ remained unchanged across all eight higher-scale captures. Original OS scales we
 The compact Light smoke passed inspector access, F2, text editing and save/reopen;
 the complete reopened model and generated ZPL matched. The complete workflow per
 combination remains open; the newer clear 125% captures are noted above. This is
-developer-editor evidence;
-the packaged candidate below remains `eec7557`.
+developer-editor evidence; the current packaged candidate is `cbacfd4`.
 
-Current packaging correction: `eec7557` adds 493 original native text segments
+Native packaging correction: `eec7557` adds 493 original native text segments
 for a conservative 277-entry Windows dependency inventory, plus byte-matched
 WebView2 loader notices and supplemental release-date Rust notices. Packaging
 verifies the pinned vpk 1.2.0 packer and its three x86 helper inputs. Reviewed inputs
@@ -74,7 +74,10 @@ passed all nine jobs.
 The existing inventory still covers 28 runtime packages and two embedded fonts.
 Exact Rust compiler/standard-library provenance remains open: the upstream nightly
 was unpinned and its build logs have expired. The supplemental notice snapshot
-cannot establish that revision. The new unsigned candidate has not been installed;
+cannot establish that revision. A fresh unsigned candidate from `cbacfd4` now
+includes the latest source fixes. Its ZIP/nupkg CRC and 263 published-file byte
+comparisons passed; Setup embeds the exact nupkg. [Current-source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36381271617)
+passed all nine jobs. This candidate has not been installed;
 native installation/association evidence below is from `1baaa76`.
 
 The preceding test-only correction, `8b8eb40`, removed extra scheduling from the
@@ -230,8 +233,9 @@ directory. Windows file properties confirmed the `0.4.0+1baaa76` source version;
 Explorer opened a synthetic `.lfl` directly in that installed app. The dense QA
 label remained in recent files and reopened after Setup. Legacy upgrade,
 pristine install and uninstall remain unverified. The script does not establish
-an update feed. The `eec7557` candidate extends the runtime inventory with native
-dependency/WebView2 notices and pins the packer/helper inputs. Exact Rust notice
+an update feed. The `eec7557` packaging change extends the runtime inventory with native
+dependency/WebView2 notices and pins the packer/helper inputs. The current `cbacfd4`
+candidate includes those notices and both guide fixes. Exact Rust notice
 provenance remains open; this candidate's native Setup has not been run. See the [candidate record](RELEASE-VALIDATION.md)
 for package hashes and the distinction between old/new candidate evidence.
 
