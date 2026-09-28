@@ -23,6 +23,30 @@ internal static class TransformGestureChecks
             foreach (bool vertical in new[] { true, false })
             {
                 string axis = vertical ? "Vertical" : "Horizontal";
+                var preciseGuides = LoadGuide(vertical);
+                Point ruler = GuideRuler(vertical, 203);
+                window.MouseDown(ruler, MouseButton.Left);
+                window.MouseUp(ruler, MouseButton.Left);
+                window.MouseDown(ruler, MouseButton.Left);
+                window.MouseUp(ruler, MouseButton.Left);
+                check($"{axis} ruler double click keeps printer-dot position",
+                    preciseGuides.SequenceEqual(new[] { 200, 203 }));
+
+                if (vertical)
+                {
+                    var menuGuides = LoadGuide(vertical);
+                    Point menuAt = GuideRuler(vertical, 205);
+                    window.MouseDown(menuAt, MouseButton.Right);
+                    window.MouseUp(menuAt, MouseButton.Right);
+                    Pump(200);
+                    Point itemAt = new(menuAt.X + 60, menuAt.Y + 21);
+                    window.MouseDown(itemAt, MouseButton.Left);
+                    window.MouseUp(itemAt, MouseButton.Left);
+                    Pump(100);
+                    check("Ruler menu inserts guide at printer-dot position",
+                        menuGuides.SequenceEqual(new[] { 200, 205 }));
+                }
+
                 var guides = LoadGuide(vertical);
                 window.MouseDown(GuideAt(vertical, 200), MouseButton.Left);
                 window.MouseMove(GuideAt(vertical, 240), RawInputModifiers.LeftMouseButton);

@@ -55,6 +55,8 @@ the authority for package versions; planning-era versions are historical.
   creates no change. Text blocks restore font dimensions and wrapping width.
   Text edge handles apply size limits only to the resized dimension; they preserve
   untouched imported values even outside the inspector's editing range.
+- Ruler guide insertion rounds only once, to the nearest printer dot. The menu
+  displays the stored dot position as centimeters; double click uses the same rule.
 - Permanent guide drags use the captured pointer offset and final release position.
   Release on the corresponding ruler removes the guide; Escape restores the starting
   position without a document edit or undo step. A nearby click must not move it.

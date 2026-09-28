@@ -1458,7 +1458,7 @@ public sealed partial class DesignerCanvas : Control
                 // starts the transient guide that vanishes on release.
                 if (e.ClickCount >= 2)
                 {
-                    InsertGuide(doc, axis, Math.Round(dots / doc.Dpmm));
+                    InsertGuide(doc, axis, GuidePositionDots(doc, axis, dots));
                 }
                 else
                 {
@@ -2078,13 +2078,17 @@ public sealed partial class DesignerCanvas : Control
         return result;
     }
 
-    /// <summary>Adds a permanent guide at the given millimeter position, clamped to
-    /// the pasteboard. Shared by the ruler double click and the ruler menu.</summary>
-    private void InsertGuide(LabelDocument doc, GuideAxis axis, double mm)
+    private static int GuidePositionDots(LabelDocument doc, GuideAxis axis, double dots)
     {
         int margin = PasteboardDots(doc);
         int limit = axis == GuideAxis.Vertical ? doc.WidthDots : doc.HeightDots;
-        int guideDots = Math.Clamp(Units.MmToDots(mm, doc.Dpmm), -margin, limit + margin);
+        return Math.Clamp((int)Math.Round(dots, MidpointRounding.AwayFromZero),
+            -margin, limit + margin);
+    }
+
+    /// <summary>Adds a permanent guide at the printable dot under the pointer.</summary>
+    private void InsertGuide(LabelDocument doc, GuideAxis axis, int guideDots)
+    {
         (axis == GuideAxis.Vertical ? doc.VerticalGuides : doc.HorizontalGuides).Add(guideDots);
         DocumentEdited?.Invoke(this, EventArgs.Empty);
         InvalidateVisual();
@@ -2186,19 +2190,18 @@ public sealed partial class DesignerCanvas : Control
             .Where(el => el.IsVisible && _bounds.GetBounds(el).Contains((int)dotX, (int)dotY))
             .OrderByDescending(el => el.ZOrder)];
 
-    /// <summary>Right-click on a ruler: insert a guide at the pointer (rounded to the
-    /// nearest whole millimeter) or clear all guides.</summary>
+    /// <summary>Right-click on a ruler: insert a guide at the nearest printer dot
+    /// or clear all guides.</summary>
     private void ShowRulerMenu(LabelDocument doc, GuideAxis axis, double dots)
     {
-        double mm = Math.Round(dots / doc.Dpmm);
+        int guideDots = GuidePositionDots(doc, axis, dots);
 
         var menu = new MenuFlyout();
         var insert = new MenuItem
         {
-            Header = "Insert guide at " +
-                (mm / 10).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + " cm",
+            Header = "Insert guide at " + CmText(guideDots, doc),
         };
-        insert.Click += (_, _) => InsertGuide(doc, axis, mm);
+        insert.Click += (_, _) => InsertGuide(doc, axis, guideDots);
         menu.Items.Add(insert);
 
         if (doc.VerticalGuides.Count + doc.HorizontalGuides.Count > 0)

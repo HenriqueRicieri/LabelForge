@@ -1,5 +1,19 @@
 # Project status
 
+## Ruler guide precision (2026-09-28)
+
+Double click and the ruler menu now insert guides at the nearest printer dot.
+Previously both rounded the pointer position to a whole millimeter, shifting the
+saved guide by several dots. The menu shows the centimeters derived from the
+exact stored dot. Guide dragging and undo behavior are unchanged.
+
+Three focused canvas checks failed before the fix and passed afterward. All 53
+transform checks, 29 centimeter checks and 1,345 local unit tests passed. The
+before/after transcript differs only in those three results and its summary.
+The complete Light designer scenario passed 589 checks. The Release solution
+build has zero warnings and errors. The existing installer candidate does not
+include this source change.
+
 ## Guide gesture reliability (2026-09-27)
 
 Permanent horizontal and vertical guides now commit the final pointer position,
