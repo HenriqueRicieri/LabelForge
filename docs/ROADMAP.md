@@ -29,9 +29,21 @@ themes and selected 100/125/150% Windows scales; those older captures did not me
 actual app scaling. The `adb1178` native tool now records RenderScaling/monitor scaling
 1.0, 1.25 and 1.5 in both themes and broad/compact windows: 12 cases with actual client
 dimensions. Compact Light editing, F2 and save/reopen passed with identical reopened
-model/ZPL; all eight higher-scale captures retained those values. Every full workflow
-combination and unobscured broad captures remain open. A recovery banner contrast defect was
-reproduced and fixed. See the [validation record](RELEASE-VALIDATION.md).
+model/ZPL; all eight higher-scale captures retained those values. The full workflow
+per combination remains open. A recovery banner contrast defect was reproduced and
+fixed. See the [validation record](RELEASE-VALIDATION.md).
+
+The `adb1178` editor was also exercised at measured 150% in a Light broad window:
+text creation, font height/width and Auto, a three-line block, 90-degree rotation,
+baseline anchor, undo/redo, OS clipboard, groups, save/reopen and ZPL/PNG/PDF export
+passed. The complete reopened model and generated/exported ZPL matched. A repeated
+Dark broad capture had no external notification, and the same model/ZPL remained
+unchanged in Dark broad and compact windows. On the later `2d4b84e` source, a native
+100% ruler guide moved from 192 to 361 dots and survived undo/redo and save/reopen.
+Clear Light and Dark broad captures on that source measured 1.25 app/monitor scale,
+1200 x 780 client DIPs, and retained the same model and ZPL. Next, repeat the
+remaining editing/export checks per cell; keep each result tied to its source
+build and actual display scale.
 
 ## 2. Reduce paint allocation and resolve warnings [P1, DONE 2026-09-26]
 

@@ -60,7 +60,8 @@ native captures recorded:
 | 1.25 / 1.25 | Light | 1200 x 780 | Dense layout, partly obscured by an external notification |
 | 1.25 / 1.25 | Dark | 1536 x 792.8, maximized | Dense layout, partly obscured by an external notification |
 | 1.25 / 1.25 | Light and Dark | 720 x 630.4 each | Dense layout with inspector overlay |
-| 1.5 / 1.5 | Light and Dark | 1200 x 640.67 each | Dense layout, height constrained by the desktop; notification overlap |
+| 1.5 / 1.5 | Light | 1200 x 640.67 | Dense layout, height constrained by the desktop; earlier notification overlap |
+| 1.5 / 1.5 | Dark | 1200 x 640.67 | Dense layout, height constrained by the desktop; earlier notification overlap |
 | 1.5 / 1.5 | Light and Dark | 720 x 630 each | Dense layout, inspector collapsed |
 
 The compact Light reopened model matched the complete edited model, and generated
@@ -69,14 +70,52 @@ and model/ZPL records are retained in local QA artifacts. None of these cases
 completes the full workflow matrix. All eight higher-scale model snapshots matched
 the reopened edited model, and their generated ZPL matched byte-for-byte.
 
+### Additional measured native workflow
+
+The `adb1178` native editor was reopened at actual app/monitor scaling 1.5/1.5 in
+a Light broad window. Windows constrained the client to 1201.33 x 640.67 DIPs.
+On a synthetic 78-element label, the UI created a text field, changed its height
+to 0.3 cm, tried Auto and then set an explicit 0.2 cm width, a 1.2 cm block with
+three lines, 90-degree rotation and a baseline (`^FT`) anchor. Undo/redo restored
+the anchor; the Windows clipboard pasted a second field with the same properties.
+Grouping all 80 fields, ungrouping and undoing the ungroup passed. The saved and
+reopened complete models matched, as did their generated ZPL byte-for-byte. ZPL
+export matched that generated output. PNG exported at 960 x 800 pixels; the
+rendered single-page PDF measured 340 x 283 points. The two new texts deliberately
+overlap existing symbols, and the editor reported quiet-zone warnings; no barcode
+scan or printable-layout claim follows from this synthetic stress case.
+
+Fresh Dark broad and compact captures at 1.5/1.5 were unobscured and retained
+that reopened model and ZPL. Their clients measured 1201.33 x 640.67 and
+720 x 630 DIPs. These checks deepen the 150% evidence; they do not cover every
+workflow in all 12 combinations. The earlier `adb1178` 125% broad captures
+remain archived with their external notification overlap.
+
+The later `2d4b84e` source was rebuilt for native QA with zero warnings/errors.
+With only the primary monitor 2 active at its observed 100% scale, a guide was
+inserted from the ruler at 192 printer dots and dragged to 361. Undo/redo restored
+each position, dropping it on the ruler removed it, and undo restored it. The
+saved and reopened document both held the 361-dot position, with matching ZPL.
+The measured app/monitor scaling was 1.0/1.0 at 1200 x 760 client DIPs. This is
+a guide check on the newer source, separate from the `adb1178` 150% workflow.
+The same `2d4b84e` source then produced unobscured Light and Dark broad captures
+at measured 1.25/1.25 app/monitor scale and 1200 x 780 client DIPs. Both held
+the same 80-element model and byte-identical ZPL from the reopened 150% workflow.
+These clear captures establish visual reachability at 125% in both themes; they
+do not repeat the complete editing/export workflow in those cells.
+Local screenshots, documents, generated output and SHA-256 hashes are indexed in
+the ignored `artifacts/native-validation/workflow-measured/workflow-review.json`.
+
 Direct Settings launch returned no targetable window. A normal Control Panel link
 opened Settings successfully. The desktop has three monitors: the primary display
 is number 2, matching the app's recorded 0,0,1920,1080 monitor bounds. Initial 125%
 selections on the other monitors left the app at 1.0 and were not counted as DPI
 passes. Those monitors returned to their observed 100% scale; changing the primary
 produced measured 1.25 and 1.5. The primary also returned to 100%, confirmed by a
-native 1.0 record. Some broad captures have an external notification over lower
-controls; repeat those captures unobscured before closing the reachability check.
+native 1.0 record. Some original broad captures have an external notification over
+lower controls; the later 125% Light/Dark clear repeats close that visual gap.
+On 2026-09-28, only monitor 2 was active. Its 100% scale was restored and confirmed
+in Settings and the native QA panel.
 
 The Release tool build had zero warnings/errors; 15 headless bootstrap/storage
 checks and all 1,345 local unit tests passed. [Source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36276142352)

@@ -35,6 +35,13 @@ and save/reopen preserved the complete model and generated ZPL; higher-scale cap
 retained those values. All nine source CI jobs passed. The full native workflow
 matrix remains open, and the packaged candidate below is unchanged.
 
+A measured 150% Light broad workflow also passed text/font/block edits, rotation,
+anchor, clipboard, grouping, save/reopen and ZPL/PNG/PDF export. Its complete model
+and ZPL survived reloading; repeated Dark broad/compact captures retained them.
+On later source `2d4b84e`, a native 100% guide drag and save/reopen preserved the
+361-dot final position. Clear Light/Dark broad captures at measured 125% retained
+the same dense model and ZPL. The per-cell workflow remains open.
+
 The latest `0.4.0` package adds original license/notice texts for 28 runtime
 packages and both embedded fonts, with an inventory check before packaging.
 The `eec7557` candidate also adds 493 original native text segments for a conservative
