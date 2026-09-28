@@ -16,8 +16,8 @@ The regular editor passed F2 content and font-height edits, undo/redo,
 save/reopen and ZPL/PNG/PDF export. Each saved/reopened model and ZPL matched
 byte-for-byte; exported ZPL also matched. The PNG was 800 x 480 pixels.
 The complete editing/export workflow in each scale/theme/size cell remains open.
-These checks use the source editor. The current unsigned `cbacfd4` installer
-includes the fixes but has not been run.
+These editing checks use the source editor. The current unsigned `cbacfd4`
+installer includes the fixes and passed an installed-app repair/smoke check below.
 
 ## Ruler guide precision (2026-09-28)
 
@@ -31,7 +31,7 @@ transform checks, 29 centimeter checks and 1,345 local unit tests passed. The
 before/after transcript differs only in those three results and its summary.
 The complete Light designer scenario passed 589 checks. The Release solution
 build has zero warnings and errors. The current installer candidate includes
-this source change; installation is unverified.
+this source change and passed an in-place repair/smoke check.
 
 ## Guide gesture reliability (2026-09-27)
 
@@ -81,8 +81,9 @@ was unpinned and its build logs have expired. The supplemental notice snapshot
 cannot establish that revision. A fresh unsigned candidate from `cbacfd4` now
 includes the latest source fixes. Its ZIP/nupkg CRC and 263 published-file byte
 comparisons passed; Setup embeds the exact nupkg. [Current-source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36381271617)
-passed all nine jobs. This candidate has not been installed;
-native installation/association evidence below is from `1baaa76`.
+passed all nine jobs. The candidate then passed an in-place repair of the
+existing 0.4.0 installation, direct `.lfl` launch and installed-app save/export.
+The earlier `1baaa76` installation evidence remains recorded below.
 
 The preceding test-only correction, `8b8eb40`, removed extra scheduling from the
 loopback receiver after a CI timeout. Six focused and all 1,345 local tests passed;
@@ -99,7 +100,10 @@ Installer testing previously exposed recent-file loss. `54a0be9` separates and
 migrates user data; the original recent list was restored and migrated exactly.
 The paint, runtime-notice and native-notice candidates include that fix, text resizing and the paint
 correction. The `1baaa76` Setup from ordinary Explorer installed its recorded version; direct
-`.lfl` opening and preservation of the synthetic recent entry passed. The
+`.lfl` opening and preservation of the synthetic recent entry passed. The current
+`cbacfd4` Setup repaired that 0.4.0 installation. Its installed executable matched
+the candidate ZIP byte-for-byte, and direct `.lfl` opening, save and ZPL export
+passed. Both pre-existing recent entries survived alongside the two QA files. The
 complete native workflow matrix, legacy upgrade, pristine install,
 uninstall and exact Rust notice provenance
 remain open.
@@ -240,8 +244,9 @@ pristine install and uninstall remain unverified. The script does not establish
 an update feed. The `eec7557` packaging change extends the runtime inventory with native
 dependency/WebView2 notices and pins the packer/helper inputs. The current `cbacfd4`
 candidate includes those notices and both guide fixes. Exact Rust notice
-provenance remains open; this candidate's native Setup has not been run. See the [candidate record](RELEASE-VALIDATION.md)
-for package hashes and the distinction between old/new candidate evidence.
+provenance remains open; this candidate passed in-place repair, not a versioned
+upgrade or pristine install. See the [candidate record](RELEASE-VALIDATION.md)
+for package hashes and the distinction between candidate results.
 
 ## Known limits
 

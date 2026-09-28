@@ -6,8 +6,9 @@ candidate is built from
 [`cbacfd4`](https://github.com/HenriqueRicieri/LabelForge/commit/cbacfd4e043298bd224ac24c496e150412386cf9).
 It includes text resize, user-data and paint corrections, guide gesture/precision
 fixes and the runtime/native notice inventories added by `eec7557`.
-Native installation and association passed on the preceding `1baaa76` candidate;
-the current package has not been installed.
+Native installation and association passed on the preceding `1baaa76` candidate.
+The current package then passed an in-place repair of that 0.4.0 installation,
+installed-app launch, direct `.lfl` opening, save and ZPL export.
 These are local unsigned packages. No release or update feed has been published.
 
 Real-printer validation is excluded at the maintainer's request because hardware
@@ -34,7 +35,7 @@ unknown; native testing can now proceed.
 | PNG/PDF | PNG verified at 960 x 800; PDF had one 340 x 283-point page for 120 x 100 mm stock; rendered PDF inspected |
 | Offline viewer | Rendered at 12 x 10 cm / 203 dpi; two known unsupported-command diagnostics for `^PW`/`^LL` remained |
 | Portable launch | Passed on `1baaa76`, including reopening the synthetic 78-element label and viewing its rulers at 100% canvas zoom; this zoom is separate from OS DPI |
-| Installed app launch and association | `1baaa76` Setup ran from ordinary Explorer; a synthetic `.lfl` opened directly in the installed app and the dense QA label reopened from recent files |
+| Installed app launch and association | `1baaa76` Setup installed from ordinary Explorer; current `cbacfd4` Setup repaired the existing 0.4.0 install; a synthetic `.lfl` opened directly in the current installed app |
 | Forced interruption/recovery | `450b1df` recovered an unsaved synthetic label after terminating only the QA process; saved model and element ID matched |
 | Corrected recovery banner | `d63901b` Light/Dark screenshots showed readable buttons; replay of the same synthetic recovery fixture preserved the complete saved model |
 
@@ -295,20 +296,45 @@ The self-contained win-x64 publish completed with zero warnings/errors. ZIP and
 nupkg CRC passed, and each contained 263 publish files with matching bytes.
 The packer intentionally omits `createdump.exe` and four PDBs. The existing
 runtime/font and native notice inventories remain bundled. Setup contains the exact
-reviewed nupkg. This unsigned package has not been installed or published.
+reviewed nupkg. This unsigned package passed an in-place repair and has not been published.
 
 [CI on `cbacfd4`](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36381271617)
 passed all nine jobs. Native QA on the current source passed the 125% Light
 guide insert/drag/undo/redo/save/reopen sequence with exact saved model/ZPL;
 the full workflow in every scale/theme/window cell remains open. Local user data
-was backed up before installer testing. Installation, upgrade and uninstall still
-require native validation.
+was backed up before installer testing. A repair of the existing same-version
+installation passed. Legacy upgrade, pristine install and uninstall still require
+native validation.
 
 | File | SHA-256 |
 | --- | --- |
 | LabelForge-win-Setup.exe | `9840597df0d9d46e8f95cded0fa0c33a26963da2bb50f3f0a9df15a697da98a3` |
 | LabelForge-win-Portable.zip | `a143c88c67fc7c70f97ba7b86ab84644d2389e88dc13634497f96c089f44061d` |
 | LabelForge-0.4.0-full.nupkg | `336856c977611c18793701b3d708ae53b55dee863de7219d24a8fe21006b8b87` |
+
+### Current candidate, installed-app repair and smoke test
+
+On 2026-09-28, the approved current Setup detected an existing 0.4.0 installation
+and offered **Repair**. The repair completed and launched the installed app from
+`%LocalAppData%/LabelForge/current/LabelForge.App.exe`. Its product version is
+`0.4.0+cbacfd4e043298bd224ac24c496e150412386cf9`. The installed executable's
+SHA-256, `6d2814fd931cd0d1e88c09436264939165ccd4fac66159da768ecce804260e93`,
+matched `current/LabelForge.App.exe` in the candidate portable ZIP exactly.
+
+Ordinary Explorer identified the synthetic fixture as a LabelForge label and
+opened it directly in that installed executable, with no Open With chooser. The
+125-element document loaded at 12 x 10 cm / 203 dpi. Save As produced an `.lfl`
+byte-identical to the validated source fixture. Export ZPL produced the same
+3,002 bytes as the prior validated export, including `^XA`/`^XZ`. The fixture
+intentionally crowds two QR quiet zones, which the app reported; this smoke test
+does not establish scannability or physical output.
+
+The normal desktop's recent-file history retained both entries present before
+the repair and added the two files opened/saved during the test. Its user-data
+folder remained outside the installation directory. This supports recent-file
+preservation in the observed session, not a full settings/catalog/recovery
+migration. The same-version Repair is not a versioned
+upgrade; pristine install, legacy upgrade and uninstall remain unverified.
 
 ### Previous native-notice candidate
 

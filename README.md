@@ -22,9 +22,11 @@ Native editing, exports, offline viewing and portable crash recovery have been
 exercised. Installer testing exposed recent-file loss; user data now lives outside
 the install directory. The current source passes 1,345 local tests and paints the
 78-element fixture at 6,360 bytes per frame locally, retaining the 70 KB limit.
-All nine source CI jobs passed. The corrected Setup passed installation from
-ordinary Explorer, direct `.lfl` opening and preservation of the synthetic recent
-entry. The complete native workflow matrix, legacy upgrade,
+All nine source CI jobs passed. The current `cbacfd4` Setup repaired the existing
+0.4.0 installation, launched the installed app, and opened a synthetic `.lfl`
+directly from Explorer. Its saved label and ZPL export matched the validated
+references byte-for-byte; existing recent entries survived. The complete native
+workflow matrix, legacy upgrade,
 pristine install, uninstall and exact
 Rust standard-library notice provenance remain open. See the dated
 [candidate record](docs/RELEASE-VALIDATION.md) for scope and package hashes.
@@ -55,8 +57,9 @@ The `eec7557` packaging change also adds 493 original native text segments for a
 Packaging verifies the pinned packer/helper inputs. A fresh unsigned `0.4.0` candidate
 was built from current source `cbacfd4`, including both guide fixes. Its archives
 passed CRC and published-file byte comparisons, and Setup embeds the exact nupkg.
-Exact Rust standard-library provenance remains open. Native installation results
-above refer to the preceding paint candidate; the current package has not been installed.
+Exact Rust standard-library provenance remains open. The current Setup passed an
+in-place repair and installed-app smoke test; pristine installation, versioned
+upgrade and uninstall remain unverified.
 
 Real-printer validation is outside the current plan because hardware is unavailable.
 Physical output remains unverified. See the [validation record](docs/RELEASE-VALIDATION.md).

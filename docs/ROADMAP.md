@@ -102,12 +102,15 @@ Only the exact Rust compiler/standard-library provenance remains open in the nat
 notice review; release-date Rust notices are supplemental. That earlier candidate
 was not installed.
 
-A fresh unsigned `0.4.0` candidate from `cbacfd4` now includes both guide fixes
+A fresh unsigned `0.4.0` candidate from `cbacfd4` includes both guide fixes
 and the reviewed notice inventories. Its self-contained publish had zero warnings
 and errors; ZIP/nupkg CRC, 263 packaged publish-file byte comparisons and the
 Setup's embedded nupkg passed. All nine CI jobs passed on that source. Local user
-data was backed up before native installer testing. Installation, legacy upgrade,
-pristine install and uninstall remain open; hashes are in the
+data was backed up before native installer testing. Setup detected the existing
+0.4.0 installation and completed an in-place repair. The installed executable
+matched the ZIP; Explorer opened `.lfl` directly, and installed-app save/export
+matched prior references byte-for-byte. Pre-existing recent entries survived.
+Legacy versioned upgrade, pristine install and uninstall remain open; hashes are in the
 [release validation record](RELEASE-VALIDATION.md).
 
 A loopback receive timeout in the packaging-source CI was addressed by test-only
