@@ -40,7 +40,9 @@ anchor, clipboard, grouping, save/reopen and ZPL/PNG/PDF export. Its complete mo
 and ZPL survived reloading; repeated Dark broad/compact captures retained them.
 On later source `2d4b84e`, a native 100% guide drag and save/reopen preserved the
 361-dot final position. Clear Light/Dark broad captures at measured 125% retained
-the same dense model and ZPL. The per-cell workflow remains open.
+the same dense model and ZPL. With the later guide-precision fix, a native 125%
+guide moved from 248 to 419 printer dots, survived undo/redo and save/reopen.
+The per-cell workflow remains open.
 
 The latest `0.4.0` package adds original license/notice texts for 28 runtime
 packages and both embedded fonts, with an inventory check before packaging.

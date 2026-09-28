@@ -1,5 +1,19 @@
 # Project status
 
+## Native workflow progress (2026-09-28)
+
+The measured 150% Light broad editor workflow passed text/font/block edits,
+rotation, anchor, clipboard, grouping, save/reopen and ZPL/PNG/PDF export;
+the complete model and generated ZPL survived reloading. Dark broad/compact
+captures retained them. Clear Light/Dark broad captures on `2d4b84e` measured
+1.25 app/monitor scaling and retained the same 80-element model and ZPL.
+
+With the later guide-precision fix, native Light 125% testing inserted a guide
+at 248 printer dots, dragged it to 419, undid/redid to the exact positions and
+saved/reopened it at 419 with matching ZPL. Monitor 2 was restored to 100%.
+The complete editing/export workflow in each scale/theme/size cell remains open.
+These checks use the source editor, not the unsigned `eec7557` installer.
+
 ## Ruler guide precision (2026-09-28)
 
 Double click and the ruler menu now insert guides at the nearest printer dot.
@@ -41,7 +55,8 @@ Actual client dimensions are in the validation record. The complete model and ZP
 remained unchanged across all eight higher-scale captures. Original OS scales were restored.
 The compact Light smoke passed inspector access, F2, text editing and save/reopen;
 the complete reopened model and generated ZPL matched. The complete workflow per
-combination and unobscured broad captures remain open. This is developer-editor evidence;
+combination remains open; the newer clear 125% captures are noted above. This is
+developer-editor evidence;
 the packaged candidate below remains `eec7557`.
 
 Current packaging correction: `eec7557` adds 493 original native text segments

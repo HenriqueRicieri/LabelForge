@@ -1,6 +1,6 @@
 # Roadmap
 
-Work order after the verified `e78aa0d` baseline, updated 2026-09-26.
+Work order after the verified `e78aa0d` baseline, updated 2026-09-28.
 The original feature milestones are implemented. The next batch should establish
 reliable use on the target desktop, then make that version easy to install.
 Native validation is now in progress. No release has been published.
@@ -41,9 +41,11 @@ Dark broad capture had no external notification, and the same model/ZPL remained
 unchanged in Dark broad and compact windows. On the later `2d4b84e` source, a native
 100% ruler guide moved from 192 to 361 dots and survived undo/redo and save/reopen.
 Clear Light and Dark broad captures on that source measured 1.25 app/monitor scale,
-1200 x 780 client DIPs, and retained the same model and ZPL. Next, repeat the
-remaining editing/export checks per cell; keep each result tied to its source
-build and actual display scale.
+1200 x 780 client DIPs, and retained the same model and ZPL. With the later
+guide-precision fix, a native Light 125% guide moved from 248 to 419 printer dots,
+undid/redid and survived save/reopen with matching ZPL. Next, repeat the remaining
+editing/export checks per cell; keep each result tied to its source build and
+actual display scale.
 
 ## 2. Reduce paint allocation and resolve warnings [P1, DONE 2026-09-26]
 

@@ -1,6 +1,6 @@
 # Windows release candidate validation
 
-Updated 2026-09-26. Candidate version: `0.4.0`. Native workflow evidence was
+Updated 2026-09-28. Candidate version: `0.4.0`. Native workflow evidence was
 collected on `450b1df`; recovery contrast was validated on `d63901b`. The current
 candidate includes text resize, user-data and paint corrections plus the runtime
 and native notice inventories in
@@ -103,6 +103,16 @@ at measured 1.25/1.25 app/monitor scale and 1200 x 780 client DIPs. Both held
 the same 80-element model and byte-identical ZPL from the reopened 150% workflow.
 These clear captures establish visual reachability at 125% in both themes; they
 do not repeat the complete editing/export workflow in those cells.
+
+The subsequent `ba8cac6` NativeQA build includes the `fb4961c` guide-precision
+fix and built with zero warnings/errors. In a Light window at measured 1.25/1.25
+app/monitor scale and 1201.6 x 761.6 client DIPs, the ruler menu inserted a
+vertical guide at 248 printer dots. A native pointer drag placed it at 419;
+Ctrl+Z restored 248 and Ctrl+Y restored 419. The saved and reopened complete
+models matched at 419 dots, as did their generated ZPL. The monitor returned to
+1.0/1.0 afterward. The automated runner separately passed all 53 transform
+gesture checks, and [source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36379556832)
+passed all nine jobs. This source-editor check does not validate the installer.
 Local screenshots, documents, generated output and SHA-256 hashes are indexed in
 the ignored `artifacts/native-validation/workflow-measured/workflow-review.json`.
 
