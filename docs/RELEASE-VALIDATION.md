@@ -117,6 +117,16 @@ passed all nine jobs. This source-editor check does not validate the installer.
 Local screenshots, documents, generated output and SHA-256 hashes are indexed in
 the ignored `artifacts/native-validation/workflow-measured/workflow-review.json`.
 
+On the same application code, measured 1.0/1.0 Dark QA added a compact
+720 x 630-DIP text creation/edit, save/reopen and ZPL export. A regular
+1200 x 780-DIP window passed F2 content and 0.5-to-0.3-cm font-height edits,
+undo/redo, save/reopen and ZPL/PNG/PDF export. In both cases the complete saved
+and reopened models and generated ZPL matched byte-for-byte; exported ZPL matched
+the record. The regular PNG was 800 x 480 pixels. The PDF has valid header and
+end markers; its page layout was not independently inspected. The QA build
+reports source `ba8cac6`; only public docs differ between it and the `cbacfd4`
+package source. These focused checks do not complete every per-cell workflow.
+
 Direct Settings launch returned no targetable window. A normal Control Panel link
 opened Settings successfully. The desktop has three monitors: the primary display
 is number 2, matching the app's recorded 0,0,1920,1080 monitor bounds. Initial 125%

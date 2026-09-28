@@ -11,6 +11,10 @@ captures retained them. Clear Light/Dark broad captures on `2d4b84e` measured
 With the later guide-precision fix, native Light 125% testing inserted a guide
 at 248 printer dots, dragged it to 419, undid/redid to the exact positions and
 saved/reopened it at 419 with matching ZPL. Monitor 2 was restored to 100%.
+At actual 100% Dark, compact text creation/edit/save/reopen/ZPL export passed.
+The regular editor passed F2 content and font-height edits, undo/redo,
+save/reopen and ZPL/PNG/PDF export. Each saved/reopened model and ZPL matched
+byte-for-byte; exported ZPL also matched. The PNG was 800 x 480 pixels.
 The complete editing/export workflow in each scale/theme/size cell remains open.
 These checks use the source editor. The current unsigned `cbacfd4` installer
 includes the fixes but has not been run.
