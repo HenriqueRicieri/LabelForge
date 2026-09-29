@@ -10,6 +10,10 @@ hardware is currently unaffordable. G9 is outside the active plan and is no long
 a release gate. Physical output remains unverified; software transport/status tests
 continue using fake printers and synthetic jobs.
 
+Scope update, 2026-09-29: the maintainer removed the legacy 0.3.0-to-0.4.0
+upgrade from the release gates because there are no active users to migrate.
+It remains untested; clean-profile installation is still required.
+
 ## 1. Validate native editing on Windows [P1, RISK-BASED G8 DONE 2026-09-29]
 
 Record actual app scaling at 100%, 125% and 150%, in both themes and regular/compact
@@ -79,7 +83,7 @@ an installer from a recorded commit. The candidate version is now `0.4.0`.
 Packaging reads the app version by default; an explicit override applies to both
 the published app and the Velopack package.
 
-Test clean install, upgrade, `.lfl` launch, uninstall, save/reopen, recovery and the
+Test clean install, `.lfl` launch, uninstall, save/reopen, recovery and the
 offline viewer. Review bundled licenses, write installation/update instructions and
 prepare release notes from the changelog.
 
@@ -125,8 +129,8 @@ the entry, direct `.lfl` launch and four recent files. This tests a reinstall
 with an existing profile, not a pristine user-profile installation. A second
 cycle showed Explorer's `.lfl` type becoming generic after uninstall and
 returning to LabelForge after reinstall; native association-key cleanup was
-not audited. Legacy versioned upgrade and pristine user-profile install remain
-open; hashes are in the
+not audited. Pristine user-profile install remains open; the versioned upgrade
+was waived without a native pass. Hashes are in the
 [release validation record](RELEASE-VALIDATION.md).
 A [0.4.0 release-notes draft](RELEASE-NOTES-0.4.0-DRAFT.md) now summarizes the
 changes and older-build migration preflight; revise it after the remaining gates.
@@ -139,8 +143,9 @@ The test-only `v0.3.0` installer was rebuilt with the tag's exact source revisio
 and passed ZIP/nupkg CRC. It was not installed: replacing the current per-user
 installation without a verified backup and restoration of its state would risk
 user data. A separate Windows user account would also isolate the test; a VM
-is not required. Native clean-profile install and 0.3.0-to-0.4.0 upgrade
-remain open. The Velopack helper workflow used an unpinned nightly; its expired
+is not required. Native clean-profile install remains open. The
+0.3.0-to-0.4.0 upgrade was removed from release acceptance by the maintainer,
+not validated. The Velopack helper workflow used an unpinned nightly; its expired
 job evidence and binaries do not establish the exact Rust standard-library
 revision. G11 remains open. Later commit `6276448` changes production Auto-width
 behavior and [passed all nine CI jobs](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36568544720),

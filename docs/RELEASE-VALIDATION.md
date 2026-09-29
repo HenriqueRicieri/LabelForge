@@ -18,6 +18,11 @@ Real-printer validation is excluded at the maintainer's request because hardware
 is currently unaffordable. Physical printing and barcode scanning remain unverified
 and do not gate this release.
 
+The maintainer removed the 0.3.0-to-0.4.0 upgrade from the 0.4.0 release gates
+on 2026-09-29 because there are no active users to migrate. It was not tested;
+the prepared 0.3.0 package and earlier migration findings remain historical
+evidence, not a passing upgrade result.
+
 ## Native Windows evidence
 
 Tests ran on Windows 11 Pro, build 26200, with synthetic labels. A fresh desktop
@@ -293,7 +298,7 @@ Packaging checks do not establish native installation results.
 | Packaging inventory guard | Passed on the publish; rejected missing Inter OFL, altered ANGLE notice and synthetic unreviewed package |
 | Native helper notices on `eec7557` | 277 conservative Windows entries, 493 original text segments, byte-matched WebView2 loader notices and supplemental Rust snapshot included; exact Rust compiler/library provenance remains open |
 | Install and `.lfl` association | Corrected Setup passed from ordinary Explorer; installed source version confirmed; synthetic file opened directly and known recent entry survived |
-| Legacy upgrade/clean install/uninstall | Earlier Codex-view upgrade exposed recent-list loss; restored/migrated exactly. Current-candidate uninstall/reinstall retained recent files. Native legacy upgrade and pristine user-profile install remain unverified |
+| Legacy upgrade/clean install/uninstall | Earlier Codex-view upgrade exposed recent-list loss; restored/migrated exactly. Current-candidate uninstall/reinstall retained recent files. Native legacy upgrade remains unverified and was removed from the release gates by the maintainer; pristine user-profile install remains unverified and required |
 
 Raw screenshots, synthetic files, export comparisons, matrix entries and logs
 remain in ignored local artifacts. Public records omit machine paths and user state.
@@ -337,8 +342,9 @@ passed all nine jobs.
 
 This package has not been installed. Native installer evidence below remains
 from `cbacfd4`; the new package needs an installed-app smoke check before
-release. Exact Rust helper provenance, pristine-profile installation and a
-versioned upgrade remain open. Nothing has been published.
+release. Exact Rust helper provenance and pristine-profile installation remain
+open release gates. Versioned upgrade was waived, not validated. Nothing has
+been published.
 
 ## Previously installed candidate files
 
@@ -357,8 +363,9 @@ passed all nine jobs. Native QA on the current source passed the 125% Light
 guide insert/drag/undo/redo/save/reopen sequence with exact saved model/ZPL;
 the full workflow in every scale/theme/window cell remains open. Local user data
 was backed up before installer testing. A repair of the existing same-version
-installation and an uninstall/reinstall cycle passed. Legacy upgrade and
-pristine user-profile install still require native validation.
+installation and an uninstall/reinstall cycle passed. Pristine user-profile
+install still requires native validation; legacy upgrade was removed from the
+release gates without a native pass.
 
 | File | SHA-256 |
 | --- | --- |
@@ -417,7 +424,7 @@ user-profile install, migration from a different installed version, and complete
 settings/catalog/recovery preservation remain unverified. The installer and
 package are still unsigned and unpublished.
 
-### Legacy-upgrade input prepared, native gate still open
+### Legacy-upgrade input prepared, validation waived
 
 On 2026-09-29, the `v0.3.0` source at
 `9ccad4e5b55d8475406fd3240e6defc6377565fb` was extracted into ignored
@@ -437,12 +444,13 @@ No legacy Setup was run. The normal profile still contains the installed 0.4.0
 candidate and user data. Running the legacy Setup in that account would replace
 the working installation, so its files and LabelForge user state need a verified
 backup and restoration plan first. A separate Windows user account is an
-alternative; a VM is not required. A native clean-profile install and a
-0.3.0-to-0.4.0 versioned upgrade therefore remain open. For the upgrade, first
-seed synthetic legacy settings/catalog/recovery/recent data, run the corrected
-0.4.0 portable
-`--migrate-user-data`, verify copies/hashes, then run Setup and check installed
-version, `.lfl` association and data preservation. The test-only legacy package
+alternative; a VM is not required. Native clean-profile installation remains a
+release gate. The maintainer waived the versioned upgrade gate because nobody
+is using an older release; no native upgrade passed. If an upgrade is later
+needed, first seed synthetic legacy settings/catalog/recovery/recent data, run
+the corrected 0.4.0 portable `--migrate-user-data`, verify copies/hashes, then
+run Setup and check installed version, `.lfl` association and data preservation.
+The test-only legacy package
 is not a public release asset.
 
 ### Exact Rust provenance follow-up
@@ -587,11 +595,11 @@ earlier packages and never replace packages already distributed to users.
 
 1. The risk-based G8 native gate passed; an exhaustive per-cell workflow matrix
    remains unverified and is outside the narrowed release check.
-2. Validate the native legacy upgrade and clean-profile install after protecting
-   the current account or using a separate Windows user account, including
-   settings/catalog/recovery preservation; audit
-   association-key cleanup after uninstall. Establish exact Rust compiler and
-   standard-library notice provenance for the native helpers (G11).
+2. Validate clean-profile installation after protecting the current account or
+   using a separate Windows user account; audit association-key cleanup after
+   uninstall. Establish exact Rust compiler and standard-library notice
+   provenance for the native helpers (G11). The legacy upgrade is outside the
+   release gates by maintainer decision, not a passed test.
 3. Complete installed-app checks for the new `b24f79b` candidate. Its source CI
    passed 9/9. Publish only after the open gates have evidence; choose a
    distribution/update feed as a separate release decision.

@@ -33,10 +33,11 @@ candidate was built from `cbacfd4` and remains installed.
 
 The [changelog](../CHANGELOG.md) has the complete user-visible list.
 
-## Installing or updating when a release is available
+## Installing when a release is available
 
-The Windows package is self-contained for win-x64. Before upgrading an older
-build that stored user data inside `%LocalAppData%/LabelForge`, close LabelForge,
+The Windows package is self-contained for win-x64. A versioned upgrade from
+0.3.0 was not validated for this release. If replacing an older local build
+that stored user data inside `%LocalAppData%/LabelForge`, close LabelForge,
 back up its user JSON files and recovery folder, and run the corrected portable
 app's migration-only command. Confirm the expected files are under
 `%LocalAppData%/LabelForge.UserData` before running Setup. The
@@ -57,9 +58,10 @@ Windows uninstall/reinstall cycle also preserved user data, restored the app
 registration and opened `.lfl` directly. Its source CI passed all nine jobs.
 The newer `b24f79b` package passed integrity checks and source CI 9/9 but awaits
 native installation. A risk-based native check covers measured 100/125/150%
-layouts and targeted high-scale compact editing and guide gestures. An exhaustive workflow in every
-scale/theme/window cell remains unverified. A versioned upgrade and pristine
-user-profile install still need native evidence.
+layouts and targeted high-scale compact editing and guide gestures. An
+exhaustive workflow in every scale/theme/window cell remains unverified. A
+pristine user-profile install
+still needs native evidence. Versioned upgrade was waived, not validated.
 Exact Rust compiler/standard-library provenance for the native packaging
 helpers also remains open.
 

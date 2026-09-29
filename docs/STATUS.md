@@ -29,9 +29,11 @@ every cell remains unverified. See the [validation record](RELEASE-VALIDATION.md
 
 A test-only 0.3.0 Setup was built from the `v0.3.0` tag with its exact source
 revision, and its ZIP/nupkg passed CRC. It was not installed. Clean-profile
-installation and a versioned upgrade remain untested. A separate Windows user
-profile is one way to protect the current installation; using this account
-would require a verified backup and restoration of its LabelForge state. The
+installation remains untested. The maintainer waived the versioned upgrade
+gate because there are no active users; the upgrade was not validated. A
+separate Windows user profile is one way to protect the current installation;
+using this account would require a verified backup and restoration of its
+LabelForge state. The
 installed 0.4.0 app and user data were left intact. The upstream Velopack
 Windows workflow used an unpinned Rust nightly, and its job
 logs/artifacts have expired. Exact Rust compiler/library provenance remains open.
@@ -158,9 +160,8 @@ pre-existing recent entries survived alongside the two QA files. A subsequent
 Windows uninstall removed the app directory and program entry but kept user
 data. Reinstalling the same candidate from Explorer restored both the entry
 and direct `.lfl` opening; the four recent entries remained visible. The
-complete native workflow matrix, legacy upgrade, pristine user-profile install
-and exact Rust notice provenance
-remain open.
+complete native workflow matrix, pristine user-profile install and exact Rust
+notice provenance remain open. Legacy upgrade was waived, not validated.
 Real-printer validation remains outside the active plan for cost reasons.
 See the [validation record](RELEASE-VALIDATION.md) for evidence and remaining gates.
 
@@ -294,8 +295,9 @@ The `1baaa76` Setup installed from ordinary Explorer into the normal per-user
 directory. Windows file properties confirmed the `0.4.0+1baaa76` source version;
 Explorer opened a synthetic `.lfl` directly in that installed app. The dense QA
 label remained in recent files and reopened after Setup. The current-candidate
-uninstall/reinstall result is recorded above; legacy upgrade and pristine
-user-profile install remain unverified. The script does not establish
+uninstall/reinstall result is recorded above; pristine user-profile install
+remains unverified. Legacy upgrade is outside the release gates by maintainer
+decision. The script does not establish
 an update feed. The `eec7557` packaging change extends the runtime inventory with native
 dependency/WebView2 notices and pins the packer/helper inputs. The installed `cbacfd4`
 candidate includes those notices and both guide fixes; the new `b24f79b` package
@@ -321,10 +323,10 @@ for package hashes and the distinction between candidate results.
   complete per-combination workflow remains unverified; external notifications
   partly obscured some broad captures.
 
-Recommended next work: validate legacy upgrade and clean-profile installation
-with a verified backup or a separate Windows user account, check the latest
-package in the installed app, and establish the native Rust compiler/standard-library
-notice revision.
+Recommended next work: validate clean-profile installation with a verified
+backup or a separate Windows user account, check the latest package in the
+installed app, and establish the native Rust compiler/standard-library notice
+revision.
 The exhaustive native workflow matrix and unobscured broad captures remain optional
 beyond the risk-based G8 release check. Runtime/native crate and WebView2 notice
 inventories are checked; G11 remains in progress. The paint budget correction
