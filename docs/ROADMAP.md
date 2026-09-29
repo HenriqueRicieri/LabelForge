@@ -1,6 +1,6 @@
 # Roadmap
 
-Work order after the verified `e78aa0d` baseline, updated 2026-09-28.
+Work order after the verified `e78aa0d` baseline, updated 2026-09-29.
 The original feature milestones are implemented. The next batch should establish
 reliable use on the target desktop, then make that version easy to install.
 Native validation is now in progress. No release has been published.
@@ -10,17 +10,21 @@ hardware is currently unaffordable. G9 is outside the active plan and is no long
 a release gate. Physical output remains unverified; software transport/status tests
 continue using fake printers and synthetic jobs.
 
-## 1. Validate native editing on Windows [P1, IN PROGRESS]
+## 1. Validate native editing on Windows [P1, RISK-BASED G8 DONE 2026-09-29]
 
-Run the app at 100%, 125% and 150% display scaling, in both themes and regular/compact
-windows. Exercise a synthetic dense label through creation, save/reopen and export.
+Record actual app scaling at 100%, 125% and 150%, in both themes and regular/compact
+windows. Exercise synthetic dense labels through representative creation,
+save/reopen and export workflows.
 Include font height/width, Auto, text blocks, rotated text, anchor changes, groups,
 undo/redo, clipboard and field navigation. Headless checks cover these contracts but
 cannot establish native focus, pointer feel or OS scaling.
 
-Complete when a matrix records commit, OS, scaling, theme, window size and pass/fail
-evidence; controls remain reachable; reopened documents and ZPL preserve the edits.
-Reproduce discovered defects in focused regressions before fixing them. Local backlog: G8.
+The release check uses measured scaling in all 12 theme/window cells and full
+workflows in representative high-risk cells: dense editing at the highest scale,
+compact inspector/F2, native guide gestures at 125%, save/reopen and export
+integrity. An exhaustive workflow in every cell remains unverified; it is not
+part of this risk-based release check. Reproduce discovered defects in focused
+regressions before fixing them. Record: G8.
 
 A fresh automation session worked; the earlier failure's cause remains unknown.
 Native dense editing, grouping, clipboard, undo/redo, text-block transforms,
@@ -43,9 +47,12 @@ unchanged in Dark broad and compact windows. On the later `2d4b84e` source, a na
 Clear Light and Dark broad captures on that source measured 1.25 app/monitor scale,
 1200 x 780 client DIPs, and retained the same model and ZPL. With the later
 guide-precision fix, a native Light 125% guide moved from 248 to 419 printer dots,
-undid/redid and survived save/reopen with matching ZPL. Next, repeat the remaining
-editing/export checks per cell; keep each result tied to its source build and
-actual display scale.
+undid/redid and survived save/reopen with matching ZPL. On `ec68421`, the
+150% Dark compact 80-element case passed F2 text edit, undo/redo, save/reopen
+and exact ZPL export at 720 x 630 DIPs; the 125% Light compact ruler guide
+moved from 372 to 570 dots and survived undo/redo and save/reopen. The display
+scale was restored to 100%. The [validation record](RELEASE-VALIDATION.md)
+ties these results to the source build and actual display scale.
 
 ## 2. Reduce paint allocation and resolve warnings [P1, DONE 2026-09-26]
 
@@ -127,6 +134,16 @@ changes and older-build migration preflight; revise it after the remaining gates
 A loopback receive timeout in the packaging-source CI was addressed by test-only
 `8b8eb40`, removing extra scheduling without changing production transport. The
 following CI passed all nine jobs; all 1,345 local unit cases also passed.
+
+The test-only `v0.3.0` installer was rebuilt with the tag's exact source revision
+and passed ZIP/nupkg CRC. It was not installed: a disposable interactive Windows
+profile was not available, and replacing the current per-user installation
+would risk user data. Native clean-profile install and 0.3.0-to-0.4.0 upgrade
+remain open. The Velopack helper workflow used an unpinned nightly; its expired
+job evidence and binaries do not establish the exact Rust standard-library
+revision. G11 remains open. Later commit `6276448` changes production Auto-width
+behavior and [passed all nine CI jobs](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36568544720),
+so the `cbacfd4` unsigned candidate needs a final-source rebuild and review.
 
 Complete when the candidate passes the native checks above, all CI jobs pass,
 versions agree, and installer smoke results/checksums are recorded. Publishing the

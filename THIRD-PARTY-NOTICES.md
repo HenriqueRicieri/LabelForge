@@ -40,10 +40,16 @@ bundle the WebView2 browser runtime.
 [MIT](licenses/Rust-LICENSE-MIT.txt) and [Apache](licenses/Rust-LICENSE-APACHE.txt)
 come from the official 2026-06-03 nightly distribution, the Velopack release date.
 This is supplemental coverage, not proof of the compiler used for the prebuilt
-helpers. The upstream build used an unpinned nightly and its logs have expired.
-Establishing the actual compiler/library revision and reconciling its notices
-remains open. The Rust 1.98.1 tools used for metadata analysis are unrelated to
-that original compilation.
+helpers. The [upstream Windows build workflow at the reviewed commit](https://github.com/velopack/velopack/blob/f2edcbcafb81da5b3c884aaea330e225ad91d8b6/.github/workflows/build-rust.yml)
+uses an unpinned `nightly-x86_64-pc-windows-msvc` toolchain and `build-std` for
+the x86 helpers. Its [successful 2026-06-03 Windows job](https://github.com/velopack/velopack/actions/runs/26919411102/job/79416485334)
+has an expired HTTP 410 log; the build artifacts had one-day retention.
+The published vpk 1.2.0 assets do not include helper PDBs. The pinned binaries
+contain nightly `rust-src` paths but no compiler commit/date string found in
+their printable bytes. Establishing the actual compiler/library revision and
+reconciling its notices remains open. A rebuild with a pinned toolchain or a
+verifiable upstream build record would close it. The Rust 1.98.1 tools used for
+metadata analysis are unrelated to that original compilation.
 
 `scripts/check-velopack-notices.ps1` rejects changes to the pinned packer or any
 of the three helper inputs. Packaging calls the verified packer entry point

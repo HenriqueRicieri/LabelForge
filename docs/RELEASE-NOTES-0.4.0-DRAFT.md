@@ -5,6 +5,8 @@ connected to an update feed. The current local candidate was built from
 [`cbacfd4`](https://github.com/HenriqueRicieri/LabelForge/commit/cbacfd4e043298bd224ac24c496e150412386cf9).
 See the [validation record](RELEASE-VALIDATION.md) for package checksums and
 the checks still needed before distribution.
+`6276448` later changed Auto-width font behavior on `main`; this local candidate
+does not include it and needs a final-source rebuild.
 
 ## What changed since v0.3.0
 
@@ -53,8 +55,10 @@ The current candidate's 0.4.0 in-place repair, installed-file comparison,
 `.lfl` association, save/export and offline viewer smoke checks passed. A
 Windows uninstall/reinstall cycle also preserved user data, restored the app
 registration and opened `.lfl` directly. Source CI passed all nine jobs. A
-versioned upgrade, pristine user-profile install and the complete native
-scale/theme/window workflow matrix still need evidence.
+risk-based native check now covers measured 100/125/150% layouts and targeted
+high-scale compact editing and guide gestures. An exhaustive workflow in every
+scale/theme/window cell remains unverified. A versioned upgrade and pristine
+user-profile install still need native evidence.
 Exact Rust compiler/standard-library provenance for the native packaging
 helpers also remains open.
 

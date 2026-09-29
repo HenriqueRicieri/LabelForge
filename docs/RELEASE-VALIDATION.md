@@ -1,6 +1,6 @@
 # Windows release candidate validation
 
-Updated 2026-09-28. Candidate version: `0.4.0`. Native workflow evidence was
+Updated 2026-09-29. Candidate version: `0.4.0`. Native workflow evidence was
 collected on `450b1df`; recovery contrast was validated on `d63901b`. The current
 candidate is built from
 [`cbacfd4`](https://github.com/HenriqueRicieri/LabelForge/commit/cbacfd4e043298bd224ac24c496e150412386cf9).
@@ -155,9 +155,33 @@ compact captures were 722 x 792. At higher selected scales, compact captures wer
 
 Windows accepted the scale selections, but the app's actual `RenderScaling` was
 not independently measured. The captures show reachable controls and focus in
-the observed layouts; they do not prove native DPI coverage. G8 stays in progress
-until actual app scaling and the full workflow matrix are recorded. The original
+the observed layouts; they do not prove native DPI coverage. G8 stayed in progress
+at that stage until actual app scaling and workflow evidence were recorded. The original
 100% Windows scale was restored after testing.
+
+### Risk-based native follow-up on `ec68421`
+
+On 2026-09-29, the isolated production editor was rebuilt with zero warnings and
+errors on `ec68421` and driven through the existing native automation runner.
+Windows 11 build 26200 reported actual app/monitor scaling, not a selected scale
+alone. All files were synthetic and stayed in ignored QA storage.
+
+| Risk cell | Measured result |
+| --- | --- |
+| 150% Dark, compact | 1.5/1.5 scaling, 720 x 630 client DIPs. Opened the 80-element dense label, ungrouped it, selected one text in the compact inspector, changed content through F2, undid/redid, saved and reopened. The saved/reopened complete model and ZPL matched byte-for-byte. Exported ZPL matched the reopened record (3,004 bytes). Undo restored the original ZPL and redo restored the edited ZPL. |
+| 125% Light, compact | 1.25/1.25 scaling, 720 x 630 client DIPs. Inserted a vertical guide from the ruler at 372 printer dots, dragged it to 570, undid to 372 and redid to 570. Save/reopen preserved the complete model and 570-dot guide byte-for-byte; generated ZPL stayed identical because guides do not print. |
+
+The monitor was restored to 100%, confirmed by the QA panel at 1.0/1.0. The
+ignored `artifacts/native-validation/risk-g8-20260929/review.json` indexes the
+runner records and output comparisons. Together with the previously measured 12
+scale/theme/window layouts, the 150% Light broad full workflow, the 100% Dark
+compact/regular editing and the 125% guide checks, this covers the highest-risk
+compact and high-scale interactions. G8's risk-based release check is satisfied;
+an exhaustive editing/export pass in every one of the 12 cells is still unverified.
+These source-editor results do not replace an installed-app test. The source at
+`ec68421` differs from the packaged `cbacfd4` only by public documentation;
+`6276448`, committed later on 2026-09-29, changes application behavior and is
+not in that installed candidate or these native captures.
 
 ## Recovery defect and regression
 
@@ -366,6 +390,57 @@ user-profile install, migration from a different installed version, and complete
 settings/catalog/recovery preservation remain unverified. The installer and
 package are still unsigned and unpublished.
 
+### Legacy-upgrade input prepared, native gate still open
+
+On 2026-09-29, the `v0.3.0` source at
+`9ccad4e5b55d8475406fd3240e6defc6377565fb` was extracted into ignored
+`artifacts/legacy-upgrade-prep` storage and built as a self-contained win-x64
+test package with `SourceRevisionId` set to that tag commit. Its file version is
+`0.3.0.0` and product version is `0.3.0+9ccad4e5b55d8475406fd3240e6defc6377565fb`.
+The reviewed vpk 1.2.0 inputs passed their pin check. ZIP and nupkg passed CRC
+(234 and 236 entries). The final test-only package is under `package-fixed`:
+
+| Legacy test file | SHA-256 |
+| --- | --- |
+| LabelForge-win-Setup.exe | `08cb581cdbef58320aad2895a6919597f1995d0648380c4ffb5c68ebc020d656` |
+| LabelForge-win-Portable.zip | `b3bdb8e4b6c04f42adccf667225fa3df170516f51124dd14934caa8155d90599` |
+| LabelForge-0.3.0-full.nupkg | `9d2e26ac13908b9fa14fbee124867b2161978c5119af25cd695a2f3bb5646bc6` |
+
+No legacy Setup was run. The normal profile still contains the installed 0.4.0
+candidate and user data; no disposable interactive Windows profile or Windows
+Sandbox executable was available to the runner. Running the legacy Setup in that
+profile would replace the working installation and put pre-migration files at
+risk. A native clean-profile install and a 0.3.0-to-0.4.0 versioned upgrade
+therefore remain open. In an isolated profile, first seed synthetic legacy
+settings/catalog/recovery/recent data, run the corrected 0.4.0 portable
+`--migrate-user-data`, verify copies/hashes, then run Setup and check installed
+version, `.lfl` association and data preservation. The test-only legacy package
+is not a public release asset.
+
+### Exact Rust provenance follow-up
+
+The [upstream Windows helper workflow](https://github.com/velopack/velopack/blob/f2edcbcafb81da5b3c884aaea330e225ad91d8b6/.github/workflows/build-rust.yml)
+for vpk 1.2.0 ran `rustup component add rust-src --toolchain nightly-x86_64-pc-windows-msvc`
+and `cargo +nightly build --locked --target i686-win7-windows-msvc -Z build-std`
+without a dated toolchain. Its successful Windows job was
+[79416485334](https://github.com/velopack/velopack/actions/runs/26919411102/job/79416485334)
+on 2026-06-03. The public job log returns HTTP 410; its artifacts had one-day
+retention and are no longer listed. The
+[release assets](https://github.com/velopack/velopack/releases/tag/1.2.0)
+do not expose helper PDBs. Inspection of the three hash-pinned helper binaries
+found nightly `rust-src` paths, but no compiler commit/date string. This narrows
+the provenance to the unpinned nightly used by that job; it does not establish
+the exact Rust compiler or standard-library revision. The supplemental
+2026-06-03 Rust notice snapshot cannot be relabeled as exact. A pinned rebuild
+of the helpers or verifiable upstream build record is needed to close this part
+of G11.
+
+After the package and native QA work, `6276448` changed production Auto-width
+font behavior on `main`; its [CI passed 9/9](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36568544720).
+The installed `cbacfd4` candidate and the `ec68421` native records do not include
+that newer behavior. Rebuild and review the 0.4.0 candidate from the final
+intended source before release publication.
+
 ### Previous native-notice candidate
 
 Built from `eec7557f2ada254d9be175e72902c080686358cf` into
@@ -482,10 +557,13 @@ earlier packages and never replace packages already distributed to users.
 
 ## Remaining work
 
-1. Finish the native workflow matrix and unobscured broad captures (G8). Actual
-   1.0/1.25/1.5 measurements across 12 combinations are recorded above.
-2. Validate legacy upgrade, pristine user-profile install and full native
-   association-key cleanup after uninstall;
-   establish exact native Rust compiler/standard-library notice provenance (G11).
-3. Publish after those checks have evidence; choose a distribution/update feed
+1. The risk-based G8 native gate passed; an exhaustive per-cell workflow matrix
+   remains unverified and is outside the narrowed release check.
+2. Validate the native legacy upgrade and pristine user-profile install in a
+   disposable profile, including settings/catalog/recovery preservation; audit
+   association-key cleanup after uninstall. Establish exact Rust compiler and
+   standard-library notice provenance for the native helpers (G11).
+3. Rebuild the candidate from the final source after `6276448` and record its
+   integrity/installed-app checks. Publish only after the open gates have evidence;
+   choose a distribution/update feed
    as a separate release decision.

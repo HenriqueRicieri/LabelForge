@@ -14,6 +14,31 @@ and their summary. The Release
 solution build has zero warnings and errors. This source change is newer than the
 current installer candidate.
 
+## Release follow-up (2026-09-29)
+
+The risk-based G8 native check now includes measured 150% Dark compact editing
+and 125% Light compact guide gestures on source `ec68421`. At 150%, the 80-element
+synthetic label passed F2 text editing, undo/redo, save/reopen and ZPL export at
+1.5/1.5 scaling and 720 x 630 DIPs. The reopened model and ZPL matched the
+saved records byte-for-byte; exported ZPL matched at 3,004 bytes. At 125% and
+720 x 630 DIPs, a ruler guide moved from 372 to 570 printer dots, undid/redid
+exactly and reopened at 570 with matching model and ZPL. Windows display scale
+was restored to 100% and measured at 1.0/1.0. This complements the earlier
+12 measured layouts and broad/compact workflows; an exhaustive workflow in
+every cell remains unverified. See the [validation record](RELEASE-VALIDATION.md).
+
+A test-only 0.3.0 Setup was built from the `v0.3.0` tag with its exact source
+revision, and its ZIP/nupkg passed CRC. It was not installed. Clean-profile
+installation and a versioned upgrade still need an accessible disposable
+Windows profile; the installed 0.4.0 app and user data were left intact. The
+upstream Velopack Windows workflow used an unpinned Rust nightly, and its job
+logs/artifacts have expired. Exact Rust compiler/library provenance remains open.
+
+`6276448` subsequently changed production Auto-width behavior and passed
+[CI 9/9](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36568544720).
+The unsigned `cbacfd4` candidate predates that change and needs a final-source
+rebuild before release review. Nothing has been published.
+
 ## Native workflow progress (2026-09-28)
 
 The measured 150% Light broad editor workflow passed text/font/block edits,
