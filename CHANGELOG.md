@@ -1,7 +1,7 @@
 # Changelog
 
 User-visible changes on `main` since `v0.3.0`, reconciled with source baseline
-`e78aa0d` on 2026-09-25, updated on 2026-09-28. The current
+`e78aa0d` on 2026-09-25, updated on 2026-09-29. The current
 candidate targets `0.4.0`; these changes have
 not yet been published as a release.
 
@@ -9,6 +9,8 @@ not yet been published as a release.
 
 ### Editing and workspace
 
+- Switching to a bitmap font now keeps an existing Auto character-width choice,
+  so the generated ZPL continues to use the printer font default.
 - Ruler guide insertion now uses the nearest printer dot instead of rounding to a
   whole millimeter. The ruler menu shows the stored position in centimeters.
 - Fixed guide drags ignoring the final release position and ruler removal state.

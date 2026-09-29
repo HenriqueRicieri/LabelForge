@@ -1,5 +1,19 @@
 # Project status
 
+## Auto width through font changes (2026-09-29)
+
+Changing an Auto-width text field from scalable font 0 to a built-in bitmap font
+used to replace the stored zero width with an explicit cell width. The Auto choice
+now survives the font change, and generated ZPL continues to omit the width.
+Explicit widths still use the new bitmap font's cell size.
+
+Two focused layout checks failed before the fix and pass afterward. Local validation
+passed 402 layout checks, 1,345 unit tests and 589 complete Light designer
+checks. The before/after layout transcripts differ only in those two results
+and their summary. The Release
+solution build has zero warnings and errors. This source change is newer than the
+current installer candidate.
+
 ## Native workflow progress (2026-09-28)
 
 The measured 150% Light broad editor workflow passed text/font/block edits,

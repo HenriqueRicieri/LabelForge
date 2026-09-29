@@ -135,7 +135,8 @@ for the work order, [Changelog](CHANGELOG.md) for changes, and
   fonts A-H use whole multiples of their character cells. New text starts with an
   explicit character width matching its height, so ZPL and the preview agree. Auto omits
   width from ZPL; the printer then uses its font default, and the inspector shows a
-  preview estimate. For a single text field, top and bottom handles change font height;
+  preview estimate. Switching fonts keeps Auto selected until you turn it off.
+  For a single text field, top and bottom handles change font height;
   left and right handles change character width, and corners scale both proportionally. On rotated
   text, a handle follows the visual axis under the pointer. On a text block, horizontal
   resizing also changes the wrapping width so the selected box follows the handle.

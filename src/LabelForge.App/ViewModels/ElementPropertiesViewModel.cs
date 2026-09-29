@@ -336,7 +336,8 @@ public sealed class TextPropertiesViewModel : ElementPropertiesViewModel
                     int magnification = ZplFont.Magnification(
                         v, _text.FontHeightDots, vertical: true, Document.Dpmm);
                     _text.FontHeightDots = cell.HeightDots * magnification;
-                    _text.FontWidthDots = cell.WidthDots * magnification;
+                    if (_text.FontWidthDots != 0)
+                        _text.FontWidthDots = cell.WidthDots * magnification;
                 }
 
                 OnPropertyChanged(nameof(FontHeight));

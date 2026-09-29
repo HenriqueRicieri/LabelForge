@@ -311,6 +311,19 @@ internal static class UiLayoutChecks
                     text.FontWidthDots == 0 && !fontWidthInput.IsEnabled &&
                     fontWidthInput.Value == 0.5m);
             }
+            var fontSwitchDocument = new LabelDocument { Dpmm = 8 };
+            var autoFontText = new TextElement { X = 30, Y = 30, Text = "Auto",
+                FontHeightDots = 40, FontWidthDots = 0 };
+            fontSwitchDocument.Elements.Add(autoFontText);
+            var fontSwitch = new TextPropertiesViewModel(autoFontText, fontSwitchDocument, _ => { });
+            fontSwitch.SelectedFont = fontSwitch.Fonts.First(font => font.Value == 'A');
+            Check("switching to a bitmap font keeps Auto width selected",
+                autoFontText.Font == 'A' && autoFontText.FontWidthDots == 0 &&
+                fontSwitch.IsFontWidthAutomatic);
+            Check("bitmap font with Auto omits width from generated ZPL",
+                new ZplGenerator().Generate(fontSwitchDocument).Contains(
+                    "^AAN,36^FDAuto", StringComparison.Ordinal));
+
             var importedTinyText = new TextElement { X = 30, Y = 30, Text = "Legacy",
                 FontHeightDots = 6, FontWidthDots = 4 };
             d.Document.Elements.Add(importedTinyText);

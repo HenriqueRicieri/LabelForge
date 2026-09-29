@@ -60,6 +60,8 @@ the authority for package versions; planning-era versions are historical.
 - Permanent guide drags use the captured pointer offset and final release position.
   Release on the corresponding ruler removes the guide; Escape restores the starting
   position without a document edit or undo step. A nearby click must not move it.
+- Font changes retain `FontWidthDots = 0` when Auto is selected. Explicit
+  bitmap widths still snap to the selected font cell.
 - `FontWidthDots = 0` omits width from ZPL; the printer chooses its default and the
   preview estimates it. New fields/starters specify width; old saved values stay intact.
   Font 0's pinned preview typeface remains a substitute.
