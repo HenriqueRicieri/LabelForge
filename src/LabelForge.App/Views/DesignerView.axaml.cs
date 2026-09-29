@@ -310,13 +310,13 @@ public partial class DesignerView : UserControl
     /// picked.
     ///
     /// Built at the density the designer is already set to, so the gallery's pictures and
-    /// the label it creates are the same label. No prompt about unsaved work, which is
-    /// what File > New does too: the crash snapshot is what stands behind that, and one
-    /// dialog here and not there would only look like an inconsistency.
+    /// the label it creates are the same label. Unsaved work is asked about first, like
+    /// every other way of replacing the label.
     /// </summary>
     private async void OnNewFromSample(object? sender, RoutedEventArgs e)
     {
-        if (TopLevel.GetTopLevel(this) is not Window owner || ViewModel is not { } vm)
+        if (TopLevel.GetTopLevel(this) is not Window owner || ViewModel is not { } vm
+            || !await ConfirmDiscardAsync())
         {
             return;
         }
@@ -460,12 +460,15 @@ public partial class DesignerView : UserControl
         RecentMenu.Items.Clear();
         foreach (string path in vm.RecentFiles)
         {
-            RecentMenu.Items.Add(new MenuItem
+            var item = new MenuItem { Header = path };
+            item.Click += async (_, _) =>
             {
-                Header = path,
-                Command = vm.OpenRecentCommand,
-                CommandParameter = path,
-            });
+                if (await ConfirmDiscardAsync())
+                {
+                    vm.OpenRecentCommand.Execute(path);
+                }
+            };
+            RecentMenu.Items.Add(item);
         }
     }
 
@@ -581,7 +584,7 @@ public partial class DesignerView : UserControl
     /// CP1252 file keeps its accents instead of collecting replacement characters.</summary>
     private async void OnImportZpl(object? sender, RoutedEventArgs e)
     {
-        if (await PickZplFile("Import a ZPL label") is not { } picked)
+        if (!await ConfirmDiscardAsync() || await PickZplFile("Import a ZPL label") is not { } picked)
         {
             return;
         }
@@ -595,6 +598,31 @@ public partial class DesignerView : UserControl
         catch (Exception ex)
         {
             vm.StatusText = $"Could not read the file: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Opens another label of the imported file. The picker only shows the view model's
+    /// choice, so a pick that the unsaved-changes question cancels puts the picker back
+    /// instead of leaving it naming a label that is not on the canvas.
+    /// </summary>
+    private async void OnImportedBlockPicked(object? sender, SelectionChangedEventArgs e)
+    {
+        if (ViewModel is not { } vm || sender is not ComboBox picker
+            || picker.SelectedItem is not ImportedBlockViewModel picked
+            || ReferenceEquals(picked, vm.SelectedImportedBlock))
+        {
+            return;
+        }
+
+        if (await ConfirmDiscardAsync())
+        {
+            vm.SelectedImportedBlock = picked;
+        }
+        else
+        {
+            // SetCurrentValue, as the picker itself does, keeps the one-way binding alive.
+            picker.SetCurrentValue(ComboBox.SelectedItemProperty, vm.SelectedImportedBlock);
         }
     }
 
@@ -872,9 +900,55 @@ public partial class DesignerView : UserControl
     private static FilePickerFileType LflType { get; } =
         new("LabelForge label") { Patterns = ["*.lfl"] };
 
+    /// <summary>
+    /// Asks what to do with unsaved changes before the label is replaced or the window
+    /// closes. Every way of losing the label comes through here: New, Open, Open Recent,
+    /// New from Sample, Import ZPL, another label of an imported file, and closing.
+    /// </summary>
+    /// <returns>True when the caller may go ahead: nothing was unsaved, the label was
+    /// saved, or the user chose not to save. False on Cancel, and when saving did not
+    /// happen (the Save As picker was dismissed or the write failed), because going
+    /// ahead then would lose exactly what the user asked to keep.</returns>
+    /// <param name="owner">The window to ask in front of. Given by the shell when it
+    /// closes, since this pane is out of the visual tree while another tab is showing.</param>
+    public async Task<bool> ConfirmDiscardAsync(Window? owner = null)
+    {
+        if (ViewModel is not { } vm || !vm.HasUnsavedChanges)
+        {
+            return true;
+        }
+
+        owner ??= TopLevel.GetTopLevel(this) as Window;
+        if (owner is null)
+        {
+            return false;
+        }
+
+        UnsavedChangesChoice choice = await new UnsavedChangesWindow(vm.DocumentName)
+            .ShowDialog<UnsavedChangesChoice>(owner);
+        switch (choice)
+        {
+            case UnsavedChangesChoice.Save:
+                return await SaveAsync(owner);
+            case UnsavedChangesChoice.DontSave:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private async void OnNewFile(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm && await ConfirmDiscardAsync())
+        {
+            vm.NewDocumentCommand.Execute(null);
+        }
+    }
+
     private async void OnOpenFile(object? sender, RoutedEventArgs e)
     {
-        if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)
+        if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm
+            || !await ConfirmDiscardAsync())
         {
             return;
         }
@@ -892,28 +966,31 @@ public partial class DesignerView : UserControl
         }
     }
 
-    private async void OnSaveFile(object? sender, RoutedEventArgs e)
+    private async void OnSaveFile(object? sender, RoutedEventArgs e) => await SaveAsync();
+
+    private async void OnSaveFileAs(object? sender, RoutedEventArgs e) => await SaveAsAsync();
+
+    /// <summary>Saves to the open file, or asks where when the label has never had one.</summary>
+    /// <returns>True when the label was written.</returns>
+    public async Task<bool> SaveAsync(TopLevel? owner = null)
     {
         if (ViewModel is not { } vm)
         {
-            return;
+            return false;
         }
 
-        if (vm.CurrentFilePath is { } path)
-        {
-            await SaveToAsync(vm, path);
-        }
-        else
-        {
-            OnSaveFileAs(sender, e);
-        }
+        return vm.CurrentFilePath is { } path
+            ? await vm.SaveToAsync(path)
+            : await SaveAsAsync(owner);
     }
 
-    private async void OnSaveFileAs(object? sender, RoutedEventArgs e)
+    /// <returns>True when a file was picked and written; false when the picker was
+    /// dismissed or the write failed.</returns>
+    private async Task<bool> SaveAsAsync(TopLevel? owner = null)
     {
-        if (TopLevel.GetTopLevel(this) is not { } top || ViewModel is not { } vm)
+        if ((owner ?? TopLevel.GetTopLevel(this)) is not { } top || ViewModel is not { } vm)
         {
-            return;
+            return false;
         }
 
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
@@ -924,29 +1001,7 @@ public partial class DesignerView : UserControl
             FileTypeChoices = [LflType],
         });
 
-        if (file?.TryGetLocalPath() is { } path)
-        {
-            await SaveToAsync(vm, path);
-            vm.CurrentFilePath = path;
-        }
-    }
-
-    private static async Task SaveToAsync(DesignerViewModel vm, string path)
-    {
-        try
-        {
-            await File.WriteAllTextAsync(path, vm.SerializeDocument());
-            vm.StatusText = $"Saved {Path.GetFileName(path)}";
-            vm.RegisterRecentFile(path);
-
-            // The work is safe in its own file now, so the crash snapshot would only be a
-            // false alarm on the next start.
-            vm.ClearRecovery();
-        }
-        catch (Exception ex)
-        {
-            vm.StatusText = $"Could not save: {ex.Message}";
-        }
+        return file?.TryGetLocalPath() is { } path && await vm.SaveToAsync(path);
     }
 
     private async void OnExportZpl(object? sender, RoutedEventArgs e)
@@ -1212,11 +1267,7 @@ public partial class DesignerView : UserControl
                 break;
 
             case Key.N:
-                if (vm.NewDocumentCommand.CanExecute(null))
-                {
-                    vm.NewDocumentCommand.Execute(null);
-                }
-
+                OnNewFile(sender, new RoutedEventArgs());
                 e.Handled = true;
                 break;
 

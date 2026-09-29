@@ -354,10 +354,10 @@
     <Grid Name="DesignerRoot" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <!-- Menu bar -->
         <Border Grid.Row="0" Padding="4,0" Background="{DynamicResource AppBarBackground}">
-            <DockPanel>
+            <DockPanel LastChildFill="False">
                 <Menu DockPanel.Dock="Left" VerticalAlignment="Center">
                     <MenuItem Header="_File">
-                        <MenuItem Header="_New" Command="{Binding NewDocumentCommand}" InputGesture="Ctrl+N" />
+                        <MenuItem Header="_New" Click="OnNewFile" InputGesture="Ctrl+N" />
                         <MenuItem Header="New from _Sample..." Click="OnNewFromSample" />
                         <MenuItem Header="_Open..." Click="OnOpenFile" InputGesture="Ctrl+O" />
                         <MenuItem x:Name="RecentMenu" Header="Open _Recent" IsEnabled="{Binding HasRecentFiles}" />
@@ -544,9 +544,6 @@
                         </Flyout>
                     </Button.Flyout>
                 </Button>
-                <TextBlock Text="{Binding CurrentFilePath}" VerticalAlignment="Center"
-                           HorizontalAlignment="Right" Margin="12,0"
-                           Opacity="0.5" FontSize="12" />
             </DockPanel>
         </Border>
 
@@ -572,8 +569,9 @@
                         ToolTip.Tip="Stop offering the other labels from this file" />
                 <TextBlock MaxWidth="180" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ImportedFrom}" Text="{Binding ImportedFrom}" VerticalAlignment="Center"
                            Opacity="0.7" Margin="0,0,8,0" />
-                <ComboBox ItemsSource="{Binding ImportedBlocks}"
-                          SelectedItem="{Binding SelectedImportedBlock}"
+                <ComboBox Name="ImportedBlockPicker" ItemsSource="{Binding ImportedBlocks}"
+                          SelectedItem="{Binding SelectedImportedBlock, Mode=OneWay}"
+                          SelectionChanged="OnImportedBlockPicked"
                           MinWidth="220"
                           ToolTip.Tip="This file holds several labels. Opening another one replaces what is on the canvas." />
             </DockPanel>

@@ -63,6 +63,29 @@ public sealed class SnapshotHistoryTests
         Assert.Equal("typing-hello", history.Redo());
     }
 
+    /// <summary>Current follows the cursor, which is what lets undoing back to a saved
+    /// state read as unmodified again.</summary>
+    [Fact]
+    public void Current_FollowsUndoRedoAndReplacement()
+    {
+        var history = new SnapshotHistory();
+        Assert.Null(history.Current);
+
+        history.Record("saved");
+        history.Record("edited");
+        Assert.Equal("edited", history.Current);
+
+        history.Undo();
+        Assert.Equal("saved", history.Current);
+
+        history.Redo();
+        history.ReplaceCurrent("edited again");
+        Assert.Equal("edited again", history.Current);
+
+        history.Clear();
+        Assert.Null(history.Current);
+    }
+
     [Fact]
     public void Capacity_DropsOldestStates()
     {

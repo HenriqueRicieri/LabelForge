@@ -182,8 +182,25 @@ public sealed class RecoveryStore : IDisposable
             return;
         }
 
-        _disposed = true;
         Clear();
+        Release();
+    }
+
+    /// <summary>
+    /// Ends the session but leaves its snapshot behind, so the next start offers it.
+    ///
+    /// For a session that ends with unsaved work nobody chose to throw away, which is what
+    /// Windows signing out looks like: there is no chance to ask, and releasing the lock is
+    /// exactly what turns the snapshot into a remnant the next start can find.
+    /// </summary>
+    public void Release()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         _lock?.Dispose();
         _lock = null;
 

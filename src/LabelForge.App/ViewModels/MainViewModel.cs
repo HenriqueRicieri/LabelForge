@@ -33,6 +33,21 @@ public partial class MainViewModel : ViewModelBase
         Designer = new DesignerViewModel(
             userMediaStore, fieldCatalogStore, recoveryStore, userSettingsStore, clipboard, recentFilesPath);
         Viewer = new ViewerViewModel(comparisonRenderer);
+
+        Designer.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(DesignerViewModel.DocumentName) or nameof(DesignerViewModel.IsDirty))
+            {
+                OnPropertyChanged(nameof(WindowTitle));
+            }
+        };
+        Viewer.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ViewerViewModel.DocumentName))
+            {
+                OnPropertyChanged(nameof(WindowTitle));
+            }
+        };
     }
 
     public DesignerViewModel Designer { get; }
@@ -42,7 +57,17 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>Which tab is showing. A property rather than a view concern because
     /// opening a file decides where it belongs, and only the shell knows both halves.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WindowTitle))]
     public partial int SelectedTab { get; set; }
+
+    /// <summary>
+    /// The window title follows the tab on show: the label's name with an asterisk while
+    /// it has unsaved changes, or the ZPL file the viewer opened. Name first, as Windows
+    /// editors do, so the taskbar still tells two windows apart when it truncates.
+    /// </summary>
+    public string WindowTitle => SelectedTab == ViewerTab
+        ? Viewer.DocumentName is { } zpl ? $"{zpl} - LabelForge" : "LabelForge"
+        : $"{Designer.DocumentName}{(Designer.IsDirty ? "*" : string.Empty)} - LabelForge";
 
     /// <summary>
     /// Opens a file the app was started with: a double-clicked .lfl, a file dropped on the

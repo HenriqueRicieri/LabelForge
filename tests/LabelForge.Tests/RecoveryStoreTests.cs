@@ -78,6 +78,22 @@ public sealed class RecoveryStoreTests : IDisposable
         Assert.Empty(next.FindAbandoned());
     }
 
+    /// <summary>Ending a session with unsaved work nobody discarded (Windows signing out)
+    /// releases the lock and keeps the snapshot, so the next start offers it.</summary>
+    [Fact]
+    public void ReleasingWithoutClearing_LeavesTheWorkToOffer()
+    {
+        var session = new RecoveryStore(_directory, "signed-out");
+        session.Save(Lfl("not discarded"), null);
+        session.Release();
+        session.Dispose();
+
+        using var next = new RecoveryStore(_directory, "next");
+
+        RecoverySnapshot offered = Assert.Single(next.FindAbandoned());
+        Assert.Contains("not discarded", offered.Lfl);
+    }
+
     /// <summary>Saving the document to its own file makes the snapshot a false alarm, so
     /// the caller clears it and the next start stays quiet.</summary>
     [Fact]

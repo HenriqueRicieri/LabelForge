@@ -1,0 +1,24 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LabelForge.App.Views.UnsavedChangesWindow"
+        Title="LabelForge"
+        Width="420" SizeToContent="Height"
+        CanResize="False" CanMinimize="False" CanMaximize="False" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppPanelBackground}">
+
+    <StackPanel Margin="20,18,20,16" Spacing="6">
+        <TextBlock Name="QuestionText" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Text="Your changes will be lost if you don't save them."
+                   Opacity="0.7" TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,14,0,0">
+            <Button Name="SaveButton" Content="Save" MinWidth="88" IsDefault="True"
+                    HorizontalContentAlignment="Center" Click="OnSave" />
+            <Button Name="DontSaveButton" Content="Don't Save" MinWidth="88"
+                    HorizontalContentAlignment="Center" Click="OnDontSave" />
+            <Button Name="CancelButton" Content="Cancel" MinWidth="88" IsCancel="True"
+                    HorizontalContentAlignment="Center" Click="OnCancel" />
+        </StackPanel>
+    </StackPanel>
+
+</Window>

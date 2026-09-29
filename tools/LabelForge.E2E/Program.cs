@@ -52,7 +52,7 @@ if (args.Contains("dark"))
 // Media presets, field catalogs and crash snapshots all live per machine. Point every
 // one of them at scratch locations, so a harness run never touches what the person using
 // the app has saved.
-string scratchRoot = args.FirstOrDefault() is "ui-layout" or "recovery-ui" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "transform-gestures" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare" or "viewer-layout" or "cm-units"
+string scratchRoot = args.FirstOrDefault() is "ui-layout" or "recovery-ui" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "transform-gestures" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare" or "viewer-layout" or "cm-units" or "unsaved-changes"
     ? Path.Combine(AppContext.BaseDirectory, args[0] + "-scratch")
     : AppContext.BaseDirectory;
 Directory.CreateDirectory(scratchRoot);
@@ -418,6 +418,14 @@ if (args.FirstOrDefault() == "quiet-zone-frames")
 {
     QuietZoneFrameChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
     Console.WriteLine($"{graded} frame checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
+if (args.FirstOrDefault() == "unsaved-changes")
+{
+    UnsavedChangesChecks.Run(scratchRoot, (label, found, wanted) => Check(label, found, wanted));
+    Console.WriteLine($"{graded} unsaved-changes checks graded, {disagreed.Count} disagreed");
     vm.Designer.ShutDown();
     window.Close();
     return disagreed.Count == 0 ? 0 : 1;
@@ -3362,7 +3370,10 @@ if (mode == "designer")
         + $"(expected 1), offer gone={!recovered.Designer.HasRecoveryOffer} (expected True), "
         + $"remnant discarded={!File.Exists(remnant)} (expected True)");
 
-    // A session that ends properly leaves nothing, so the next start stays quiet.
+    // A session that ends properly leaves nothing, so the next start stays quiet. The label
+    // still has the edit above, and ending properly with one means the user was asked and
+    // chose Don't Save; ending without an answer keeps it (UnsavedChangesChecks).
+    d.AcceptDiscard();
     d.ShutDown();
     var afterCleanExit = new MainViewModel(
         new LabelForge.Core.Media.UserMediaStore(presetsPath),
@@ -3571,6 +3582,7 @@ if (mode == "designer")
     CanvasDisplayChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
     MenuOptionChecks.Run(window, vm.Designer, settingsPath, (label, held) => Check(label, held, true));
     PrinterStatusChecks.Run(window, vm, (label, held) => Check(label, held, true));
+    UnsavedChangesChecks.Run(scratchRoot, (label, found, wanted) => Check(label, found, wanted));
 }
 
 Capture($"{mode}.png");

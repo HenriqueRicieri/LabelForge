@@ -174,11 +174,7 @@ public partial class ViewerView : UserControl
             using var buffer = new System.IO.MemoryStream();
             await stream.CopyToAsync(buffer);
             vm.LoadZplRead(LabelForge.Core.Io.ZplTextFile.Read(buffer.ToArray()));
-        }
-
-        if (top is Window window)
-        {
-            window.Title = $"LabelForge - {file.Name}";
+            vm.DocumentName = file.Name;
         }
     }
 

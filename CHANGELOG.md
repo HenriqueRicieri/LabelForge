@@ -9,6 +9,11 @@ not yet been published as a release.
 
 ### Editing and workspace
 
+- Unsaved changes are no longer lost without warning. Closing the window, New,
+  Open, Open Recent, New from Sample, Import ZPL and picking another label of an
+  imported file now ask Save, Don't Save or Cancel. The window title shows the
+  label's name, marked with an asterisk while it has unsaved changes, and the full
+  path no longer sits in the menu bar.
 - Switching to a bitmap font now keeps an existing Auto character-width choice,
   so the generated ZPL continues to use the printer font default.
 - Ruler guide insertion now uses the nearest printer dot instead of rounding to a

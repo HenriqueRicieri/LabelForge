@@ -36,6 +36,11 @@ public partial class ViewerViewModel : ViewModelBase
     [ObservableProperty]
     public partial string ZplText { get; set; } = SampleZpl;
 
+    /// <summary>The name of the ZPL file on show, for the window title; null for the
+    /// built-in sample.</summary>
+    [ObservableProperty]
+    public partial string? DocumentName { get; set; }
+
     [ObservableProperty]
     public partial bool AutoSize { get; set; } = true;
 
@@ -159,7 +164,8 @@ public partial class ViewerViewModel : ViewModelBase
         try
         {
             LoadZplRead(LabelForge.Core.Io.ZplTextFile.ReadFile(path));
-            return Path.GetFileName(path);
+            DocumentName = Path.GetFileName(path);
+            return DocumentName;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
                                        or System.Security.SecurityException or ArgumentException)

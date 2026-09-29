@@ -341,10 +341,15 @@ for the work order, [Changelog](CHANGELOG.md) for changes, and
   Import a script file alongside and the calls it offers are completed too, read from its
   public method signatures, so `##@Abate.maturidade(COD_MATURIDADE)##` is picked rather
   than retyped. Signatures only; nothing in the file is executed.
+- Unsaved changes are never dropped silently. The window title shows the label's name with
+  an asterisk while it has changes, and closing the window, New, Open, Open Recent, New from
+  Sample, Import ZPL or switching to another label of an imported file first asks whether
+  to save. Undoing back to the saved state clears the asterisk.
 - Crash recovery: the open document is snapshotted as you work, and if LabelForge closes
-  unexpectedly the next start offers the unsaved changes back. It never restores by itself,
-  and a session that closes properly leaves nothing behind, so an ordinary shutdown is
-  never mistaken for a crash.
+  unexpectedly (or Windows ends the session before the question can be asked) the next
+  start offers the unsaved changes back. It never restores by itself, recovered work stays
+  marked as unsaved until it is saved, and a session that closes properly leaves nothing
+  behind, so an ordinary shutdown is never mistaken for a crash.
 - Save and open the native `.lfl` project format (with a recent-files menu); export ZPL, PNG, and
   PDF at exact physical size.
 - Two ZPL exports, because they are not the same bytes: Export ZPL writes the label the

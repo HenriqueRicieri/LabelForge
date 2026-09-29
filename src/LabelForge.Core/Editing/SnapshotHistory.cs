@@ -26,6 +26,11 @@ public sealed class SnapshotHistory
 
     public bool CanRedo => _cursor < _states.Count - 1;
 
+    /// <summary>The state the cursor points at, or null before anything is recorded.
+    /// Undo and redo move it, so comparing it with a saved state says whether the
+    /// document is back where it was saved.</summary>
+    public string? Current => _cursor >= 0 ? _states[_cursor] : null;
+
     /// <summary>Records a new state after an edit, discarding any redo tail.</summary>
     public void Record(string state)
     {

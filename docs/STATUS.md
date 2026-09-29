@@ -1,5 +1,20 @@
 # Project status
 
+## Unsaved changes protection (2026-09-29)
+
+Closing the window, New, Open, Open Recent, New from Sample and Import ZPL used to
+replace or close an edited label without asking, and a normal close deleted the
+recovery snapshot, so the work was lost. They now ask Save / Don't Save / Cancel,
+as does picking another label of an imported file. The window title shows the
+label's name with an asterisk while it has changes and follows the active tab.
+Unsaved work at a Windows sign-out is kept for the next start.
+
+The loss was reproduced in the running app before the fix and each path was
+checked afterward, maximized and at a reduced size. 30 new harness checks
+(22 failed on the previous code), 1347 unit tests, 619 designer checks per theme and
+the seven focused UI modes pass; the Release build has zero warnings and errors.
+This change is not in any built package.
+
 ## Auto width through font changes (2026-09-29)
 
 Changing an Auto-width text field from scalable font 0 to a built-in bitmap font

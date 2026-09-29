@@ -9,7 +9,7 @@
         x:DataType="vm:MainViewModel"
         Width="1200" Height="760"
         Icon="/Assets/labelforge.ico"
-        Title="LabelForge">
+        Title="{Binding WindowTitle}">
 
     <Design.DataContext>
         <vm:MainViewModel />
@@ -18,7 +18,7 @@
     <TabControl Name="MainTabs" Padding="0" Margin="0,4,0,0"
                 SelectedIndex="{Binding SelectedTab}">
         <TabItem Header="Designer">
-            <views:DesignerView DataContext="{Binding Designer}" />
+            <views:DesignerView Name="DesignerPane" DataContext="{Binding Designer}" />
         </TabItem>
         <TabItem Header="ZPL Viewer">
             <views:ViewerView DataContext="{Binding Viewer}" />

@@ -950,7 +950,94 @@ public partial class DesignerViewModel : ViewModelBase
 
     /// <summary>Path of the open .lfl file; null until first save.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DocumentName))]
     public partial string? CurrentFilePath { get; set; }
+
+    /// <summary>What the window title calls the label: its file name, or Untitled
+    /// before it has one.</summary>
+    public string DocumentName =>
+        CurrentFilePath is { } path ? Path.GetFileName(path) : "Untitled";
+
+    /// <summary>
+    /// Whether the label differs from what was last opened or saved.
+    ///
+    /// A comparison of serialized documents rather than a flag set by every edit, so
+    /// undoing back to the saved state reads as unmodified again and no edit path can
+    /// forget to set it. It is refreshed from strings the undo history and the recovery
+    /// snapshot already produce; <see cref="HasUnsavedChanges"/> is the exact answer at
+    /// the moment one is needed.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsDirty { get; set; }
+
+    /// <summary>The document as last opened or saved; null when it has never matched
+    /// a file, as with recovered work, which stays modified until it is saved.</summary>
+    private string? _savedState;
+
+    /// <summary>Set once the user has chosen to throw the changes away, so shutting down
+    /// clears the recovery snapshot instead of keeping it for the next start.</summary>
+    private bool _discardAccepted;
+
+    /// <summary>True when the label has changes that are in no file. Serializes the
+    /// document now, so an edit the render has not reached yet still counts.</summary>
+    public bool HasUnsavedChanges
+    {
+        get
+        {
+            UpdateDirty(SerializeDocument());
+            return IsDirty;
+        }
+    }
+
+    private void UpdateDirty(string? state) =>
+        IsDirty = !string.Equals(state, _savedState, StringComparison.Ordinal);
+
+    /// <summary>Takes the current document as the saved one.</summary>
+    private void MarkClean()
+    {
+        _savedState = _history.Current ?? SerializeDocument();
+        _discardAccepted = false;
+        IsDirty = false;
+    }
+
+    /// <summary>The user answered the close question, so the shutdown that follows clears
+    /// the snapshot instead of keeping it for the next start.</summary>
+    public void AcceptDiscard() => _discardAccepted = true;
+
+    /// <summary>
+    /// Writes the label to <paramref name="path"/> and makes it the open file.
+    ///
+    /// The string written becomes the saved state, so an edit made while the write was
+    /// in progress still reads as unsaved afterwards.
+    /// </summary>
+    /// <returns>False when the file could not be written; the status line says why and
+    /// the label keeps its previous path.</returns>
+    public async Task<bool> SaveToAsync(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        string lfl = SerializeDocument();
+        try
+        {
+            await File.WriteAllTextAsync(path, lfl);
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Could not save: {ex.Message}";
+            return false;
+        }
+
+        _savedState = lfl;
+        _discardAccepted = false;
+        CurrentFilePath = path;
+        UpdateDirty(SerializeDocument());
+        StatusText = $"Saved {Path.GetFileName(path)}";
+        RegisterRecentFile(path);
+
+        // The work is safe in its own file now, so the crash snapshot would only be a
+        // false alarm on the next start.
+        ClearRecovery();
+        return true;
+    }
 
     public NetworkPrinterViewModel NetworkPrinter { get; } = new();
 
@@ -1030,6 +1117,7 @@ public partial class DesignerViewModel : ViewModelBase
         _restoring = false;
 
         RecordUndo();
+        MarkClean();
         ScheduleRender();
         OfferRecovery();
     }
@@ -1079,6 +1167,11 @@ public partial class DesignerViewModel : ViewModelBase
         try
         {
             LoadDocument(LabelDocumentJson.Deserialize(snapshot.Lfl), snapshot.OriginalPath);
+
+            // The recovered work is in no file, whatever path it came from, so it stays
+            // modified until it is saved and closing asks about it.
+            _savedState = null;
+            IsDirty = true;
             Notify("Recovered the unsaved changes. Save the label to keep them.");
         }
         catch (Exception ex)
@@ -1117,6 +1210,21 @@ public partial class DesignerViewModel : ViewModelBase
         try
         {
             string lfl = SerializeDocument();
+            UpdateDirty(lfl);
+
+            // Nothing unsaved means nothing to recover, including after undoing back to
+            // the saved state; a snapshot left from the edits in between would be a false
+            // alarm on the next start.
+            if (!IsDirty)
+            {
+                if (_lastSnapshot is not null)
+                {
+                    ClearRecovery();
+                }
+
+                return;
+            }
+
             if (string.Equals(lfl, _lastSnapshot, StringComparison.Ordinal))
             {
                 return;
@@ -1140,13 +1248,27 @@ public partial class DesignerViewModel : ViewModelBase
         _recovery.Clear();
     }
 
-    /// <summary>Ends the session cleanly, which is what stops the next start offering to
-    /// recover work that was never lost.</summary>
+    /// <summary>
+    /// Ends the session. With nothing unsaved, or after the user chose not to save, the
+    /// snapshot goes, which is what stops the next start offering to recover work that
+    /// was never lost.
+    ///
+    /// Unsaved work nobody chose to discard is kept instead: closing the window asks
+    /// first, so reaching here with it means Windows ended the session (signing out,
+    /// restarting) with no chance to ask, and the next start should offer it.
+    /// </summary>
     public void ShutDown()
     {
         StopGesturePreview();
         _renderCts?.Cancel();
-        _recovery.Dispose();
+        if (_discardAccepted || !HasUnsavedChanges)
+        {
+            _recovery.Dispose();
+            return;
+        }
+
+        _recovery.Save(SerializeDocument(), CurrentFilePath);
+        _recovery.Release();
     }
 
     /// <summary>Called continuously while the canvas drags or resizes: the model is
@@ -1368,6 +1490,10 @@ public partial class DesignerViewModel : ViewModelBase
         _lastRecordTicks = 0;
         _lastCoalesceKey = null;
         RecordUndo();
+
+        // Whatever was just loaded is the saved state: an opened file, and equally a new,
+        // starter or imported label, which has nothing in it yet worth asking about.
+        MarkClean();
         ScheduleRender();
     }
 
@@ -2763,6 +2889,7 @@ public partial class DesignerViewModel : ViewModelBase
         _lastRecordTicks = now;
         _lastCoalesceKey = coalesceKey;
         UpdateUndoState();
+        UpdateDirty(snapshot);
     }
 
     private void RestoreSnapshot(string snapshot)
@@ -2785,6 +2912,7 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         // Restoring must not count as a new edit; a subsequent edit starts fresh.
+        UpdateDirty(snapshot);
         _lastRecordTicks = 0;
         _lastCoalesceKey = null;
         NotifyPrintSettingsChanged();
