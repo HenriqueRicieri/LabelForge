@@ -52,6 +52,9 @@ it. There is no automatic update feed yet.
 
 ## Validation and current limits
 
+This draft is for a possible future distribution. Current use is internal;
+the remaining installer and provenance checks are deferred while it stays that way.
+
 The previously installed candidate's 0.4.0 in-place repair, installed-file
 comparison, `.lfl` association, save/export and offline viewer smoke checks passed. A
 Windows uninstall/reinstall cycle also preserved user data, restored the app
@@ -60,8 +63,8 @@ The newer `b24f79b` package passed integrity checks and source CI 9/9 but awaits
 native installation. A risk-based native check covers measured 100/125/150%
 layouts and targeted high-scale compact editing and guide gestures. An
 exhaustive workflow in every scale/theme/window cell remains unverified. A
-pristine user-profile install
-still needs native evidence. Versioned upgrade was waived, not validated.
+pristine user-profile install remains unverified. Versioned upgrade was waived,
+not validated.
 Exact Rust compiler/standard-library provenance for the native packaging
 helpers also remains open.
 

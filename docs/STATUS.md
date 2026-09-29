@@ -16,6 +16,11 @@ the latest unsigned package; that package has not been installed.
 
 ## Release follow-up (2026-09-29)
 
+The app currently has only internal users. The installed `cbacfd4` candidate
+remains usable; clean-profile installation, installed checks of the later
+`b24f79b` package and exact Rust helper provenance are deferred until external
+distribution is considered. No release has been published.
+
 The risk-based G8 native check now includes measured 150% Dark compact editing
 and 125% Light compact guide gestures on source `ec68421`. At 150%, the 80-element
 synthetic label passed F2 text editing, undo/redo, save/reopen and ZPL export at
@@ -43,7 +48,7 @@ logs/artifacts have expired. Exact Rust compiler/library provenance remains open
 An unsigned 0.4.0 package was built from `b24f79b`, including that change. Its
 publish and package-integrity checks passed; [source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36571200858)
 passed all nine jobs. The installed app remains the earlier
-`cbacfd4` candidate. The new package still needs an installed-app check.
+`cbacfd4` candidate. The new package has not had an installed-app check.
 Nothing has been published.
 
 ## Native workflow progress (2026-09-28)
@@ -323,10 +328,9 @@ for package hashes and the distinction between candidate results.
   complete per-combination workflow remains unverified; external notifications
   partly obscured some broad captures.
 
-Recommended next work: validate clean-profile installation with a verified
+Before external distribution, review clean-profile installation with a verified
 backup or a separate Windows user account, check the latest package in the
-installed app, and establish the native Rust compiler/standard-library notice
-revision.
+installed app, and assess the native Rust compiler/standard-library notice gap.
 The exhaustive native workflow matrix and unobscured broad captures remain optional
 beyond the risk-based G8 release check. Runtime/native crate and WebView2 notice
 inventories are checked; G11 remains in progress. The paint budget correction

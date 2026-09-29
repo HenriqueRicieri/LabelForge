@@ -12,7 +12,9 @@ continue using fake printers and synthetic jobs.
 
 Scope update, 2026-09-29: the maintainer removed the legacy 0.3.0-to-0.4.0
 upgrade from the release gates because there are no active users to migrate.
-It remains untested; clean-profile installation is still required.
+It remains untested. Current use is internal to the maintainer and this team;
+clean-profile installation, installed checks of the latest package and exact
+Rust helper provenance are deferred until external distribution is considered.
 
 ## 1. Validate native editing on Windows [P1, RISK-BASED G8 DONE 2026-09-29]
 
@@ -83,9 +85,9 @@ an installer from a recorded commit. The candidate version is now `0.4.0`.
 Packaging reads the app version by default; an explicit override applies to both
 the published app and the Velopack package.
 
-Test clean install, `.lfl` launch, uninstall, save/reopen, recovery and the
-offline viewer. Review bundled licenses, write installation/update instructions and
-prepare release notes from the changelog.
+Before external distribution, test clean install, `.lfl` launch, uninstall,
+save/reopen, recovery and the offline viewer. Review bundled licenses, write
+installation/update instructions and prepare release notes from the changelog.
 
 The `1baaa76` paint candidate passed integrity/version/notice-byte checks,
 portable launch and reopening the dense synthetic label. It includes the paint,
@@ -155,10 +157,11 @@ nupkg check passed; hashes are in the [release validation record](RELEASE-VALIDA
 Its [source CI passed all nine jobs](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36571200858).
 It has not been installed. The installed `cbacfd4` candidate remains intact.
 
-Complete when the candidate passes the native checks above, all CI jobs pass,
-versions agree, and installer smoke results/checksums are recorded. Publishing the
-release and choosing a distribution/update feed are separate actions after that evidence
-exists. Local backlog: G11.
+The installed `cbacfd4` candidate is sufficient for current internal use.
+Before distributing a new installer externally, smoke-test that exact package
+on an installed app and clean profile, and assess the documented Rust helper
+provenance gap. Publishing the release and choosing a distribution/update feed
+are separate decisions. Local backlog: G11.
 
 ## Later, when a workflow requires it
 

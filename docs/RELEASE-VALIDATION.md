@@ -23,6 +23,12 @@ on 2026-09-29 because there are no active users to migrate. It was not tested;
 the prepared 0.3.0 package and earlier migration findings remain historical
 evidence, not a passing upgrade result.
 
+The current scope is internal use by the maintainer and this team, with no
+release publication. Clean-profile installation, native installation of the
+latest package and exact Rust helper provenance are deferred. Their unknowns
+remain recorded for a future decision to distribute the installer externally;
+none blocks continued internal use of the installed `cbacfd4` candidate.
+
 ## Native Windows evidence
 
 Tests ran on Windows 11 Pro, build 26200, with synthetic labels. A fresh desktop
@@ -298,7 +304,7 @@ Packaging checks do not establish native installation results.
 | Packaging inventory guard | Passed on the publish; rejected missing Inter OFL, altered ANGLE notice and synthetic unreviewed package |
 | Native helper notices on `eec7557` | 277 conservative Windows entries, 493 original text segments, byte-matched WebView2 loader notices and supplemental Rust snapshot included; exact Rust compiler/library provenance remains open |
 | Install and `.lfl` association | Corrected Setup passed from ordinary Explorer; installed source version confirmed; synthetic file opened directly and known recent entry survived |
-| Legacy upgrade/clean install/uninstall | Earlier Codex-view upgrade exposed recent-list loss; restored/migrated exactly. Current-candidate uninstall/reinstall retained recent files. Native legacy upgrade remains unverified and was removed from the release gates by the maintainer; pristine user-profile install remains unverified and required |
+| Legacy upgrade/clean install/uninstall | Earlier Codex-view upgrade exposed recent-list loss; restored/migrated exactly. Current-candidate uninstall/reinstall retained recent files. Native legacy upgrade remains unverified and was waived; pristine user-profile install remains unverified and deferred while use is internal |
 
 Raw screenshots, synthetic files, export comparisons, matrix entries and logs
 remain in ignored local artifacts. Public records omit machine paths and user state.
@@ -341,10 +347,10 @@ passed all nine jobs.
 | LabelForge-0.4.0-full.nupkg | `416354bde45b4b02fccf8b0c7cac8fbe3087088a8f3daef013eb0db56f31fea5` |
 
 This package has not been installed. Native installer evidence below remains
-from `cbacfd4`; the new package needs an installed-app smoke check before
-release. Exact Rust helper provenance and pristine-profile installation remain
-open release gates. Versioned upgrade was waived, not validated. Nothing has
-been published.
+from `cbacfd4`. An installed-app check of this exact package, clean-profile
+installation and exact Rust helper provenance are deferred while use is
+internal; revisit them before external distribution. Versioned upgrade was
+waived, not validated. Nothing has been published.
 
 ## Previously installed candidate files
 
@@ -364,8 +370,8 @@ guide insert/drag/undo/redo/save/reopen sequence with exact saved model/ZPL;
 the full workflow in every scale/theme/window cell remains open. Local user data
 was backed up before installer testing. A repair of the existing same-version
 installation and an uninstall/reinstall cycle passed. Pristine user-profile
-install still requires native validation; legacy upgrade was removed from the
-release gates without a native pass.
+install remains unverified and deferred during internal use; legacy upgrade
+was removed from the plan without a native pass.
 
 | File | SHA-256 |
 | --- | --- |
@@ -444,8 +450,8 @@ No legacy Setup was run. The normal profile still contains the installed 0.4.0
 candidate and user data. Running the legacy Setup in that account would replace
 the working installation, so its files and LabelForge user state need a verified
 backup and restoration plan first. A separate Windows user account is an
-alternative; a VM is not required. Native clean-profile installation remains a
-release gate. The maintainer waived the versioned upgrade gate because nobody
+alternative; a VM is not required. Native clean-profile installation is deferred
+during internal use. The maintainer waived the versioned upgrade gate because nobody
 is using an older release; no native upgrade passed. If an upgrade is later
 needed, first seed synthetic legacy settings/catalog/recovery/recent data, run
 the corrected 0.4.0 portable `--migrate-user-data`, verify copies/hashes, then
@@ -591,15 +597,18 @@ Velopack refuses to repack a version already present in its output directory.
 Use `-OutputDirectory` with a fresh folder for another local candidate. Preserve
 earlier packages and never replace packages already distributed to users.
 
-## Remaining work
+## Deferred validation for external distribution
 
-1. The risk-based G8 native gate passed; an exhaustive per-cell workflow matrix
-   remains unverified and is outside the narrowed release check.
-2. Validate clean-profile installation after protecting the current account or
-   using a separate Windows user account; audit association-key cleanup after
-   uninstall. Establish exact Rust compiler and standard-library notice
-   provenance for the native helpers (G11). The legacy upgrade is outside the
-   release gates by maintainer decision, not a passed test.
-3. Complete installed-app checks for the new `b24f79b` candidate. Its source CI
-   passed 9/9. Publish only after the open gates have evidence; choose a
-   distribution/update feed as a separate release decision.
+The risk-based G8 native check passed. The exhaustive per-cell workflow matrix
+remains unverified and is outside the internal-use scope. Before distributing
+an installer externally, review the following against the intended audience:
+
+1. Smoke-test the exact `b24f79b` Setup in an installed app and on a clean
+   profile; its source CI passed 9/9. Preserve the current account's data if
+   using this machine, and audit association cleanup if uninstall is repeated.
+2. Resolve or explicitly assess the exact Rust compiler/standard-library
+   provenance gap for the bundled helpers (G11). Existing pinned helper hashes
+   and notice inventories remain documented.
+
+The legacy upgrade is waived, not a passed test. Choose a distribution/update
+feed separately if publication is later requested. Do not publish yet.
