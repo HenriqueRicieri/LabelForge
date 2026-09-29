@@ -11,8 +11,8 @@ Two focused layout checks failed before the fix and pass afterward. Local valida
 passed 402 layout checks, 1,345 unit tests and 589 complete Light designer
 checks. The before/after layout transcripts differ only in those two results
 and their summary. The Release
-solution build has zero warnings and errors. This source change is newer than the
-current installer candidate.
+solution build has zero warnings and errors. This source change is included in
+the latest unsigned package; that package has not been installed.
 
 ## Release follow-up (2026-09-29)
 
@@ -36,8 +36,11 @@ logs/artifacts have expired. Exact Rust compiler/library provenance remains open
 
 `6276448` subsequently changed production Auto-width behavior and passed
 [CI 9/9](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36568544720).
-The unsigned `cbacfd4` candidate predates that change and needs a final-source
-rebuild before release review. Nothing has been published.
+An unsigned 0.4.0 package was built from `b24f79b`, including that change. Its
+publish and package-integrity checks passed; [source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36571200858)
+passed all nine jobs. The installed app remains the earlier
+`cbacfd4` candidate. The new package still needs an installed-app check after
+the disposable-profile gates can be run. Nothing has been published.
 
 ## Native workflow progress (2026-09-28)
 
@@ -55,7 +58,7 @@ The regular editor passed F2 content and font-height edits, undo/redo,
 save/reopen and ZPL/PNG/PDF export. Each saved/reopened model and ZPL matched
 byte-for-byte; exported ZPL also matched. The PNG was 800 x 480 pixels.
 The complete editing/export workflow in each scale/theme/size cell remains open.
-These editing checks use the source editor. The current unsigned `cbacfd4`
+These editing checks use the source editor. The previously installed `cbacfd4`
 installer includes the fixes and passed installed-app repair and
 uninstall/reinstall smoke checks below.
 
@@ -101,7 +104,7 @@ remained unchanged across all eight higher-scale captures. Original OS scales we
 The compact Light smoke passed inspector access, F2, text editing and save/reopen;
 the complete reopened model and generated ZPL matched. The complete workflow per
 combination remains open; the newer clear 125% captures are noted above. This is
-developer-editor evidence; the current packaged candidate is `cbacfd4`.
+developer-editor evidence; the currently installed candidate is `cbacfd4`.
 
 Native packaging correction: `eec7557` adds 493 original native text segments
 for a conservative 277-entry Windows dependency inventory, plus byte-matched
@@ -118,13 +121,16 @@ passed all nine jobs.
 The existing inventory still covers 28 runtime packages and two embedded fonts.
 Exact Rust compiler/standard-library provenance remains open: the upstream nightly
 was unpinned and its build logs have expired. The supplemental notice snapshot
-cannot establish that revision. A fresh unsigned candidate from `cbacfd4` now
-includes the latest source fixes. Its ZIP/nupkg CRC and 263 published-file byte
+cannot establish that revision. The previously installed candidate from `cbacfd4`
+includes the guide fixes. Its ZIP/nupkg CRC and 263 published-file byte
 comparisons passed; Setup embeds the exact nupkg. [Current-source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36381271617)
 passed all nine jobs. The candidate then passed an in-place repair of the
 existing 0.4.0 installation, direct `.lfl` launch and installed-app save/export.
 An uninstall/reinstall cycle preserved recent files and restored the Windows
 program entry and `.lfl` association.
+The newer `b24f79b` package adds the Auto-width correction. Its unsigned
+Setup/portable/nupkg hashes and integrity checks are in the validation record;
+native installation of that package has not been checked.
 The earlier `1baaa76` installation evidence remains recorded below.
 
 The preceding test-only correction, `8b8eb40`, removed extra scheduling from the
@@ -289,9 +295,10 @@ label remained in recent files and reopened after Setup. The current-candidate
 uninstall/reinstall result is recorded above; legacy upgrade and pristine
 user-profile install remain unverified. The script does not establish
 an update feed. The `eec7557` packaging change extends the runtime inventory with native
-dependency/WebView2 notices and pins the packer/helper inputs. The current `cbacfd4`
-candidate includes those notices and both guide fixes. Exact Rust notice
-provenance remains open; this candidate passed in-place repair, not a versioned
+dependency/WebView2 notices and pins the packer/helper inputs. The installed `cbacfd4`
+candidate includes those notices and both guide fixes; the new `b24f79b` package
+also includes the Auto-width correction. Exact Rust notice provenance remains
+open; the installed candidate passed in-place repair, not a versioned
 upgrade or pristine install. See the [candidate record](RELEASE-VALIDATION.md)
 for package hashes and the distinction between candidate results.
 
@@ -312,10 +319,11 @@ for package hashes and the distinction between candidate results.
   complete per-combination workflow remains unverified; external notifications
   partly obscured some broad captures.
 
-Recommended next work: complete the native workflow matrix and unobscured broad captures,
-validate legacy upgrade and pristine user-profile install, and establish the native
-Rust compiler/standard-library notice revision. Runtime/native crate and WebView2
-notice inventories are checked; G11
-remains in progress. The paint budget correction (G10)
-is confirmed in the source CI.
+Recommended next work: validate legacy upgrade and pristine user-profile install
+in an isolated Windows profile, check the latest package in the installed app,
+and establish the native Rust compiler/standard-library notice revision.
+The exhaustive native workflow matrix and unobscured broad captures remain optional
+beyond the risk-based G8 release check. Runtime/native crate and WebView2 notice
+inventories are checked; G11 remains in progress. The paint budget correction
+(G10) is confirmed in the source CI.
 See [Roadmap](ROADMAP.md).

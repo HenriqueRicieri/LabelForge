@@ -1,13 +1,14 @@
 # Windows release candidate validation
 
 Updated 2026-09-29. Candidate version: `0.4.0`. Native workflow evidence was
-collected on `450b1df`; recovery contrast was validated on `d63901b`. The current
-candidate is built from
+collected on `450b1df`; recovery contrast was validated on `d63901b`. The latest
+unsigned candidate is built from `b24f79b`, including the later Auto-width font
+correction. The previously installed candidate was built from
 [`cbacfd4`](https://github.com/HenriqueRicieri/LabelForge/commit/cbacfd4e043298bd224ac24c496e150412386cf9).
 It includes text resize, user-data and paint corrections, guide gesture/precision
 fixes and the runtime/native notice inventories added by `eec7557`.
 Native installation and association passed on the preceding `1baaa76` candidate.
-The current package then passed an in-place repair of that 0.4.0 installation,
+That installed package then passed an in-place repair of the 0.4.0 installation,
 installed-app launch, direct `.lfl` opening, save and ZPL export. A later
 uninstall/reinstall cycle preserved user data and restored the Windows program
 entry and `.lfl` launch.
@@ -313,7 +314,33 @@ The exact scheduling condition behind the earlier timeout was not reproduced
 locally. The candidate remains built from `12847fc`; the following commit changes
 only the test, not app source or package contents.
 
-## Current candidate files
+## Latest candidate files
+
+The unsigned `0.4.0` candidate from
+[`b24f79b`](https://github.com/HenriqueRicieri/LabelForge/commit/b24f79b481caad546d2f68d3104bd0ae562692e7)
+is in `artifacts/releases/candidate-0.4.0-b24f79b`. It includes the production
+Auto-width fix from `6276448`. The self-contained win-x64 publish had zero
+warnings/errors and reports product version
+`0.4.0+b24f79b481caad546d2f68d3104bd0ae562692e7`. The pinned vpk 1.2.0
+input check and runtime/native notice guard passed. ZIP and nupkg passed CRC
+(267 and 269 entries). Each archive contained 263 published files with exactly
+matching bytes; the packer excluded `createdump.exe` and four PDBs. Setup embeds
+the exact nupkg. The ignored `review.json` beside the package records hashes
+and comparisons. Its [source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36571200858)
+passed all nine jobs.
+
+| File | SHA-256 |
+| --- | --- |
+| LabelForge-win-Setup.exe | `6aaa07f44629b3de9542b74ee554b84aa42f973addd5bf413a90f71cafc91e53` |
+| LabelForge-win-Portable.zip | `608caaf240b206576cf2dc69aa0b2985dfe51d503091791a5d576b413302a1fd` |
+| LabelForge-0.4.0-full.nupkg | `416354bde45b4b02fccf8b0c7cac8fbe3087088a8f3daef013eb0db56f31fea5` |
+
+This package has not been installed. Native installer evidence below remains
+from `cbacfd4`; the new package needs an installed-app smoke check before
+release. Exact Rust helper provenance, pristine-profile installation and a
+versioned upgrade remain open. Nothing has been published.
+
+## Previously installed candidate files
 
 Built from `cbacfd4e043298bd224ac24c496e150412386cf9` into
 `artifacts/releases/candidate-0.4.0-current-source`. App informational version is
@@ -339,9 +366,9 @@ pristine user-profile install still require native validation.
 | LabelForge-win-Portable.zip | `a143c88c67fc7c70f97ba7b86ab84644d2389e88dc13634497f96c089f44061d` |
 | LabelForge-0.4.0-full.nupkg | `336856c977611c18793701b3d708ae53b55dee863de7219d24a8fe21006b8b87` |
 
-### Current candidate, installed-app repair and smoke test
+### Previous candidate, installed-app repair and smoke test
 
-On 2026-09-28, the approved current Setup detected an existing 0.4.0 installation
+On 2026-09-28, the then-current Setup detected an existing 0.4.0 installation
 and offered **Repair**. The repair completed and launched the installed app from
 `%LocalAppData%/LabelForge/current/LabelForge.App.exe`. Its product version is
 `0.4.0+cbacfd4e043298bd224ac24c496e150412386cf9`. The installed executable's
@@ -369,7 +396,7 @@ folder remained outside the installation directory. This supports recent-file
 preservation in the observed session, not a full settings/catalog/recovery
 migration. The same-version Repair is not a versioned upgrade.
 
-### Current candidate, uninstall and reinstall
+### Previous candidate, uninstall and reinstall
 
 On 2026-09-28, Windows Programs and Features listed LabelForge 0.4.0. Its
 uninstaller reported success. The program entry disappeared on refresh, the
@@ -435,11 +462,11 @@ the exact Rust compiler or standard-library revision. The supplemental
 of the helpers or verifiable upstream build record is needed to close this part
 of G11.
 
-After the package and native QA work, `6276448` changed production Auto-width
-font behavior on `main`; its [CI passed 9/9](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36568544720).
+After the installed-package and native QA work, `6276448` changed production
+Auto-width font behavior on `main`; its [CI passed 9/9](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36568544720).
 The installed `cbacfd4` candidate and the `ec68421` native records do not include
-that newer behavior. Rebuild and review the 0.4.0 candidate from the final
-intended source before release publication.
+that newer behavior. The `b24f79b` package above includes it but has not been
+installed or exercised natively.
 
 ### Previous native-notice candidate
 
@@ -563,7 +590,6 @@ earlier packages and never replace packages already distributed to users.
    disposable profile, including settings/catalog/recovery preservation; audit
    association-key cleanup after uninstall. Establish exact Rust compiler and
    standard-library notice provenance for the native helpers (G11).
-3. Rebuild the candidate from the final source after `6276448` and record its
-   integrity/installed-app checks. Publish only after the open gates have evidence;
-   choose a distribution/update feed
-   as a separate release decision.
+3. Complete installed-app checks for the new `b24f79b` candidate. Its source CI
+   passed 9/9. Publish only after the open gates have evidence; choose a
+   distribution/update feed as a separate release decision.

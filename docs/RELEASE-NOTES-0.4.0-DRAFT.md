@@ -1,12 +1,12 @@
 # LabelForge 0.4.0 release notes (draft)
 
 This is a draft for review. Version 0.4.0 has not been published, signed or
-connected to an update feed. The current local candidate was built from
-[`cbacfd4`](https://github.com/HenriqueRicieri/LabelForge/commit/cbacfd4e043298bd224ac24c496e150412386cf9).
+connected to an update feed. The latest local unsigned candidate was built from
+[`b24f79b`](https://github.com/HenriqueRicieri/LabelForge/commit/b24f79b481caad546d2f68d3104bd0ae562692e7).
 See the [validation record](RELEASE-VALIDATION.md) for package checksums and
 the checks still needed before distribution.
-`6276448` later changed Auto-width font behavior on `main`; this local candidate
-does not include it and needs a final-source rebuild.
+It includes the `6276448` Auto-width font correction. The previously installed
+candidate was built from `cbacfd4` and remains installed.
 
 ## What changed since v0.3.0
 
@@ -46,17 +46,18 @@ until your labels and settings reopen successfully.
 
 After installation, open a `.lfl` from Explorer and check that LabelForge starts.
 The candidate is currently unsigned; verify its checksum against the
-[validation record](RELEASE-VALIDATION.md#current-candidate-files) before using
+[validation record](RELEASE-VALIDATION.md#latest-candidate-files) before using
 it. There is no automatic update feed yet.
 
 ## Validation and current limits
 
-The current candidate's 0.4.0 in-place repair, installed-file comparison,
-`.lfl` association, save/export and offline viewer smoke checks passed. A
+The previously installed candidate's 0.4.0 in-place repair, installed-file
+comparison, `.lfl` association, save/export and offline viewer smoke checks passed. A
 Windows uninstall/reinstall cycle also preserved user data, restored the app
-registration and opened `.lfl` directly. Source CI passed all nine jobs. A
-risk-based native check now covers measured 100/125/150% layouts and targeted
-high-scale compact editing and guide gestures. An exhaustive workflow in every
+registration and opened `.lfl` directly. Its source CI passed all nine jobs.
+The newer `b24f79b` package passed integrity checks and source CI 9/9 but awaits
+native installation. A risk-based native check covers measured 100/125/150%
+layouts and targeted high-scale compact editing and guide gestures. An exhaustive workflow in every
 scale/theme/window cell remains unverified. A versioned upgrade and pristine
 user-profile install still need native evidence.
 Exact Rust compiler/standard-library provenance for the native packaging

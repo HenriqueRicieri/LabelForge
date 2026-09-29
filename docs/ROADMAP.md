@@ -143,7 +143,11 @@ remain open. The Velopack helper workflow used an unpinned nightly; its expired
 job evidence and binaries do not establish the exact Rust standard-library
 revision. G11 remains open. Later commit `6276448` changes production Auto-width
 behavior and [passed all nine CI jobs](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36568544720),
-so the `cbacfd4` unsigned candidate needs a final-source rebuild and review.
+so a new unsigned package was built from `b24f79b`. Its self-contained publish,
+pinned-input/notice checks, ZIP/nupkg CRC, 263-file comparisons and embedded
+nupkg check passed; hashes are in the [release validation record](RELEASE-VALIDATION.md).
+Its [source CI passed all nine jobs](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36571200858).
+It has not been installed. The installed `cbacfd4` candidate remains intact.
 
 Complete when the candidate passes the native checks above, all CI jobs pass,
 versions agree, and installer smoke results/checksums are recorded. Publishing the
