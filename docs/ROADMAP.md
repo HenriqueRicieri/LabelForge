@@ -136,9 +136,10 @@ A loopback receive timeout in the packaging-source CI was addressed by test-only
 following CI passed all nine jobs; all 1,345 local unit cases also passed.
 
 The test-only `v0.3.0` installer was rebuilt with the tag's exact source revision
-and passed ZIP/nupkg CRC. It was not installed: a disposable interactive Windows
-profile was not available, and replacing the current per-user installation
-would risk user data. Native clean-profile install and 0.3.0-to-0.4.0 upgrade
+and passed ZIP/nupkg CRC. It was not installed: replacing the current per-user
+installation without a verified backup and restoration of its state would risk
+user data. A separate Windows user account would also isolate the test; a VM
+is not required. Native clean-profile install and 0.3.0-to-0.4.0 upgrade
 remain open. The Velopack helper workflow used an unpinned nightly; its expired
 job evidence and binaries do not establish the exact Rust standard-library
 revision. G11 remains open. Later commit `6276448` changes production Auto-width

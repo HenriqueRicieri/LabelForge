@@ -29,9 +29,11 @@ every cell remains unverified. See the [validation record](RELEASE-VALIDATION.md
 
 A test-only 0.3.0 Setup was built from the `v0.3.0` tag with its exact source
 revision, and its ZIP/nupkg passed CRC. It was not installed. Clean-profile
-installation and a versioned upgrade still need an accessible disposable
-Windows profile; the installed 0.4.0 app and user data were left intact. The
-upstream Velopack Windows workflow used an unpinned Rust nightly, and its job
+installation and a versioned upgrade remain untested. A separate Windows user
+profile is one way to protect the current installation; using this account
+would require a verified backup and restoration of its LabelForge state. The
+installed 0.4.0 app and user data were left intact. The upstream Velopack
+Windows workflow used an unpinned Rust nightly, and its job
 logs/artifacts have expired. Exact Rust compiler/library provenance remains open.
 
 `6276448` subsequently changed production Auto-width behavior and passed
@@ -39,8 +41,8 @@ logs/artifacts have expired. Exact Rust compiler/library provenance remains open
 An unsigned 0.4.0 package was built from `b24f79b`, including that change. Its
 publish and package-integrity checks passed; [source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36571200858)
 passed all nine jobs. The installed app remains the earlier
-`cbacfd4` candidate. The new package still needs an installed-app check after
-the disposable-profile gates can be run. Nothing has been published.
+`cbacfd4` candidate. The new package still needs an installed-app check.
+Nothing has been published.
 
 ## Native workflow progress (2026-09-28)
 
@@ -319,9 +321,10 @@ for package hashes and the distinction between candidate results.
   complete per-combination workflow remains unverified; external notifications
   partly obscured some broad captures.
 
-Recommended next work: validate legacy upgrade and pristine user-profile install
-in an isolated Windows profile, check the latest package in the installed app,
-and establish the native Rust compiler/standard-library notice revision.
+Recommended next work: validate legacy upgrade and clean-profile installation
+with a verified backup or a separate Windows user account, check the latest
+package in the installed app, and establish the native Rust compiler/standard-library
+notice revision.
 The exhaustive native workflow matrix and unobscured broad captures remain optional
 beyond the risk-based G8 release check. Runtime/native crate and WebView2 notice
 inventories are checked; G11 remains in progress. The paint budget correction

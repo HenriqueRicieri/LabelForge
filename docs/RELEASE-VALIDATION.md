@@ -434,12 +434,13 @@ The reviewed vpk 1.2.0 inputs passed their pin check. ZIP and nupkg passed CRC
 | LabelForge-0.3.0-full.nupkg | `9d2e26ac13908b9fa14fbee124867b2161978c5119af25cd695a2f3bb5646bc6` |
 
 No legacy Setup was run. The normal profile still contains the installed 0.4.0
-candidate and user data; no disposable interactive Windows profile or Windows
-Sandbox executable was available to the runner. Running the legacy Setup in that
-profile would replace the working installation and put pre-migration files at
-risk. A native clean-profile install and a 0.3.0-to-0.4.0 versioned upgrade
-therefore remain open. In an isolated profile, first seed synthetic legacy
-settings/catalog/recovery/recent data, run the corrected 0.4.0 portable
+candidate and user data. Running the legacy Setup in that account would replace
+the working installation, so its files and LabelForge user state need a verified
+backup and restoration plan first. A separate Windows user account is an
+alternative; a VM is not required. A native clean-profile install and a
+0.3.0-to-0.4.0 versioned upgrade therefore remain open. For the upgrade, first
+seed synthetic legacy settings/catalog/recovery/recent data, run the corrected
+0.4.0 portable
 `--migrate-user-data`, verify copies/hashes, then run Setup and check installed
 version, `.lfl` association and data preservation. The test-only legacy package
 is not a public release asset.
@@ -586,8 +587,9 @@ earlier packages and never replace packages already distributed to users.
 
 1. The risk-based G8 native gate passed; an exhaustive per-cell workflow matrix
    remains unverified and is outside the narrowed release check.
-2. Validate the native legacy upgrade and pristine user-profile install in a
-   disposable profile, including settings/catalog/recovery preservation; audit
+2. Validate the native legacy upgrade and clean-profile install after protecting
+   the current account or using a separate Windows user account, including
+   settings/catalog/recovery preservation; audit
    association-key cleanup after uninstall. Establish exact Rust compiler and
    standard-library notice provenance for the native helpers (G11).
 3. Complete installed-app checks for the new `b24f79b` candidate. Its source CI
