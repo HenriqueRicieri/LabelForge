@@ -17,7 +17,8 @@ save/reopen and ZPL/PNG/PDF export. Each saved/reopened model and ZPL matched
 byte-for-byte; exported ZPL also matched. The PNG was 800 x 480 pixels.
 The complete editing/export workflow in each scale/theme/size cell remains open.
 These editing checks use the source editor. The current unsigned `cbacfd4`
-installer includes the fixes and passed an installed-app repair/smoke check below.
+installer includes the fixes and passed installed-app repair and
+uninstall/reinstall smoke checks below.
 
 ## Ruler guide precision (2026-09-28)
 
@@ -83,6 +84,8 @@ includes the latest source fixes. Its ZIP/nupkg CRC and 263 published-file byte
 comparisons passed; Setup embeds the exact nupkg. [Current-source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36381271617)
 passed all nine jobs. The candidate then passed an in-place repair of the
 existing 0.4.0 installation, direct `.lfl` launch and installed-app save/export.
+An uninstall/reinstall cycle preserved recent files and restored the Windows
+program entry and `.lfl` association.
 The earlier `1baaa76` installation evidence remains recorded below.
 
 The preceding test-only correction, `8b8eb40`, removed extra scheduling from the
@@ -104,9 +107,12 @@ correction. The `1baaa76` Setup from ordinary Explorer installed its recorded ve
 `cbacfd4` Setup repaired that 0.4.0 installation. Its installed executable matched
 the candidate ZIP byte-for-byte, as did all 264 installed `current/` files. Direct
 `.lfl` opening, save, ZPL export and offline viewing of that export passed. Both
-pre-existing recent entries survived alongside the two QA files. The
-complete native workflow matrix, legacy upgrade, pristine install,
-uninstall and exact Rust notice provenance
+pre-existing recent entries survived alongside the two QA files. A subsequent
+Windows uninstall removed the app directory and program entry but kept user
+data. Reinstalling the same candidate from Explorer restored both the entry
+and direct `.lfl` opening; the four recent entries remained visible. The
+complete native workflow matrix, legacy upgrade, pristine user-profile install
+and exact Rust notice provenance
 remain open.
 Real-printer validation remains outside the active plan for cost reasons.
 See the [validation record](RELEASE-VALIDATION.md) for evidence and remaining gates.
@@ -240,8 +246,9 @@ view. The recent list was restored and migrated to the separated data directory.
 The `1baaa76` Setup installed from ordinary Explorer into the normal per-user
 directory. Windows file properties confirmed the `0.4.0+1baaa76` source version;
 Explorer opened a synthetic `.lfl` directly in that installed app. The dense QA
-label remained in recent files and reopened after Setup. Legacy upgrade,
-pristine install and uninstall remain unverified. The script does not establish
+label remained in recent files and reopened after Setup. The current-candidate
+uninstall/reinstall result is recorded above; legacy upgrade and pristine
+user-profile install remain unverified. The script does not establish
 an update feed. The `eec7557` packaging change extends the runtime inventory with native
 dependency/WebView2 notices and pins the packer/helper inputs. The current `cbacfd4`
 candidate includes those notices and both guide fixes. Exact Rust notice
@@ -267,7 +274,7 @@ for package hashes and the distinction between candidate results.
   partly obscured some broad captures.
 
 Recommended next work: complete the native workflow matrix and unobscured broad captures,
-validate legacy upgrade, pristine install and uninstall, and establish the native
+validate legacy upgrade and pristine user-profile install, and establish the native
 Rust compiler/standard-library notice revision. Runtime/native crate and WebView2
 notice inventories are checked; G11
 remains in progress. The paint budget correction (G10)

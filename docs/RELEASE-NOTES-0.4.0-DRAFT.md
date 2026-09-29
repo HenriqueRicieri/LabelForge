@@ -50,9 +50,11 @@ it. There is no automatic update feed yet.
 ## Validation and current limits
 
 The current candidate's 0.4.0 in-place repair, installed-file comparison,
-`.lfl` association, save/export and offline viewer smoke checks passed. Source
-CI passed all nine jobs. A versioned upgrade, pristine install, uninstall and
-the complete native scale/theme/window workflow matrix still need evidence.
+`.lfl` association, save/export and offline viewer smoke checks passed. A
+Windows uninstall/reinstall cycle also preserved user data, restored the app
+registration and opened `.lfl` directly. Source CI passed all nine jobs. A
+versioned upgrade, pristine user-profile install and the complete native
+scale/theme/window workflow matrix still need evidence.
 Exact Rust compiler/standard-library provenance for the native packaging
 helpers also remains open.
 

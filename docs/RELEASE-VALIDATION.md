@@ -8,7 +8,9 @@ It includes text resize, user-data and paint corrections, guide gesture/precisio
 fixes and the runtime/native notice inventories added by `eec7557`.
 Native installation and association passed on the preceding `1baaa76` candidate.
 The current package then passed an in-place repair of that 0.4.0 installation,
-installed-app launch, direct `.lfl` opening, save and ZPL export.
+installed-app launch, direct `.lfl` opening, save and ZPL export. A later
+uninstall/reinstall cycle preserved user data and restored the Windows program
+entry and `.lfl` launch.
 These are local unsigned packages. No release or update feed has been published.
 
 Real-printer validation is excluded at the maintainer's request because hardware
@@ -35,7 +37,7 @@ unknown; native testing can now proceed.
 | PNG/PDF | PNG verified at 960 x 800; PDF had one 340 x 283-point page for 120 x 100 mm stock; rendered PDF inspected |
 | Offline viewer | Rendered at 12 x 10 cm / 203 dpi; two known unsupported-command diagnostics for `^PW`/`^LL` remained |
 | Portable launch | Passed on `1baaa76`, including reopening the synthetic 78-element label and viewing its rulers at 100% canvas zoom; this zoom is separate from OS DPI |
-| Installed app launch and association | `1baaa76` Setup installed from ordinary Explorer; current `cbacfd4` Setup repaired the existing 0.4.0 install; a synthetic `.lfl` opened directly in the current installed app |
+| Installed app launch and association | `1baaa76` Setup installed from ordinary Explorer; current `cbacfd4` Setup repaired the existing 0.4.0 install, then reinstalled after a Windows uninstall; a synthetic `.lfl` opened directly in the current installed app |
 | Forced interruption/recovery | `450b1df` recovered an unsaved synthetic label after terminating only the QA process; saved model and element ID matched |
 | Corrected recovery banner | `d63901b` Light/Dark screenshots showed readable buttons; replay of the same synthetic recovery fixture preserved the complete saved model |
 
@@ -215,7 +217,7 @@ they do not establish preservation of every settings/catalog/recovery file.
 No upgrade prompt appeared, and the previous version in the native install
 directory was not independently observed. This passes installation, installed
 source-version verification and `.lfl` association. Legacy upgrade, a pristine
-clean install and uninstall remain unverified. Installed notice bytes were not
+clean install and uninstall were unverified at that stage. Installed notice bytes were not
 independently compared; archive notice-byte checks remain the evidence for bundling.
 
 ## Paint allocation correction
@@ -266,7 +268,7 @@ Packaging checks do not establish native installation results.
 | Packaging inventory guard | Passed on the publish; rejected missing Inter OFL, altered ANGLE notice and synthetic unreviewed package |
 | Native helper notices on `eec7557` | 277 conservative Windows entries, 493 original text segments, byte-matched WebView2 loader notices and supplemental Rust snapshot included; exact Rust compiler/library provenance remains open |
 | Install and `.lfl` association | Corrected Setup passed from ordinary Explorer; installed source version confirmed; synthetic file opened directly and known recent entry survived |
-| Legacy upgrade/clean install/uninstall | Earlier Codex-view upgrade exposed recent-list loss; restored/migrated exactly. Native legacy upgrade, pristine install and uninstall remain unverified |
+| Legacy upgrade/clean install/uninstall | Earlier Codex-view upgrade exposed recent-list loss; restored/migrated exactly. Current-candidate uninstall/reinstall retained recent files. Native legacy upgrade and pristine user-profile install remain unverified |
 
 Raw screenshots, synthetic files, export comparisons, matrix entries and logs
 remain in ignored local artifacts. Public records omit machine paths and user state.
@@ -296,15 +298,16 @@ The self-contained win-x64 publish completed with zero warnings/errors. ZIP and
 nupkg CRC passed, and each contained 263 publish files with matching bytes.
 The packer intentionally omits `createdump.exe` and four PDBs. The existing
 runtime/font and native notice inventories remain bundled. Setup contains the exact
-reviewed nupkg. This unsigned package passed an in-place repair and has not been published.
+reviewed nupkg. This unsigned package passed an in-place repair and a later
+uninstall/reinstall cycle; it has not been published.
 
 [CI on `cbacfd4`](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36381271617)
 passed all nine jobs. Native QA on the current source passed the 125% Light
 guide insert/drag/undo/redo/save/reopen sequence with exact saved model/ZPL;
 the full workflow in every scale/theme/window cell remains open. Local user data
 was backed up before installer testing. A repair of the existing same-version
-installation passed. Legacy upgrade, pristine install and uninstall still require
-native validation.
+installation and an uninstall/reinstall cycle passed. Legacy upgrade and
+pristine user-profile install still require native validation.
 
 | File | SHA-256 |
 | --- | --- |
@@ -340,8 +343,28 @@ The normal desktop's recent-file history retained both entries present before
 the repair and added the two files opened/saved during the test. Its user-data
 folder remained outside the installation directory. This supports recent-file
 preservation in the observed session, not a full settings/catalog/recovery
-migration. The same-version Repair is not a versioned
-upgrade; pristine install, legacy upgrade and uninstall remain unverified.
+migration. The same-version Repair is not a versioned upgrade.
+
+### Current candidate, uninstall and reinstall
+
+On 2026-09-28, Windows Programs and Features listed LabelForge 0.4.0. Its
+uninstaller reported success. The program entry disappeared on refresh, the
+application directory and `Update.exe` were removed, and the separate user-data
+directory and recent-file record remained. The candidate Setup was then opened
+from ordinary Explorer. It launched the app from the normal per-user install
+path; a freshly opened Programs and Features list again showed LabelForge 0.4.0.
+The native app's Open Recent menu still contained all four entries observed
+after the repair. Explorer identified the saved synthetic `.lfl` as a LabelForge
+label and opened it directly in the reinstalled app at 12 x 10 cm / 203 dpi.
+In a second uninstall/reinstall cycle, Explorer changed the file type from
+"LabelForge Label" to the generic "Arquivo LFL" after removal and restored
+"LabelForge Label" after Setup. The final Windows program entry and all four
+recent files were confirmed again. Native registry-key cleanup was not audited.
+
+This validates uninstall and reinstall with an existing user profile. A pristine
+user-profile install, migration from a different installed version, and complete
+settings/catalog/recovery preservation remain unverified. The installer and
+package are still unsigned and unpublished.
 
 ### Previous native-notice candidate
 
@@ -375,7 +398,8 @@ not evidence that the helper used that revision. Metadata-analysis tool versions
 are recorded separately. See the [notice index](../THIRD-PARTY-NOTICES.md).
 
 This earlier unsigned Setup has not been executed. Native installation evidence is
-still from `1baaa76`; legacy upgrade, pristine install and uninstall remain open.
+still from `1baaa76` at that stage; legacy upgrade, pristine install and
+uninstall had not yet been exercised.
 
 | File | SHA-256 |
 | --- | --- |
@@ -460,7 +484,8 @@ earlier packages and never replace packages already distributed to users.
 
 1. Finish the native workflow matrix and unobscured broad captures (G8). Actual
    1.0/1.25/1.5 measurements across 12 combinations are recorded above.
-2. Validate legacy upgrade, pristine clean install and uninstall;
+2. Validate legacy upgrade, pristine user-profile install and full native
+   association-key cleanup after uninstall;
    establish exact native Rust compiler/standard-library notice provenance (G11).
 3. Publish after those checks have evidence; choose a distribution/update feed
    as a separate release decision.

@@ -25,11 +25,12 @@ the install directory. The current source passes 1,345 local tests and paints th
 All nine source CI jobs passed. The current `cbacfd4` Setup repaired the existing
 0.4.0 installation, launched the installed app, and opened a synthetic `.lfl`
 directly from Explorer. Its saved label and ZPL export matched the validated
-references byte-for-byte; the offline viewer rendered that export, and existing
-recent entries survived. The complete native
-workflow matrix, legacy upgrade,
-pristine install, uninstall and exact
-Rust standard-library notice provenance remain open. See the dated
+references byte-for-byte; the offline viewer rendered that export. A subsequent
+Windows uninstall removed the app while retaining user data; reinstalling the
+same candidate restored the normal program entry and `.lfl` launch, with the
+recent list intact. The complete native workflow matrix, legacy versioned
+upgrade, pristine user-profile install and exact Rust standard-library notice
+provenance remain open. See the dated
 [candidate record](docs/RELEASE-VALIDATION.md) for scope and package hashes.
 
 The `adb1178` developer QA tool measured actual app/monitor scaling 1.0, 1.25 and
@@ -59,8 +60,9 @@ Packaging verifies the pinned packer/helper inputs. A fresh unsigned `0.4.0` can
 was built from current source `cbacfd4`, including both guide fixes. Its archives
 passed CRC and published-file byte comparisons, and Setup embeds the exact nupkg.
 Exact Rust standard-library provenance remains open. The current Setup passed an
-in-place repair and installed-app smoke test; pristine installation, versioned
-upgrade and uninstall remain unverified.
+in-place repair, installed-app smoke test and uninstall/reinstall cycle with
+existing user data. A pristine user-profile installation and versioned upgrade
+remain unverified.
 
 Real-printer validation is outside the current plan because hardware is unavailable.
 Physical output remains unverified. See the [validation record](docs/RELEASE-VALIDATION.md).

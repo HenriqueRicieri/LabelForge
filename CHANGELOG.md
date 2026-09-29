@@ -101,8 +101,9 @@ not yet been published as a release.
 - Recorded native editing/export/viewer and portable recovery evidence. The
   current candidate includes the recovery contrast fix; measured DPI layouts,
   installed-app repair, `.lfl` association, save/export and offline viewer smoke
-  checks passed. The full per-layout workflow and clean-install/upgrade/uninstall
-  checks remain open.
+  checks passed. A Windows uninstall/reinstall cycle preserved recent files and
+  restored the app registration and `.lfl` launch. The full per-layout workflow,
+  pristine user-profile installation and legacy upgrade checks remain open.
 
 ## Tagged versions
 

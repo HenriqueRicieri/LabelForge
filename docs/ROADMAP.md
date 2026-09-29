@@ -85,8 +85,9 @@ installed the recorded `0.4.0+1baaa76` version in the normal per-user directory.
 Explorer opened a synthetic `.lfl` directly in the installed app; the dense QA
 label survived in recent files and reopened after Setup. The previous version
 in that native directory was not independently observed, so legacy upgrade and
-pristine install remain unverified. Uninstall and exact Rust notice provenance are also
-open. Earlier candidates supply dense editing/export/recovery evidence.
+pristine user-profile install remain unverified. The later current-candidate
+uninstall/reinstall cycle is recorded below. Exact Rust notice provenance is open.
+Earlier candidates supply dense editing/export/recovery evidence.
 
 The preceding `12847fc` candidate includes 22 original license/notice texts, inventoried
 against 28 published runtime packages and both embedded fonts. Packaging verifies
@@ -111,7 +112,14 @@ data was backed up before native installer testing. Setup detected the existing
 and all 264 installed `current/` files matched the ZIP; Explorer opened `.lfl`
 directly, and installed-app save/export matched prior references byte-for-byte.
 The offline viewer rendered that ZPL without errors. Pre-existing recent entries survived.
-Legacy versioned upgrade, pristine install and uninstall remain open; hashes are in the
+An approved Windows uninstall removed the app directory and program entry while
+preserving user data. Reinstalling this same candidate from Explorer restored
+the entry, direct `.lfl` launch and four recent files. This tests a reinstall
+with an existing profile, not a pristine user-profile installation. A second
+cycle showed Explorer's `.lfl` type becoming generic after uninstall and
+returning to LabelForge after reinstall; native association-key cleanup was
+not audited. Legacy versioned upgrade and pristine user-profile install remain
+open; hashes are in the
 [release validation record](RELEASE-VALIDATION.md).
 A [0.4.0 release-notes draft](RELEASE-NOTES-0.4.0-DRAFT.md) now summarizes the
 changes and older-build migration preflight; revise it after the remaining gates.
