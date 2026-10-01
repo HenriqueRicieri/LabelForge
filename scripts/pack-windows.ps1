@@ -38,9 +38,13 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 
 & (Join-Path $PSScriptRoot 'check-third-party-notices.ps1') -PublishDirectory $publishDir
 
+# Shown by Setup while it installs; regenerate with make-installer-splash.ps1.
+$splashImage = Join-Path $PSScriptRoot "installer-splash.png"
+if (-not (Test-Path -LiteralPath $splashImage)) { throw "Missing installer splash: $splashImage" }
+
 Write-Host "Packing installer with Velopack..."
 dotnet $velopackEntryPoint pack --packId LabelForge --packVersion $Version --packDir $publishDir `
-    --mainExe LabelForge.App.exe --packTitle "LabelForge" --outputDir $releaseDir
+    --mainExe LabelForge.App.exe --packTitle "LabelForge" --splashImage $splashImage --outputDir $releaseDir
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
 
 Write-Host "Done. Installer at: $releaseDir"

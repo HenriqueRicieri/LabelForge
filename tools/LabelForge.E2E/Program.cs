@@ -52,7 +52,7 @@ if (args.Contains("dark"))
 // Media presets, field catalogs and crash snapshots all live per machine. Point every
 // one of them at scratch locations, so a harness run never touches what the person using
 // the app has saved.
-string scratchRoot = args.FirstOrDefault() is "ui-layout" or "recovery-ui" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "transform-gestures" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare" or "viewer-layout" or "cm-units" or "unsaved-changes" or "start-screen"
+string scratchRoot = args.FirstOrDefault() is "ui-layout" or "recovery-ui" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "transform-gestures" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare" or "viewer-layout" or "cm-units" or "unsaved-changes" or "start-screen" or "updates"
     ? Path.Combine(AppContext.BaseDirectory, args[0] + "-scratch")
     : AppContext.BaseDirectory;
 Directory.CreateDirectory(scratchRoot);
@@ -418,6 +418,14 @@ if (args.FirstOrDefault() == "quiet-zone-frames")
 {
     QuietZoneFrameChecks.Run(window, vm.Designer, (label, held) => Check(label, held, true));
     Console.WriteLine($"{graded} frame checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
+if (args.FirstOrDefault() == "updates")
+{
+    UpdateChecks.Run(scratchRoot, (label, found, wanted) => Check(label, found, wanted));
+    Console.WriteLine($"{graded} update checks graded, {disagreed.Count} disagreed");
     vm.Designer.ShutDown();
     window.Close();
     return disagreed.Count == 0 ? 0 : 1;
@@ -3599,6 +3607,7 @@ if (mode == "designer")
     PrinterStatusChecks.Run(window, vm, (label, held) => Check(label, held, true));
     UnsavedChangesChecks.Run(scratchRoot, (label, found, wanted) => Check(label, found, wanted));
     StartScreenChecks.Run(scratchRoot, (label, found, wanted) => Check(label, found, wanted));
+    UpdateChecks.Run(scratchRoot, (label, found, wanted) => Check(label, found, wanted));
 }
 
 Capture($"{mode}.png");

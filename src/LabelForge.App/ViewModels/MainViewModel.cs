@@ -19,6 +19,7 @@ public partial class MainViewModel : ViewModelBase
     /// <param name="userSettingsStore">Where per-machine editing preferences live.</param>
     /// <param name="clipboard">The platform element clipboard; null keeps copies within this designer.</param>
     /// <param name="recentFilesPath">Scratch recent-file storage for QA; null uses the per-user file.</param>
+    /// <param name="updates">Where updates are checked; null uses the GitHub Releases feed.</param>
     /// <remarks>Inject scratch stores and an offline comparison renderer in the harness.
     /// Clipboard checks use Avalonia's headless clipboard, never the user's OS clipboard.</remarks>
     public MainViewModel(
@@ -28,10 +29,11 @@ public partial class MainViewModel : ViewModelBase
         Func<LabelForge.Core.Rendering.IZplRenderer>? comparisonRenderer = null,
         LabelForge.Core.Settings.UserSettingsStore? userSettingsStore = null,
         Services.IElementClipboard? clipboard = null,
-        string? recentFilesPath = null)
+        string? recentFilesPath = null,
+        Services.IAppUpdates? updates = null)
     {
         Designer = new DesignerViewModel(
-            userMediaStore, fieldCatalogStore, recoveryStore, userSettingsStore, clipboard, recentFilesPath);
+            userMediaStore, fieldCatalogStore, recoveryStore, userSettingsStore, clipboard, recentFilesPath, updates);
         Viewer = new ViewerViewModel(comparisonRenderer);
 
         Designer.PropertyChanged += (_, e) =>

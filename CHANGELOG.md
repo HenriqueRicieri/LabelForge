@@ -9,6 +9,9 @@ not yet been published as a release.
 
 ### Editing and workspace
 
+- Added Help > About (version, source, licenses) and Help > Check for Updates, which
+  looks for newer releases on GitHub Releases in an installed copy and asks before it
+  restarts. Setup shows a splash while it installs.
 - Added a start screen with a new blank label, Open, recent labels and the sample
   starters. It opens when the app starts without a file and can be turned off from
   itself; File > Start Screen opens it at any time.

@@ -993,6 +993,92 @@ public partial class DesignerView : UserControl
 
     private async void OnShowStartScreen(object? sender, RoutedEventArgs e) => await ShowStartScreenAsync();
 
+    private async void OnShowAbout(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is Window owner && ViewModel is { } vm)
+        {
+            await new AboutWindow(vm.Updates.CurrentVersion).ShowDialog(owner);
+        }
+    }
+
+    private async void OnCheckForUpdates(object? sender, RoutedEventArgs e) => await CheckForUpdatesAsync();
+
+    /// <summary>
+    /// Help &gt; Check for Updates. Only an installed copy can update itself, so a build
+    /// folder says so without touching the network. An update asks before it restarts,
+    /// and goes through the unsaved-changes question first, because applying it ends the
+    /// process.
+    /// </summary>
+    public async Task CheckForUpdatesAsync(Window? owner = null)
+    {
+        owner ??= TopLevel.GetTopLevel(this) as Window;
+        if (owner is null || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        IAppUpdates updates = vm.Updates;
+        if (!updates.IsInstalled)
+        {
+            await Tell(owner, "Updates come with the installed app",
+                "This copy runs from a build or portable folder, so there is nothing to update in place. "
+                + "Install LabelForge with its Setup to get updates.");
+            return;
+        }
+
+        AppUpdate? update;
+        vm.StatusText = "Checking for updates...";
+        try
+        {
+            update = await updates.CheckAsync();
+        }
+        catch (Exception ex)
+        {
+            vm.StatusText = string.Empty;
+            await Tell(owner, "Could not check for updates", ex.Message);
+            return;
+        }
+
+        vm.StatusText = string.Empty;
+        if (update is null)
+        {
+            await Tell(owner, "LabelForge is up to date", $"Version {updates.CurrentVersion} is the latest release.");
+            return;
+        }
+
+        bool install = await new MessageWindow(
+                $"LabelForge {update.Version} is available",
+                $"You have version {updates.CurrentVersion}. Download it and restart LabelForge now?",
+                "Update and restart", "Later")
+            .ShowDialog<bool>(owner);
+        if (!install || !await ConfirmDiscardAsync(owner))
+        {
+            return;
+        }
+
+        try
+        {
+            await updates.DownloadAsync(update, percent => Dispatcher.UIThread.Post(
+                () => vm.StatusText = $"Downloading the update... {percent}%"));
+        }
+        catch (Exception ex)
+        {
+            vm.StatusText = string.Empty;
+            await Tell(owner, "Could not download the update", ex.Message);
+            return;
+        }
+
+        // The restart ends the process without the window closing, so the session is ended
+        // here: the question above was answered, and a snapshot left behind would greet the
+        // updated app with an offer to recover work nobody lost.
+        vm.AcceptDiscard();
+        vm.ShutDown();
+        updates.ApplyAndRestart(update);
+    }
+
+    private static Task Tell(Window owner, string heading, string body) =>
+        new MessageWindow(heading, body, "OK").ShowDialog(owner);
+
     private async void OnNewFile(object? sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm && await ConfirmDiscardAsync())

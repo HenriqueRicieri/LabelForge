@@ -160,8 +160,9 @@ It has not been installed. The installed `cbacfd4` candidate remains intact.
 The installed `cbacfd4` candidate is sufficient for current internal use.
 Before distributing a new installer externally, smoke-test that exact package
 on an installed app and clean profile, and assess the documented Rust helper
-provenance gap. Publishing the release and choosing a distribution/update feed
-are separate decisions. Local backlog: G11.
+provenance gap. Publishing the release is a separate decision. The update feed is
+chosen: GitHub Releases through Velopack, checked on request from Help > Check
+for Updates (see the development guide). Local backlog: G11.
 
 ## Later, when a workflow requires it
 

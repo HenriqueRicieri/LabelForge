@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LabelForge.App.Views.AboutWindow"
+        Title="About LabelForge"
+        Width="440" SizeToContent="Height"
+        CanResize="False" CanMinimize="False" CanMaximize="False" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppPanelBackground}">
+
+    <StackPanel Margin="22,20,22,16" Spacing="4">
+        <StackPanel Orientation="Horizontal" Spacing="14">
+            <Image Source="/Assets/labelforge.ico" Width="56" Height="56" />
+            <StackPanel VerticalAlignment="Center" Spacing="2">
+                <TextBlock Text="LabelForge" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Name="VersionText" Opacity="0.7" />
+            </StackPanel>
+        </StackPanel>
+        <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" Opacity="0.85"
+                   Text="Visual designer for Zebra printer labels, with an offline ZPL viewer." />
+        <TextBlock TextWrapping="Wrap" Opacity="0.85"
+                   Text="Free and open source under the MIT License. Bundled components keep their own licenses." />
+        <StackPanel Margin="0,10,0,0" Spacing="6">
+            <Button Name="GitHubButton" Content="Source on GitHub" Click="OnGitHub"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+            <Button Name="LicenseButton" Content="MIT License" Click="OnLicense"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+            <Button Name="NoticesButton" Content="Third-party notices" Click="OnNotices"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+        </StackPanel>
+        <Button Name="CloseAboutButton" Content="Close" HorizontalAlignment="Right" MinWidth="88"
+                HorizontalContentAlignment="Center" Margin="0,14,0,0" IsCancel="True" IsDefault="True"
+                Click="OnClose" />
+    </StackPanel>
+
+</Window>

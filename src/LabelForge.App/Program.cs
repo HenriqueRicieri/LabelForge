@@ -25,8 +25,8 @@ sealed class Program
             return;
         }
         // Velopack installer hooks (install/update/uninstall) must run first;
-        // on a normal launch none of these fire. UpdateManager integration comes
-        // once the app has a public distribution feed.
+        // on a normal launch none of these fire. Updates themselves are checked on
+        // request from Help > Check for Updates (Services/AppUpdates), never at startup.
         //
         // The hooks own the .lfl shell association, because that is per-machine state the
         // app itself has no business writing on an ordinary launch. Registration is

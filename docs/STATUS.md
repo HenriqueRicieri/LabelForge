@@ -1,5 +1,26 @@
 # Project status
 
+## Usability pass (2026-10-01)
+
+Four more changes from the same native review, each checked in the running app
+maximized and at a reduced size:
+
+- The creation rail shows "Shapes" whole, groups Data Matrix and PDF417 under the
+  QR code tool and draws Repeat as a toggle; the bar under the canvas no longer
+  repeats the label size (7 new layout checks failed before the change).
+- Images gain Atkinson, Stucki and Sierra dithering, a threshold and Invert; labels
+  that do not use them keep their exact bytes (13 unit tests, 6 layout checks).
+- A start screen opens on a plain launch, with an opt-out and File > Start Screen
+  (12 harness checks).
+- Help > About and Help > Check for Updates (GitHub Releases through Velopack, in an
+  installed copy, asking before it restarts), and a Setup splash (14 harness checks
+  with a stand-in source). That package's Setup, run as a repair over the installed
+  copy, showed the splash and installed the build; the installed copy's update check
+  reached GitHub Releases and reported 0.4.0 as the latest. No release has been
+  published, so an actual update is untested.
+
+1365 unit tests pass; layout, designer (per theme) and the focused UI modes pass.
+
 ## Centered, bounded work area (2026-09-30)
 
 The fitted label is centered in the canvas, and scrolling, panning, zooming and
@@ -49,8 +70,9 @@ the latest unsigned package; that package has not been installed.
 
 ## Release follow-up (2026-09-29)
 
-The app currently has only internal users. The installed `cbacfd4` candidate
-remains usable; clean-profile installation, installed checks of the later
+The app currently has only internal users. (2026-10-01: the installed copy was
+repaired with a local unsigned 0.4.0 package of the usability pass; see above.)
+The installed `cbacfd4` candidate remained usable; clean-profile installation, installed checks of the later
 `b24f79b` package and exact Rust helper provenance are deferred until external
 distribution is considered. No release has been published.
 

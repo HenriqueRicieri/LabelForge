@@ -48,7 +48,8 @@ until your labels and settings reopen successfully.
 After installation, open a `.lfl` from Explorer and check that LabelForge starts.
 The candidate is currently unsigned; verify its checksum against the
 [validation record](RELEASE-VALIDATION.md#latest-candidate-files) before using
-it. There is no automatic update feed yet.
+it. Help > Check for Updates looks for newer releases on the project's GitHub
+Releases page; none has been published there yet.
 
 ## Validation and current limits
 

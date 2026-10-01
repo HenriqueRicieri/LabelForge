@@ -492,6 +492,9 @@
                     </MenuItem>
                     <MenuItem Header="_Help">
                         <MenuItem Header="_Keyboard and Mouse..." Click="OnShowShortcuts" />
+                        <Separator />
+                        <MenuItem Name="CheckUpdatesMenu" Header="Check for _Updates..." Click="OnCheckForUpdates" />
+                        <MenuItem Name="AboutMenu" Header="_About LabelForge" Click="OnShowAbout" />
                     </MenuItem>
                 </Menu>
                 <Button DockPanel.Dock="Right" Content="Print..." Margin="4,4">

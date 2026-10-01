@@ -198,5 +198,28 @@ candidate, use a fresh folder with `-OutputDirectory artifacts/releases/candidat
 Relative output paths resolve from the repository root; previous packages are preserved.
 Record the source commit and checksums in [release validation](RELEASE-VALIDATION.md).
 Building packages does not validate
-installation/upgrade or configure an update feed. Follow the [roadmap](ROADMAP.md)
+installation/upgrade or publish anything. Follow the [roadmap](ROADMAP.md)
 before describing a build as a distributed release.
+
+Setup shows `scripts/installer-splash.png` while it installs. It is generated from
+the app icon by `scripts/make-installer-splash.ps1`; rerun that script after the
+icon or the name changes and commit the new image.
+
+### Updates
+
+Help > Check for Updates uses Velopack's `GithubSource` against this repository's
+GitHub Releases (stable releases only) and only in an installed copy; a build or
+portable folder says so without contacting the network. Nothing checks at startup.
+An available update asks before it restarts and goes through the unsaved-changes
+question first. To make a release reachable, publish the packages Velopack produced
+for that version to a GitHub release, for example:
+
+```powershell
+vpk upload github --repoUrl https://github.com/HenriqueRicieri/LabelForge `
+    --outputDir artifacts/releases/<candidate-folder> --tag v<x.y.z> `
+    --releaseName "LabelForge <x.y.z>" --publish --token <github-token>
+```
+
+The installed app compares its version with the newest published release, so the
+release must carry the `RELEASES`, `releases.win.json` and `.nupkg` files from the
+same output folder. The harness substitutes a fake source (`UpdateChecks`).

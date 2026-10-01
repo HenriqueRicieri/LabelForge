@@ -948,6 +948,10 @@ public partial class DesignerViewModel : ViewModelBase
     [ObservableProperty]
     public partial string CanvasReadout { get; set; } = string.Empty;
 
+    /// <summary>Where Help &gt; Check for Updates looks. Injected so the harness never
+    /// reaches the real release feed.</summary>
+    public Services.IAppUpdates Updates { get; }
+
     /// <summary>Path of the open .lfl file; null until first save.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DocumentName))]
@@ -1089,8 +1093,10 @@ public partial class DesignerViewModel : ViewModelBase
         RecoveryStore? recoveryStore = null,
         UserSettingsStore? userSettingsStore = null,
         Services.IElementClipboard? clipboard = null,
-        string? recentFilesPath = null)
+        string? recentFilesPath = null,
+        Services.IAppUpdates? updates = null)
     {
+        Updates = updates ?? new Services.VelopackAppUpdates();
         _clipboard = clipboard;
         _recentFilesPath = recentFilesPath;
         RecentFiles = new(Services.RecentFilesStore.Load(recentFilesPath));
