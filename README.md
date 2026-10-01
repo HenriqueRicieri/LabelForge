@@ -74,7 +74,9 @@ for the work order, [Changelog](CHANGELOG.md) for changes, and
 ## What works today
 
 - The designer has a labeled, scrollable creation rail and a resizable inspector with Properties,
-  Elements and Data tabs. Arrange holds alignment, distribution, sizing and grouping.
+  Elements and Data tabs. Shapes and the 2D codes are split buttons: the QR code tool's arrow
+  also offers Data Matrix and PDF417. The bar under the canvas reports only warnings and
+  messages; the label size stays in the setup bar at the top. Arrange holds alignment, distribution, sizing and grouping.
   In Elements, find a field by name or its full text/barcode content; Enter moves to
   the next match and wraps, while Escape or Clear empties the search. The field is
   selected on the canvas without filtering the stacking list. Use Edit beside the

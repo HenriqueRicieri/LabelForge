@@ -9,6 +9,10 @@ not yet been published as a release.
 
 ### Editing and workspace
 
+- The creation rail groups Data Matrix and PDF417 under the QR code tool's arrow,
+  shows the whole "Shapes" caption beside its arrow, and draws Repeat as a proper
+  toggle. The bar under the label no longer repeats its size, which stays in the
+  setup bar; it shows "Ready" until there is a warning or message.
 - The fitted label is centered in the canvas instead of pinned to the top left, and
   the work area around it is now half the label's size on each side (at least 2 cm).
   Scrolling, panning and zooming stop at its edge, so the view can no longer drift

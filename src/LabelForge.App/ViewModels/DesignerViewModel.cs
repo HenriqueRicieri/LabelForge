@@ -1750,6 +1750,7 @@ public partial class DesignerViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsQrArmed));
         OnPropertyChanged(nameof(IsDataMatrixArmed));
         OnPropertyChanged(nameof(IsPdf417Armed));
+        OnPropertyChanged(nameof(IsCode2DArmed));
         OnPropertyChanged(nameof(IsImageArmed));
     }
 
@@ -1770,6 +1771,9 @@ public partial class DesignerViewModel : ViewModelBase
     public bool IsDataMatrixArmed => ArmedTool == "DataMatrix";
 
     public bool IsPdf417Armed => ArmedTool == "Pdf417";
+
+    /// <summary>Any of the three 2D symbols, which share one split button in the rail.</summary>
+    public bool IsCode2DArmed => ArmedTool is "QR" or "DataMatrix" or "Pdf417";
 
     public bool IsImageArmed => ArmedTool == "Image";
 
@@ -3494,9 +3498,9 @@ public partial class DesignerViewModel : ViewModelBase
                 }
             }
 
-            // The rendered bitmap may be pasteboard-expanded; always report the label's
-            // own size. A render problem outranks anything a command had to say; the
-            // idle size readout does not (see Notify).
+            // A render problem outranks anything a command had to say. With nothing to
+            // say the status clears rather than repeating the label size, which the setup
+            // bar at the top already shows: the bottom bar is for what changes (see Notify).
             if (diagnosis.Count > 0)
             {
                 StatusText = string.Join(" | ", diagnosis);
@@ -3504,8 +3508,7 @@ public partial class DesignerViewModel : ViewModelBase
             }
             else if (!_statusHeld)
             {
-                StatusText = FormattableString.Invariant(
-                    $"{document.WidthMm / 10:0.###} x {document.HeightMm / 10:0.###} cm");
+                StatusText = string.Empty;
             }
         }
         catch (OperationCanceledException)

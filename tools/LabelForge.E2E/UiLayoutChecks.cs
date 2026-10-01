@@ -610,6 +610,73 @@ internal static class UiLayoutChecks
             using (var compactPlacementFrame = window.CaptureRenderedFrame())
                 compactPlacementFrame?.Save(Path.Combine(output, "compact-place-and-type.png"), PngBitmapEncoderOptions.Default);
 
+            // Rail captions must fit their tools: the split buttons gave their caption about
+            // 30 px beside a 32 px arrow, so "Shapes" was cut off.
+            window.Width = 1200;
+            window.Height = 760;
+            Pump(150);
+            var railTools = view.FindControl<Border>("CreationRail")!;
+            foreach (var split in railTools.GetVisualDescendants().OfType<SplitButton>())
+            {
+                var arrow = split.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Name == "PART_SecondaryButton");
+                double arrowLeft = arrow?.TranslatePoint(default, split)?.X ?? split.Bounds.Width;
+                foreach (var caption in split.GetVisualDescendants().OfType<TextBlock>()
+                    .Where(t => !string.IsNullOrEmpty(t.Text)))
+                {
+                    var layout = new Avalonia.Media.TextFormatting.TextLayout(
+                        caption.Text, new Avalonia.Media.Typeface(caption.FontFamily, caption.FontStyle, caption.FontWeight),
+                        caption.FontSize, null);
+                    double textLeft = caption.TranslatePoint(
+                        new Point((caption.Bounds.Width - layout.Width) / 2, 0), split)?.X ?? 0;
+                    Check($"rail caption '{caption.Text}' clears the dropdown arrow",
+                        layout.Width <= caption.Bounds.Width && textLeft >= 0
+                        && textLeft + layout.Width <= arrowLeft - 2);
+                }
+            }
+
+            // One split button holds the three 2D symbols; its menu arms each, and the
+            // button shows the armed state for all three.
+            var codes = railTools.GetVisualDescendants().OfType<SplitButton>()
+                .FirstOrDefault(b => b.Name == "Codes2DButton");
+            Check("2D codes share one split button", codes is not null);
+            var codeItems = (codes?.Flyout as MenuFlyout)?.Items.OfType<MenuItem>().ToArray() ?? [];
+            Check("2D codes menu offers QR code, Data Matrix and PDF417",
+                string.Join(",", codeItems.Select(i => i.Header)) == "QR code,Data Matrix,PDF417");
+            Check("the rail no longer repeats Data Matrix and PDF417 as their own tools",
+                !railTools.GetVisualDescendants().OfType<Button>().Any(b =>
+                    Avalonia.Automation.AutomationProperties.GetName(b) is "Data Matrix" or "PDF417"));
+            foreach (var item in codeItems)
+            {
+                // Opened first, as a person would: the items bind to the designer only
+                // once the menu is shown.
+                codes!.Flyout!.ShowAt(codes);
+                Pump(100);
+                item.Command?.Execute(null);
+                codes.Flyout.Hide();
+                Pump(100);
+                Check($"{item.Header} from the menu highlights the 2D button",
+                    d.ArmedTool is "QR" or "DataMatrix" or "Pdf417" && codes!.Classes.Contains("armed"));
+                d.CancelInsert();
+                Pump(50);
+            }
+
+            // Repeat reads as a centered control rather than text in a box's corner.
+            var repeatCaption = view.FindControl<ToggleButton>("RepeatToolButton")?
+                .GetVisualDescendants().OfType<TextBlock>().FirstOrDefault(t => t.Text == "Repeat");
+            var repeatHost = view.FindControl<ToggleButton>("RepeatToolButton");
+            Check("repeat caption is centered in its button",
+                repeatCaption is not null && repeatHost is not null
+                && repeatCaption.TranslatePoint(new Point(0, repeatCaption.Bounds.Height / 2), repeatHost) is { } captionMiddle
+                && Math.Abs(captionMiddle.Y - repeatHost.Bounds.Height / 2) <= 1
+                && captionMiddle.X > repeatHost.Bounds.Width / 4);
+
+            // The bottom bar shows what changes; the size stays in the setup bar.
+            d.NewDocumentCommand.Execute(null);
+            Pump(600);
+            Check("bottom bar does not repeat the label size",
+                !d.WorkspaceStatus.Contains(" cm") && d.SetupSummary.Contains(" cm"));
+            Check("bottom bar Details hides with nothing to report", !d.HasWorkspaceMessages);
+
             var repeatButton = view.FindControl<ToggleButton>("RepeatToolButton");
             Check("repeat placement control is available", repeatButton is not null);
             if (repeatButton is not null)
