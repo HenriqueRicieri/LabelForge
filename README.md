@@ -199,7 +199,8 @@ for the work order, [Changelog](CHANGELOG.md) for changes, and
   a long thin line keeps its handles.
 - A drafting-table workspace: centimeter rulers pinned top and left (tick steps adapt to zoom, all
   conversion through the label density), and a pasteboard around the label where elements can be
-  parked. Off-label content stays visible, dimmed, with an amber outline and a clear warning; at
+  parked: half the label's size on each side, at least 2 cm. The fitted label sits centered in
+  the canvas, and scrolling, panning and the scrollbars stop at the pasteboard's edge. Off-label content stays visible, dimmed, with an amber outline and a clear warning; at
   print time content crossing the edge is clipped like the printer would, and elements whose origin
   is off the label are skipped from the generated ZPL.
 - While dragging, pink guides show the nearest gaps in centimeters. Snap between two

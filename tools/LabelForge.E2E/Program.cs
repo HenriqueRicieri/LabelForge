@@ -642,7 +642,10 @@ if (mode == "designer")
 {
     var d = vm.Designer;
     Console.WriteLine($"placement warning: '{d.PlacementWarning}' (expect QR outside, will not print)");
-    Console.WriteLine($"underlay margin: {d.UnderlayMarginDots} dots (expected 160 at 8 dpmm)");
+    // The preview reaches as far as the furthest off-label footprint, capped at the
+    // pasteboard. The header box moved to the right edge above overflows by about 9.5 cm,
+    // past the 5 cm pasteboard of a 10 cm label, so the cap is what applies.
+    Console.WriteLine($"underlay margin: {d.UnderlayMarginDots} dots (expected 400 at 8 dpmm: the whole pasteboard)");
 
     // The canvas draws the underlay into a rectangle taken from Bitmap.Size, which is
     // device-independent pixels, while the label is counted in printer dots. The two are
@@ -3254,7 +3257,11 @@ if (mode == "designer")
             d.NotifyDocumentEdited();
             Pump(400);
             canvas.SetZoom(2);
-            canvas.SetScrollOffsets(dpmm * 40 + 100, dpmm * 40 + 80);
+
+            // Scrolled to just inside the label's corner, wherever the pasteboard puts it.
+            (int pasteboardX, int pasteboardY) =
+                LabelForge.Core.Model.ElementPlacement.PasteboardMarginDots(d.Document);
+            canvas.SetScrollOffsets(pasteboardX * 2 + 100, pasteboardY * 2 + 80);
             Pump(200);
             var at = canvas.DotsToView(100, 100);
             var hover = SendDropEvent(DragDrop.DragOverEvent, imageTransfer, at);

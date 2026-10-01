@@ -49,6 +49,61 @@ internal static class UiLayoutChecks
                     readoutCanvas.Bounds.Height == heightWithout && readoutCanvas.GetZoom() == zoomWithout);
                 d.ReportPointerLeft();
                 Pump(100);
+
+                // The work area: the fitted label sits in the middle of the canvas, the
+                // wheel stops at the pasteboard's edge, and the scrollbars describe the
+                // same space the view can reach.
+                string at = $"{size.Item1}x{size.Item2} {theme}";
+                readoutCanvas.ResetView();
+                Pump(100);
+                Point topLeft = readoutCanvas.DotsToView(0, 0);
+                Point bottomRight = readoutCanvas.DotsToView(d.Document.WidthDots, d.Document.HeightDots);
+                var (hInfo, vInfo) = readoutCanvas.GetScrollInfo();
+                double rulerX = readoutCanvas.Bounds.Width - hInfo.Viewport;
+                double rulerY = readoutCanvas.Bounds.Height - vInfo.Viewport;
+                Check($"{at}: the fitted label is centered across",
+                    Math.Abs((topLeft.X - rulerX) - (readoutCanvas.Bounds.Width - bottomRight.X)) <= 1);
+                Check($"{at}: the fitted label is centered down",
+                    Math.Abs((topLeft.Y - rulerY) - (readoutCanvas.Bounds.Height - bottomRight.Y)) <= 1);
+
+                Point wheelAt = readoutCanvas.TranslatePoint(
+                    new Point(readoutCanvas.Bounds.Width / 2, readoutCanvas.Bounds.Height / 2), window)!.Value;
+                for (int tick = 0; tick < 60; tick++)
+                {
+                    window.MouseWheel(wheelAt, new Vector(0, -1));
+                }
+                Pump(150);
+                var (_, vDown) = readoutCanvas.GetScrollInfo();
+                var vScroll = view.FindControl<ScrollBar>("CanvasVScroll")!;
+                Check($"{at}: the wheel stops at the bottom of the pasteboard",
+                    Math.Abs(vDown.Offset - (vDown.Extent - vDown.Viewport)) <= 0.5);
+                Check($"{at}: the scrollbar ends where the wheel does",
+                    Math.Abs(vScroll.Value - vScroll.Maximum) <= 0.5
+                    && Math.Abs(vScroll.Maximum - Math.Max(vDown.Extent - vDown.Viewport, 0)) <= 0.5);
+                for (int tick = 0; tick < 120; tick++)
+                {
+                    window.MouseWheel(wheelAt, new Vector(0, 1));
+                }
+                Pump(150);
+                Check($"{at}: the wheel stops at the top of the pasteboard",
+                    Math.Abs(readoutCanvas.GetScrollInfo().Vertical.Offset) <= 0.5);
+                for (int tick = 0; tick < 30; tick++)
+                {
+                    window.MouseWheel(wheelAt, new Vector(0, -1), RawInputModifiers.Control);
+                }
+                Pump(150);
+                var (hOut, vOut) = readoutCanvas.GetScrollInfo();
+                Point outTopLeft = readoutCanvas.DotsToView(0, 0);
+                Point outBottomRight = readoutCanvas.DotsToView(d.Document.WidthDots, d.Document.HeightDots);
+                Check($"{at}: zoomed out past the pasteboard, the label stays centered",
+                    hOut.Extent <= hOut.Viewport && vOut.Extent <= vOut.Viewport
+                    && Math.Abs((outTopLeft.X - rulerX) - (readoutCanvas.Bounds.Width - outBottomRight.X)) <= 1
+                    && Math.Abs((outTopLeft.Y - rulerY) - (readoutCanvas.Bounds.Height - outBottomRight.Y)) <= 1);
+                readoutCanvas.Focus();
+                window.KeyPress(Key.D0, RawInputModifiers.Control, PhysicalKey.Digit0, "0");
+                Pump(100);
+                Check($"{at}: Ctrl+0 returns to the centered fit",
+                    readoutCanvas.DotsToView(0, 0) == topLeft);
                 if (!baseline)
                 {
                     view.FindControl<Button>("LabelSetupButton")!.RaiseEvent(

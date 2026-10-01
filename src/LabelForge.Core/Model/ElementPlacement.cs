@@ -29,9 +29,60 @@ public enum PlacementStatus
 /// </summary>
 public static class ElementPlacement
 {
-    /// <summary>Working area kept around the label on the design surface, where
-    /// elements can be parked without printing.</summary>
-    public const double PasteboardMarginMm = 20;
+    /// <summary>The least working area kept around the label on each side.</summary>
+    public const double MinimumPasteboardMarginMm = 20;
+
+    /// <summary>Preview margins are rounded up to this step, so the underlay keeps its
+    /// size while an off-label element moves a little.</summary>
+    public const double PreviewMarginStepMm = 5;
+
+    /// <summary>
+    /// The working area around the label on the design surface, per axis, in dots: half
+    /// the label's size on each side, and never less than
+    /// <see cref="MinimumPasteboardMarginMm"/>. Elements can be parked there without
+    /// printing, and the view scrolls no further than its edge.
+    ///
+    /// Proportional rather than fixed because a fixed margin is a sliver beside a large
+    /// label and most of the screen beside a small one.
+    /// </summary>
+    public static (int X, int Y) PasteboardMarginDots(LabelDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        int minimum = Units.MmToDots(MinimumPasteboardMarginMm, document.Dpmm);
+        return (Math.Max(minimum, (document.WidthDots + 1) / 2),
+                Math.Max(minimum, (document.HeightDots + 1) / 2));
+    }
+
+    /// <summary>
+    /// The margin a preview needs to show the given footprints: how far the furthest one
+    /// reaches past any label edge, rounded up to <see cref="PreviewMarginStepMm"/> and
+    /// capped at the pasteboard. Zero when every footprint is on the label.
+    ///
+    /// Measured from the footprints rather than taken as the whole pasteboard, because the
+    /// render grows with the square of the margin and the pasteboard is large around a
+    /// large label, while a parked element is usually just past the edge.
+    /// </summary>
+    public static int PreviewMarginDots(LabelDocument document, IEnumerable<DotRect> footprints)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(footprints);
+        int reach = 0;
+        foreach (DotRect b in footprints)
+        {
+            reach = Math.Max(reach, Math.Max(
+                Math.Max(-b.X, b.X + b.Width - document.WidthDots),
+                Math.Max(-b.Y, b.Y + b.Height - document.HeightDots)));
+        }
+
+        if (reach <= 0)
+        {
+            return 0;
+        }
+
+        int step = Math.Max(Units.MmToDots(PreviewMarginStepMm, document.Dpmm), 1);
+        (int x, int y) = PasteboardMarginDots(document);
+        return Math.Min((reach + step - 1) / step * step, Math.Max(x, y));
+    }
 
     /// <summary>
     /// True when the element is meant to print and its origin lands on the label. ZPL has

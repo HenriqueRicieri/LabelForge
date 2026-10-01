@@ -60,7 +60,7 @@ foreach ((string name, LabelDocument document) in scenarios)
     // so a clock variable resolves to the same text in every row.
     DateTime now = DateTime.Now;
 
-    int margin = Units.MmToDots(ElementPlacement.PasteboardMarginMm, dpmm);
+    int margin = Units.MmToDots(ElementPlacement.MinimumPasteboardMarginMm, dpmm);
     double marginMm = Units.DotsToMm(margin, dpmm);
 
     string Preview(LabelDocument source, int offsetDots) =>
@@ -100,6 +100,17 @@ foreach ((string name, LabelDocument document) in scenarios)
         previewPasteboard, widthMm + 2 * marginMm, heightMm + 2 * marginMm, dpmm,
         0, RenderOutput.Pixels));
 
+    // The worst case since the pasteboard became half the label per side: something
+    // parked at its far edge, so the preview covers all of it. The designer sizes the
+    // preview to how far elements reach, so this is the ceiling, not the usual frame.
+    (int pasteboardX, int pasteboardY) = ElementPlacement.PasteboardMarginDots(document);
+    int fullMargin = Math.Max(pasteboardX, pasteboardY);
+    double fullMarginMm = Units.DotsToMm(fullMargin, dpmm);
+    string previewFull = Preview(document, fullMargin);
+    double drawPixelsFull = Measure.Time(() => renderer.Render(
+        previewFull, widthMm + 2 * fullMarginMm, heightMm + 2 * fullMarginMm, dpmm,
+        0, RenderOutput.Pixels));
+
     // What a gesture layer costs: the moving element rendered by itself at label size,
     // on transparency so it composites over the rest.
     Element? sample = document.Elements.FirstOrDefault(e => e is BarcodeElement)
@@ -121,6 +132,7 @@ foreach ((string name, LabelDocument document) in scenarios)
         Measure.Ms(drawPasteboard),
         Measure.Ms(drawPixels),
         Measure.Ms(drawPixelsPasteboard),
+        Measure.Ms(drawPixelsFull),
         sample is null ? "n/a" : Measure.Ms(oneElement),
         Measure.Ms(pngEncode),
         Measure.Ms(pngDecode),
@@ -173,7 +185,7 @@ Console.WriteLine();
 
 Table(
     ["Label", "Size (dots)", "Draw to PNG", "Draw to PNG, pasteboard", "Draw to pixels",
-        "Draw to pixels, pasteboard", "One element alone, pixels", "PNG encode alone",
+        "Draw to pixels, 2 cm pasteboard", "Draw to pixels, full pasteboard", "One element alone, pixels", "PNG encode alone",
         "PNG decode"],
     frames);
 

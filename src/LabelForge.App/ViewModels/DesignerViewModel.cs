@@ -3309,16 +3309,16 @@ public partial class DesignerViewModel : ViewModelBase
         var bounds = new ElementBoundsCalculator();
         var offLabel = document.Elements
             .Where(e => e.IsVisible)
-            .Select(e => (Element: e, Status: ElementPlacement.Classify(
-                e, bounds.GetBounds(e), document)))
+            .Select(e => (Element: e, Bounds: bounds.GetBounds(e)))
+            .Select(t => (t.Element, t.Bounds, Status: ElementPlacement.Classify(t.Element, t.Bounds, document)))
             .Where(t => t.Status != PlacementStatus.Inside)
             .ToList();
 
-        // Only pay for the expanded pasteboard render when something actually sits off
-        // the label.
-        int margin = offLabel.Count > 0
-            ? Units.MmToDots(ElementPlacement.PasteboardMarginMm, dpmm)
-            : 0;
+        // Only pay for an expanded render when something actually sits off the label, and
+        // only as far as it reaches: the pasteboard can be half the label again on every
+        // side, and rendering all of it for one field parked past the edge would multiply
+        // the cost of every preview.
+        int margin = ElementPlacement.PreviewMarginDots(document, offLabel.Select(t => t.Bounds));
         double marginMm = Units.DotsToMm(margin, dpmm);
 
         // Always the preview variant, even at margin 0: it keeps job settings and
@@ -3345,7 +3345,7 @@ public partial class DesignerViewModel : ViewModelBase
         {
             return new RenderPass(
                 generated, null, null, margin,
-                DescribePlacement(offLabel), string.Join(" ", run.Warnings), key);
+                DescribePlacement(offLabel.Select(t => (t.Element, t.Status)).ToList()), string.Join(" ", run.Warnings), key);
         }
 
         // Pixels rather than a PNG: encoding one and decoding it again is most of a
@@ -3358,7 +3358,7 @@ public partial class DesignerViewModel : ViewModelBase
 
         return new RenderPass(
             generated, rendered, ToBitmap(rendered), margin,
-            DescribePlacement(offLabel), string.Join(" ", run.Warnings), key);
+            DescribePlacement(offLabel.Select(t => (t.Element, t.Status)).ToList()), string.Join(" ", run.Warnings), key);
     }
 
     /// <param name="live">A frame of a gesture rather than a finished edit. The picture is

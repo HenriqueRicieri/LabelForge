@@ -1,5 +1,15 @@
 # Project status
 
+## Centered, bounded work area (2026-09-30)
+
+The fitted label is centered in the canvas, and scrolling, panning, zooming and
+dragging stay inside a work area of half the label per side (at least 2 cm). The
+wheel used to scroll without limit. The off-label preview now renders only as far
+as parked elements reach; drawing the whole work area is the measured worst case
+(25/38/109 ms at 8/12/24 dpmm on a dense 10 x 15 cm label, against 19/26/57 ms for
+the old fixed 2 cm). 450 layout checks, 619 designer checks per theme and 1352
+unit tests pass.
+
 ## Steady canvas under the pointer readout (2026-09-30)
 
 The pointer readout below the canvas used to appear as two lines when the pointer

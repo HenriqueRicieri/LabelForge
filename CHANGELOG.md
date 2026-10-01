@@ -9,6 +9,10 @@ not yet been published as a release.
 
 ### Editing and workspace
 
+- The fitted label is centered in the canvas instead of pinned to the top left, and
+  the work area around it is now half the label's size on each side (at least 2 cm).
+  Scrolling, panning and zooming stop at its edge, so the view can no longer drift
+  into empty space, and the scrollbars match what is reachable.
 - The canvas no longer shrinks and re-zooms when the pointer enters it. The pointer
   readout and snapping state share one fixed line below the canvas.
 - Unsaved changes are no longer lost without warning. Closing the window, New,

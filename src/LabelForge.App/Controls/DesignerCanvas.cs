@@ -516,14 +516,20 @@ public sealed partial class DesignerCanvas : Control
         InvalidateVisual();
     }
 
-    /// <summary>Auto-fit pins the label to the top-left corner, tight against the
-    /// rulers, so the 0mm marks always line up with the label origin (Label Matrix
-    /// style); zoom and pan then take over as an explicit transform.</summary>
+    /// <summary>
+    /// Auto-fit centers the label in the viewport; the rulers count from its corner
+    /// wherever it lands, so their zero still lines up with the label origin. Zoom and pan
+    /// then take over as an explicit transform, which is kept inside the pasteboard
+    /// (<see cref="ClampOrigin"/>).
+    ///
+    /// Centered rather than pinned top-left: pinned, a maximized window left nearly half
+    /// the canvas as empty gray on one side.
+    /// </summary>
     private (double Scale, Point Origin) GetTransform()
     {
         if (_userScale is { } explicitScale)
         {
-            return (explicitScale, _viewOrigin);
+            return (explicitScale, ClampOrigin(_viewOrigin, explicitScale));
         }
 
         var doc = Document;
@@ -538,13 +544,46 @@ public sealed partial class DesignerCanvas : Control
             (Bounds.Height - RulerSize - 2 * FitGap) / doc.HeightDots);
         scale = Math.Max(scale, 0.01);
 
-        return (scale, new Point(RulerSize + FitGap, RulerSize + FitGap));
+        return (scale, new Point(
+            RulerSize + (Bounds.Width - RulerSize - doc.WidthDots * scale) / 2,
+            RulerSize + (Bounds.Height - RulerSize - doc.HeightDots * scale) / 2));
     }
 
-    /// <summary>Pasteboard margin in dots: the parking area kept around the label for
-    /// dragging, scrolling, and the expanded preview.</summary>
-    private static int PasteboardDots(LabelDocument doc) =>
-        Units.MmToDots(ElementPlacement.PasteboardMarginMm, doc.Dpmm);
+    /// <summary>Pasteboard margin in dots, per axis: the parking area kept around the
+    /// label, and how far the view can scroll past it.</summary>
+    private static (int X, int Y) PasteboardDots(LabelDocument doc) =>
+        ElementPlacement.PasteboardMarginDots(doc);
+
+    /// <summary>
+    /// Keeps the view inside the pasteboard. On an axis where the label and its margins
+    /// fit the viewport they are centered, so there is nothing to scroll; otherwise the
+    /// view stops at the pasteboard's edge. Every way of moving the view goes through
+    /// here, which is what makes the scrollbars and the gray area describe the same
+    /// space: before, the wheel kept going far past where the scrollbars ended.
+    /// </summary>
+    private Point ClampOrigin(Point origin, double scale)
+    {
+        if (Document is not { } doc || doc.WidthDots <= 0 || doc.HeightDots <= 0 ||
+            Bounds.Width <= RulerSize || Bounds.Height <= RulerSize)
+        {
+            return origin;
+        }
+
+        (int mx, int my) = PasteboardDots(doc);
+        return new Point(
+            ClampAxis(origin.X, doc.WidthDots, mx, Bounds.Width),
+            ClampAxis(origin.Y, doc.HeightDots, my, Bounds.Height));
+
+        double ClampAxis(double start, int size, int margin, double bound)
+        {
+            double viewport = bound - RulerSize;
+            double extent = (size + 2 * margin) * scale;
+            double atStart = RulerSize + margin * scale;
+            return extent <= viewport
+                ? atStart + (viewport - extent) / 2
+                : Math.Clamp(start, atStart - (extent - viewport), atStart);
+        }
+    }
 
     /// <summary>Returns to the auto-fit view (Ctrl+0).</summary>
     public void ResetView()
@@ -624,9 +663,9 @@ public sealed partial class DesignerCanvas : Control
 
         EnsureExplicitTransform();
         _userScale = scale;
-        _viewOrigin = new Point(
+        _viewOrigin = ClampOrigin(new Point(
             RulerSize + FitGap + (viewWidth - area.Width * scale) / 2 - area.X * scale,
-            RulerSize + FitGap + (viewHeight - area.Height * scale) / 2 - area.Y * scale);
+            RulerSize + FitGap + (viewHeight - area.Height * scale) / 2 - area.Y * scale), scale);
 
         InvalidateVisual();
         ViewChanged?.Invoke(this, EventArgs.Empty);
@@ -659,7 +698,7 @@ public sealed partial class DesignerCanvas : Control
     }
 
     /// <summary>Extent, viewport, and offset of one scroll axis, in screen pixels.
-    /// The extent is the label plus the pasteboard margin on both sides.</summary>
+    /// The extent is the label plus that axis's pasteboard margin on both sides.</summary>
     public readonly record struct ScrollAxisInfo(double Extent, double Viewport, double Offset);
 
     public (ScrollAxisInfo Horizontal, ScrollAxisInfo Vertical) GetScrollInfo()
@@ -670,16 +709,18 @@ public sealed partial class DesignerCanvas : Control
         }
 
         var (scale, origin) = GetTransform();
-        double m = PasteboardDots(doc) * scale;
+        (int marginX, int marginY) = PasteboardDots(doc);
+        double mx = marginX * scale;
+        double my = marginY * scale;
 
         var horizontal = new ScrollAxisInfo(
-            doc.WidthDots * scale + 2 * m,
+            doc.WidthDots * scale + 2 * mx,
             Math.Max(Bounds.Width - RulerSize, 0),
-            RulerSize - origin.X + m);
+            RulerSize - origin.X + mx);
         var vertical = new ScrollAxisInfo(
-            doc.HeightDots * scale + 2 * m,
+            doc.HeightDots * scale + 2 * my,
             Math.Max(Bounds.Height - RulerSize, 0),
-            RulerSize - origin.Y + m);
+            RulerSize - origin.Y + my);
         return (horizontal, vertical);
     }
 
@@ -693,8 +734,10 @@ public sealed partial class DesignerCanvas : Control
         }
 
         EnsureExplicitTransform();
-        double m = PasteboardDots(doc) * _userScale!.Value;
-        _viewOrigin = new Point(RulerSize + m - offsetX, RulerSize + m - offsetY);
+        double scale = _userScale!.Value;
+        (int mx, int my) = PasteboardDots(doc);
+        _viewOrigin = ClampOrigin(
+            new Point(RulerSize + mx * scale - offsetX, RulerSize + my * scale - offsetY), scale);
         InvalidateVisual();
         ViewChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -705,15 +748,14 @@ public sealed partial class DesignerCanvas : Control
         ViewChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>Captures the current fit transform so zoom/pan can start from it.</summary>
+    /// <summary>Captures the current transform so zoom/pan can start from it: the fit
+    /// when there is no explicit one yet, and otherwise the explicit one as clamped to
+    /// the current size, since a resize can have moved the pasteboard's edge.</summary>
     private void EnsureExplicitTransform()
     {
-        if (_userScale is null)
-        {
-            (double scale, Point origin) = GetTransform();
-            _userScale = scale;
-            _viewOrigin = origin;
-        }
+        (double scale, Point origin) = GetTransform();
+        _userScale = scale;
+        _viewOrigin = origin;
     }
 
     private void ZoomAt(Point pivot, double factor)
@@ -723,10 +765,11 @@ public sealed partial class DesignerCanvas : Control
         double newScale = Math.Clamp(oldScale * factor, 0.05, 40);
         double ratio = newScale / oldScale;
 
-        // Keep the point under the cursor stationary while scaling.
-        _viewOrigin = new Point(
+        // Keep the point under the cursor stationary while scaling, as far as the
+        // pasteboard allows.
+        _viewOrigin = ClampOrigin(new Point(
             pivot.X - (pivot.X - _viewOrigin.X) * ratio,
-            pivot.Y - (pivot.Y - _viewOrigin.Y) * ratio);
+            pivot.Y - (pivot.Y - _viewOrigin.Y) * ratio), newScale);
         _userScale = newScale;
         InvalidateVisual();
         ViewChanged?.Invoke(this, EventArgs.Empty);
@@ -747,7 +790,7 @@ public sealed partial class DesignerCanvas : Control
             const double step = 40;
             double dx = (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? e.Delta.Y : e.Delta.X) * step;
             double dy = e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 0 : e.Delta.Y * step;
-            _viewOrigin = new Point(_viewOrigin.X + dx, _viewOrigin.Y + dy);
+            _viewOrigin = ClampOrigin(new Point(_viewOrigin.X + dx, _viewOrigin.Y + dy), _userScale!.Value);
             InvalidateVisual();
             ViewChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -1909,13 +1952,18 @@ public sealed partial class DesignerCanvas : Control
         }
 
         (double dx, double dy) = AutoPanStep(_autoPanPointer);
-        if (dx == 0 && dy == 0)
+        EnsureExplicitTransform();
+        Point panned = ClampOrigin(new Point(_viewOrigin.X + dx, _viewOrigin.Y + dy), _userScale!.Value);
+
+        // At the pasteboard's edge there is nowhere further to go, so the view stops
+        // rather than replaying the gesture against a view that did not move.
+        if (panned == _viewOrigin)
         {
             StopAutoPan();
             return;
         }
 
-        _viewOrigin = new Point(_viewOrigin.X + dx, _viewOrigin.Y + dy);
+        _viewOrigin = panned;
         ViewChanged?.Invoke(this, EventArgs.Empty);
 
         // The pointer has not moved; the label under it has. Replaying the gesture with the
@@ -2080,7 +2128,8 @@ public sealed partial class DesignerCanvas : Control
 
     private static int GuidePositionDots(LabelDocument doc, GuideAxis axis, double dots)
     {
-        int margin = PasteboardDots(doc);
+        (int marginX, int marginY) = PasteboardDots(doc);
+        int margin = axis == GuideAxis.Vertical ? marginX : marginY;
         int limit = axis == GuideAxis.Vertical ? doc.WidthDots : doc.HeightDots;
         return Math.Clamp((int)Math.Round(dots, MidpointRounding.AwayFromZero),
             -margin, limit + margin);
@@ -2248,9 +2297,9 @@ public sealed partial class DesignerCanvas : Control
 
         if (_panning)
         {
-            _viewOrigin = new Point(
+            _viewOrigin = ClampOrigin(new Point(
                 _viewOrigin.X + (p.X - _panLast.X),
-                _viewOrigin.Y + (p.Y - _panLast.Y));
+                _viewOrigin.Y + (p.Y - _panLast.Y)), _userScale ?? GetTransform().Scale);
             _panLast = p;
             InvalidateVisual();
             ViewChanged?.Invoke(this, EventArgs.Empty);
@@ -2375,7 +2424,8 @@ public sealed partial class DesignerCanvas : Control
         bool vertical = _dragGuideAxis == GuideAxis.Vertical;
         double pointerDots = vertical ? (p.X - origin.X) / scale : (p.Y - origin.Y) / scale;
         int delta = (int)Math.Round(pointerDots - _dragGuidePointerStart);
-        int margin = PasteboardDots(doc);
+        (int marginX, int marginY) = PasteboardDots(doc);
+        int margin = vertical ? marginX : marginY;
         IList<int> guides = vertical ? doc.VerticalGuides : doc.HorizontalGuides;
         guides[_dragGuideIndex] = delta == 0 ? _dragGuideStart :
             Math.Clamp(_dragGuideStart + delta, -margin,
@@ -3133,16 +3183,16 @@ public sealed partial class DesignerCanvas : Control
     /// dimmed with a warning and is skipped at print time.</summary>
     private (int Dx, int Dy) ClampGroupDelta(LabelDocument doc, int dx, int dy)
     {
-        int margin = PasteboardDots(doc);
+        (int marginX, int marginY) = PasteboardDots(doc);
         int dxLow = int.MinValue, dxHigh = int.MaxValue;
         int dyLow = int.MinValue, dyHigh = int.MaxValue;
 
         foreach ((Element _, int startX, int startY) in _dragItems)
         {
-            dxLow = Math.Max(dxLow, -margin - startX);
-            dxHigh = Math.Min(dxHigh, Math.Max(doc.WidthDots - 1, 0) + margin - startX);
-            dyLow = Math.Max(dyLow, -margin - startY);
-            dyHigh = Math.Min(dyHigh, Math.Max(doc.HeightDots - 1, 0) + margin - startY);
+            dxLow = Math.Max(dxLow, -marginX - startX);
+            dxHigh = Math.Min(dxHigh, Math.Max(doc.WidthDots - 1, 0) + marginX - startX);
+            dyLow = Math.Max(dyLow, -marginY - startY);
+            dyHigh = Math.Min(dyHigh, Math.Max(doc.HeightDots - 1, 0) + marginY - startY);
         }
 
         return (Math.Clamp(dx, dxLow, dxHigh), Math.Clamp(dy, dyLow, dyHigh));

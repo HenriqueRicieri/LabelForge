@@ -14,7 +14,7 @@ internal static class GestureBench
         LabelDocument document = scenario.Document;
         Element moving = document.Elements.OfType<BarcodeElement>().First();
         GestureLayerPlan plan = GestureLayers.Split(document, [moving]);
-        int margin = Units.MmToDots(ElementPlacement.PasteboardMarginMm, document.Dpmm);
+        int margin = Units.MmToDots(ElementPlacement.MinimumPasteboardMarginMm, document.Dpmm);
         var viewport = new DotRect(-margin, -margin,
             document.WidthDots + 2 * margin, document.HeightDots + 2 * margin);
         DotRect crop = GestureLayers.GetMovingViewport(plan.Moving);

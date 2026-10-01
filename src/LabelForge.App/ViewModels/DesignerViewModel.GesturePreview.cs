@@ -63,7 +63,14 @@ public partial class DesignerViewModel
         GestureLayerPlan livePlan = GestureLayers.Split(Document, elements);
         if (!livePlan.CanComposite) return;
 
-        int margin = Units.MmToDots(ElementPlacement.PasteboardMarginMm, Document.Dpmm);
+        // The frozen layer covers the old fixed margin and reaches further only for an
+        // element parked further out, so the larger pasteboard does not push ordinary
+        // gestures past the pixel budget.
+        var footprints = new ElementBoundsCalculator();
+        int margin = Math.Max(
+            Units.MmToDots(ElementPlacement.MinimumPasteboardMarginMm, Document.Dpmm),
+            ElementPlacement.PreviewMarginDots(
+                Document, Document.Elements.Where(e => e.IsVisible).Select(footprints.GetBounds)));
         var viewport = new DotRect(-margin, -margin,
             Document.WidthDots + 2 * margin, Document.HeightDots + 2 * margin);
         if (!CanRenderLayer(viewport) || livePlan.Moving.Any(e => e.X < -margin || e.Y < -margin)) return;
