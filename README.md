@@ -273,7 +273,9 @@ for the work order, [Changelog](CHANGELOG.md) for changes, and
   inside a clear frame does not trigger a warning. A design aid only, so it never changes the
   generated ZPL.
 - Images (PNG, JPEG, BMP) are converted to the printer's 1-bit black with a selectable dither
-  (threshold for logos, ordered, Floyd-Steinberg for photos) and embedded in the label as an
+  (threshold for logos, ordered, Floyd-Steinberg, Stucki or Sierra for photos, Atkinson for
+  soft-edged logos), a threshold slider that lightens or darkens every mode, and an Invert
+  option, and embedded in the label as an
   inline `^GF` graphic field, so the saved file and the exported ZPL are self-contained. Place the
   same image twice and it is downloaded once as `~DG` and recalled with `^XG` instead of repeating
   the payload; a single placement stays inline and leaves the printer's memory alone. Drop one

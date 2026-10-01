@@ -9,6 +9,9 @@ not yet been published as a release.
 
 ### Editing and workspace
 
+- Images gain Atkinson, Stucki and Sierra dithering, a threshold slider that lightens
+  or darkens any mode, and an Invert option. Labels that do not use them save and
+  print exactly as before.
 - The creation rail groups Data Matrix and PDF417 under the QR code tool's arrow,
   shows the whole "Shapes" caption beside its arrow, and draws Repeat as a proper
   toggle. The bar under the label no longer repeats its size, which stays in the

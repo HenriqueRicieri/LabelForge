@@ -294,8 +294,11 @@ public sealed class ZplGenerator : IElementVisitor
             return null;
         }
 
+        // Threshold and inversion change the bits as surely as the mode does, so two
+        // placements differing only there must not share one download.
         string digest = Convert.ToHexString(SHA256.HashData(image.ImageData));
-        return $"{digest}:{image.WidthDots}x{image.HeightDots}:{image.Dithering}";
+        return $"{digest}:{image.WidthDots}x{image.HeightDots}:{image.Dithering}"
+            + $":{image.Threshold ?? Imaging.ImageDitherer.DefaultThreshold}:{image.Invert}";
     }
 
     /// <summary>The field origin, plus the reverse marker when the field asks for it.
@@ -503,7 +506,8 @@ public sealed class ZplGenerator : IElementVisitor
         return gray is null
             ? null
             : Imaging.ImageDitherer.Dither(
-                gray, element.WidthDots, element.HeightDots, element.Dithering);
+                gray, element.WidthDots, element.HeightDots, element.Dithering,
+                element.Threshold ?? Imaging.ImageDitherer.DefaultThreshold, element.Invert);
     }
 
     public void Visit(QrCodeElement element)

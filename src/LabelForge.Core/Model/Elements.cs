@@ -211,6 +211,17 @@ public enum DitherMode
 
     /// <summary>Floyd-Steinberg error diffusion; best for photos and gradients.</summary>
     FloydSteinberg,
+
+    /// <summary>Atkinson diffusion: spreads only three quarters of the error, so
+    /// highlights and shadows stay clean. Good for logos and line art with soft edges.</summary>
+    Atkinson,
+
+    /// <summary>Stucki diffusion over two rows below; smoother gradients than
+    /// Floyd-Steinberg at a little more cost.</summary>
+    Stucki,
+
+    /// <summary>Sierra (three-row) diffusion; close to Stucki, slightly lighter.</summary>
+    Sierra,
 }
 
 /// <summary>An image placed on the label, emitted as an inline ^GF graphic field.
@@ -233,6 +244,24 @@ public sealed class ImageElement : Element
     public int HeightDots { get; set; } = 200;
 
     public DitherMode Dithering { get; set; } = DitherMode.FloydSteinberg;
+
+    /// <summary>
+    /// The gray level below which a pixel prints black, 1 to 254; null is the 50% default
+    /// (128). Every mode honours it: it shifts the image's grays before the pattern or
+    /// the diffusion is applied, so it reads as a brightness control in all of them.
+    ///
+    /// Nullable and written only when set, like <see cref="Element.GroupId"/>, so every
+    /// label saved before it existed keeps its exact bytes.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(
+        Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? Threshold { get; set; }
+
+    /// <summary>Swap black and white before dithering, for a light design on a dark
+    /// source or the reverse. Written only when on.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(
+        Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Invert { get; set; }
 
     public override void Accept(IElementVisitor visitor) => visitor.Visit(this);
 }

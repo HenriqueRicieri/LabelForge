@@ -894,6 +894,30 @@ public sealed class ImagePropertiesViewModel : ElementPropertiesViewModel
         set => Edit(_image.Dithering, value, v => _image.Dithering = v);
     }
 
+    /// <summary>The gray level below which a pixel prints black. Back at the default it
+    /// is stored as unset, so a label nudged and returned keeps its saved bytes.</summary>
+    public double ImageThreshold
+    {
+        get => _image.Threshold ?? Core.Imaging.ImageDitherer.DefaultThreshold;
+        set
+        {
+            int level = (int)Math.Clamp(Math.Round(value), 1, 254);
+            Edit(_image.Threshold, level == Core.Imaging.ImageDitherer.DefaultThreshold ? null : level,
+                v => _image.Threshold = v);
+            OnPropertyChanged(nameof(ThresholdText));
+        }
+    }
+
+    public string ThresholdText => _image.Threshold is null
+        ? "Threshold: 128 (default)"
+        : $"Threshold: {_image.Threshold}";
+
+    public bool InvertImage
+    {
+        get => _image.Invert;
+        set => Edit(_image.Invert, value, v => _image.Invert = v);
+    }
+
     public decimal ImageWidth
     {
         get => FromDots(_image.WidthDots);

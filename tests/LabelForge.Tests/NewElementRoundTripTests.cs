@@ -42,6 +42,27 @@ public sealed class NewElementRoundTripTests
         Assert.Equal(120, image.WidthDots);
     }
 
+    /// <summary>Threshold and inversion survive a save, and an image that never set them
+    /// saves exactly as before they existed: neither key is written.</summary>
+    [Fact]
+    public void ImageThresholdAndInvert_RoundTripAndStayOutUntilSet()
+    {
+        var doc = new LabelDocument();
+        var untouched = new ImageElement { ImageData = TestImages.SolidPng(2, 2, 0, 0, 0), Dithering = DitherMode.Sierra };
+        doc.Elements.Add(untouched);
+        string plain = LabelDocumentJson.Serialize(doc);
+        Assert.DoesNotContain("\"Threshold\"", plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Invert\"", plain, StringComparison.Ordinal);
+
+        untouched.Threshold = 90;
+        untouched.Invert = true;
+        var image = Assert.IsType<ImageElement>(Assert.Single(
+            LabelDocumentJson.Deserialize(LabelDocumentJson.Serialize(doc)).Elements));
+        Assert.Equal(90, image.Threshold);
+        Assert.True(image.Invert);
+        Assert.Equal(DitherMode.Sierra, image.Dithering);
+    }
+
     [Fact]
     public void PrintSettingsAndSamples_RoundTrip()
     {

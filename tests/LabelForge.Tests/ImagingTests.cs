@@ -32,6 +32,80 @@ public sealed class ImagingTests
         Assert.InRange(blackCount, 64, 192);
     }
 
+    /// <summary>The three added diffusions turn a flat mid gray into a mix, as
+    /// Floyd-Steinberg does, and each is its own pattern.</summary>
+    [Theory]
+    [InlineData(DitherMode.Atkinson)]
+    [InlineData(DitherMode.Stucki)]
+    [InlineData(DitherMode.Sierra)]
+    public void AddedDiffusions_RenderMidGrayAsMix(DitherMode mode)
+    {
+        var gray = new byte[32 * 32];
+        Array.Fill(gray, (byte)100);
+
+        bool[] black = ImageDitherer.Dither(gray, 32, 32, mode);
+
+        Assert.InRange(black.Count(b => b), 32 * 32 / 4, 32 * 32 * 3 / 4);
+        Assert.NotEqual(ImageDitherer.Dither(gray, 32, 32, DitherMode.FloydSteinberg), black);
+        Assert.Equal(black, ImageDitherer.Dither(gray, 32, 32, mode));
+    }
+
+    /// <summary>Atkinson spreads only three quarters of the error, so a light gray stays
+    /// cleaner (fewer black dots) than under Floyd-Steinberg, which spreads all of it.</summary>
+    [Fact]
+    public void Atkinson_KeepsLightGraysCleaner()
+    {
+        var gray = new byte[64 * 64];
+        Array.Fill(gray, (byte)225);
+
+        int atkinson = ImageDitherer.Dither(gray, 64, 64, DitherMode.Atkinson).Count(b => b);
+        int floyd = ImageDitherer.Dither(gray, 64, 64, DitherMode.FloydSteinberg).Count(b => b);
+
+        Assert.True(atkinson < floyd, $"Atkinson {atkinson} vs Floyd-Steinberg {floyd}");
+    }
+
+    /// <summary>The threshold moves the split point exactly, and its default reproduces
+    /// the output every existing label was generated with.</summary>
+    [Fact]
+    public void Threshold_MovesTheSplitAndDefaultsToTheOldOutput()
+    {
+        byte[] gray = [90, 100, 110, 200];
+
+        Assert.Equal([true, true, true, false], ImageDitherer.Dither(gray, 4, 1, DitherMode.Threshold, threshold: 128));
+        Assert.Equal([true, false, false, false], ImageDitherer.Dither(gray, 4, 1, DitherMode.Threshold, threshold: 95));
+        Assert.Equal([true, true, true, true], ImageDitherer.Dither(gray, 4, 1, DitherMode.Threshold, threshold: 254));
+
+        var ramp = Enumerable.Range(0, 256).Select(i => (byte)i).ToArray();
+        foreach (DitherMode mode in Enum.GetValues<DitherMode>())
+        {
+            Assert.Equal(ImageDitherer.Dither(ramp, 16, 16, mode),
+                ImageDitherer.Dither(ramp, 16, 16, mode, ImageDitherer.DefaultThreshold, invert: false));
+        }
+    }
+
+    /// <summary>A higher threshold darkens every mode, not just the plain split.</summary>
+    [Theory]
+    [InlineData(DitherMode.Ordered)]
+    [InlineData(DitherMode.FloydSteinberg)]
+    [InlineData(DitherMode.Atkinson)]
+    [InlineData(DitherMode.Stucki)]
+    [InlineData(DitherMode.Sierra)]
+    public void Threshold_DarkensEveryMode(DitherMode mode)
+    {
+        var gray = new byte[32 * 32];
+        Array.Fill(gray, (byte)128);
+
+        int light = ImageDitherer.Dither(gray, 32, 32, mode, threshold: 64).Count(b => b);
+        int dark = ImageDitherer.Dither(gray, 32, 32, mode, threshold: 192).Count(b => b);
+
+        Assert.True(dark > light, $"{mode}: threshold 192 gave {dark} black, 64 gave {light}");
+    }
+
+    [Fact]
+    public void Invert_SwapsBlackAndWhite() =>
+        Assert.Equal([false, false, true, true],
+            ImageDitherer.Dither([0, 127, 128, 255], 4, 1, DitherMode.Threshold, invert: true));
+
     [Fact]
     public void Ordered_IsDeterministic()
     {

@@ -47,6 +47,22 @@ public sealed class GraphicReuseTests
         Assert.StartsWith("^XA", zpl, StringComparison.Ordinal);
     }
 
+    /// <summary>The threshold and inversion change the bits, so placements that differ
+    /// only there cannot share a download.</summary>
+    [Fact]
+    public void SameImageWithAnotherThresholdOrInversion_GetsItsOwnDownload()
+    {
+        ImageElement darker = Stamp(10, 200);
+        darker.Threshold = 200;
+        ImageElement inverted = Stamp(300, 10);
+        inverted.Invert = true;
+        string zpl = new ZplGenerator().Generate(Label(Stamp(10, 10), Stamp(300, 200), darker, inverted));
+
+        Assert.Equal(1, Occurrences(zpl, "~DG"));
+        Assert.Equal(2, Occurrences(zpl, "^XGR:LFG0.GRF,1,1"));
+        Assert.Equal(2, Occurrences(zpl, "^GFA,"));
+    }
+
     [Fact]
     public void RepeatedImage_DownloadsOnceAndRecallsPerPlacement()
     {

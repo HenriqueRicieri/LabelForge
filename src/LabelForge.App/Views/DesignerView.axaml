@@ -269,10 +269,17 @@
                         HorizontalAlignment="Stretch"
                         ToolTip.Tip="Re-derives the height from the width using the source image proportions" />
                 <TextBlock Classes="propLabel" Text="Dithering" />
-                <ComboBox ItemsSource="{Binding DitherModes}"
+                <ComboBox Name="DitherModeInput" ItemsSource="{Binding DitherModes}"
                           SelectedItem="{Binding Dithering}"
                           HorizontalAlignment="Stretch"
-                          ToolTip.Tip="Threshold for logos and line art, Floyd-Steinberg for photos" />
+                          ToolTip.Tip="Threshold for logos and line art; Floyd-Steinberg, Stucki or Sierra for photos; Atkinson for soft-edged logos" />
+                <TextBlock Classes="propLabel" Text="{Binding ThresholdText}" />
+                <Slider Name="ImageThresholdInput" Minimum="1" Maximum="254" SmallChange="1" LargeChange="16"
+                        TickFrequency="1" IsSnapToTickEnabled="True"
+                        Value="{Binding ImageThreshold}"
+                        ToolTip.Tip="Grays darker than this print black. Lower makes the image lighter, higher darker." />
+                <CheckBox Name="ImageInvertInput" Content="Invert" IsChecked="{Binding InvertImage, Mode=TwoWay}"
+                          ToolTip.Tip="Swap black and white before dithering" />
             </StackPanel>
         </DataTemplate>
 

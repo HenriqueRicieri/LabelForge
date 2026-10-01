@@ -677,6 +677,65 @@ internal static class UiLayoutChecks
                 !d.WorkspaceStatus.Contains(" cm") && d.SetupSummary.Contains(" cm"));
             Check("bottom bar Details hides with nothing to report", !d.HasWorkspaceMessages);
 
+            // Image dithering from the inspector: six modes, a threshold that reaches the
+            // ZPL and is stored as unset again at its default, and inversion with undo.
+            d.NewDocumentCommand.Execute(null);
+            Pump(200);
+            byte[] gradient;
+            using (var ramp = new SkiaSharp.SKBitmap(64, 32))
+            {
+                for (int y = 0; y < 32; y++)
+                {
+                    for (int x = 0; x < 64; x++)
+                    {
+                        byte level = (byte)(x * 4);
+                        ramp.SetPixel(x, y, new SkiaSharp.SKColor(level, level, level));
+                    }
+                }
+
+                using var encoded = ramp.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+                gradient = encoded.ToArray();
+            }
+
+            var picture = new ImageElement
+            {
+                ImageData = gradient, SourcePixelWidth = 64, SourcePixelHeight = 32,
+                WidthDots = 256, HeightDots = 128, X = 40, Y = 40,
+            };
+            d.Document.Elements.Add(picture);
+            d.NotifyDocumentEdited();
+            d.Selection.Set(picture);
+            Pump(400);
+            var imagePanel = view.FindControl<ContentControl>("PropertiesContent")!;
+            var modeInput = imagePanel.GetVisualDescendants().OfType<ComboBox>().FirstOrDefault(c => c.Name == "DitherModeInput");
+            var thresholdInput = imagePanel.GetVisualDescendants().OfType<Slider>().FirstOrDefault(s => s.Name == "ImageThresholdInput");
+            var invertInput = imagePanel.GetVisualDescendants().OfType<CheckBox>().FirstOrDefault(c => c.Name == "ImageInvertInput");
+            Check("image dithering offers Atkinson, Stucki and Sierra",
+                modeInput?.Items.Cast<object>().Select(o => o.ToString()).ToArray() is { } modes
+                && string.Join(",", modes) == "Threshold,Ordered,FloydSteinberg,Atkinson,Stucki,Sierra");
+            string defaultZpl = d.GeneratedZpl;
+            modeInput?.SetCurrentValue(SelectingItemsControl.SelectedItemProperty, DitherMode.Atkinson);
+            Pump(400);
+            Check("choosing Atkinson changes the graphic", d.GeneratedZpl != defaultZpl && picture.Dithering == DitherMode.Atkinson);
+            modeInput?.SetCurrentValue(SelectingItemsControl.SelectedItemProperty, DitherMode.FloydSteinberg);
+            Pump(400);
+            thresholdInput?.SetCurrentValue(RangeBase.ValueProperty, 200d);
+            Pump(400);
+            Check("a higher threshold darkens the graphic in the ZPL",
+                thresholdInput is not null && picture.Threshold == 200 && d.GeneratedZpl != defaultZpl);
+            thresholdInput?.SetCurrentValue(RangeBase.ValueProperty, 128d);
+            Pump(400);
+            Check("returning the threshold to 128 stores it as unset and restores the ZPL",
+                thresholdInput is not null && picture.Threshold is null && d.GeneratedZpl == defaultZpl);
+            invertInput?.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+            Pump(400);
+            Check("Invert reaches the ZPL", invertInput is not null && picture.Invert && d.GeneratedZpl != defaultZpl);
+            d.UndoCommand.Execute(null);
+            Pump(400);
+            Check("undo turns Invert back off",
+                invertInput is not null && d.Document.Elements.OfType<ImageElement>().Single().Invert == false
+                && d.GeneratedZpl == defaultZpl);
+
             var repeatButton = view.FindControl<ToggleButton>("RepeatToolButton");
             Check("repeat placement control is available", repeatButton is not null);
             if (repeatButton is not null)
