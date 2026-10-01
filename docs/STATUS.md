@@ -1,5 +1,13 @@
 # Project status
 
+## Steady canvas under the pointer readout (2026-09-30)
+
+The pointer readout below the canvas used to appear as two lines when the pointer
+entered, taller than the zoom row, so the canvas shrank and the fitted zoom changed
+(87% to 86% maximized). It is now one fixed line. Six new layout checks failed
+before and pass after; 408 layout and 619 designer checks per theme pass. The
+designer transcripts change only where the taller canvas moves fitted measurements.
+
 ## Unsaved changes protection (2026-09-29)
 
 Closing the window, New, Open, Open Recent, New from Sample and Import ZPL used to

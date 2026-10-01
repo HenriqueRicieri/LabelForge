@@ -690,17 +690,19 @@
             <ScrollBar Name="CanvasHScroll" Grid.Row="1" Orientation="Horizontal"
                        AllowAutoHide="False" Visibility="Visible" />
 
+            <!-- One line, always present and as tall as the zoom row: a strip that appeared
+                 or grew when the pointer entered the canvas shrank the canvas under it. -->
             <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="4">
-            <Border Grid.Column="0" IsHitTestVisible="False"
-                    HorizontalAlignment="Stretch" Margin="0"
-                    IsVisible="{Binding CanvasReadout, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+            <Border Name="CanvasReadoutStrip" Grid.Column="0" IsHitTestVisible="False"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0"
                     Background="{DynamicResource AppPanelBackground}"
                     BorderBrush="{DynamicResource AppSeparator}" BorderThickness="1"
-                    CornerRadius="4" Padding="8,3">
-                <StackPanel Spacing="0">
-                    <TextBlock Text="{Binding CanvasReadout}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CanvasReadout}" FontSize="12" Opacity="0.75" />
-                    <TextBlock Text="{Binding SnapSummary}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SnapSummary}" FontSize="12" Opacity="0.55" />
-                </StackPanel>
+                    CornerRadius="4" Padding="8,0">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding CanvasReadout}" TextTrimming="CharacterEllipsis" FontSize="12" Opacity="0.75" />
+                    <TextBlock Grid.Column="1" Text="{Binding SnapSummary}" TextTrimming="CharacterEllipsis"
+                               FontSize="12" Opacity="0.55" Margin="12,0,0,0" />
+                </Grid>
             </Border>
 
             <Border Grid.Column="1"

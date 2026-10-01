@@ -33,6 +33,22 @@ internal static class UiLayoutChecks
                 window.Width = size.Item1;
                 window.Height = size.Item2;
                 Pump(100);
+
+                // The pointer entering the canvas must not resize it: the readout strip
+                // used to grow from nothing to two lines, taller than the zoom row, and
+                // the fitted zoom followed it.
+                var readoutCanvas = view.FindControl<DesignerCanvas>("Canvas")!;
+                d.Selection.Clear();
+                d.ReportPointerLeft();
+                Pump(150);
+                double heightWithout = readoutCanvas.Bounds.Height;
+                double zoomWithout = readoutCanvas.GetZoom();
+                d.ReportPointer(80, 80);
+                Pump(150);
+                Check($"{size.Item1}x{size.Item2} {theme}: canvas keeps its height when the readout appears",
+                    readoutCanvas.Bounds.Height == heightWithout && readoutCanvas.GetZoom() == zoomWithout);
+                d.ReportPointerLeft();
+                Pump(100);
                 if (!baseline)
                 {
                     view.FindControl<Button>("LabelSetupButton")!.RaiseEvent(

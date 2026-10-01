@@ -9,6 +9,8 @@ not yet been published as a release.
 
 ### Editing and workspace
 
+- The canvas no longer shrinks and re-zooms when the pointer enters it. The pointer
+  readout and snapping state share one fixed line below the canvas.
 - Unsaved changes are no longer lost without warning. Closing the window, New,
   Open, Open Recent, New from Sample, Import ZPL and picking another label of an
   imported file now ask Save, Don't Save or Cancel. The window title shows the
