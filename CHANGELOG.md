@@ -9,6 +9,9 @@ not yet been published as a release.
 
 ### Editing and workspace
 
+- Added a start screen with a new blank label, Open, recent labels and the sample
+  starters. It opens when the app starts without a file and can be turned off from
+  itself; File > Start Screen opens it at any time.
 - Images gain Atkinson, Stucki and Sierra dithering, a threshold slider that lightens
   or darkens any mode, and an Invert option. Labels that do not use them save and
   print exactly as before.

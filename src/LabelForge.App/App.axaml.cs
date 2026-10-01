@@ -31,6 +31,11 @@ public partial class App : Application
             {
                 main.OpenStartupFile(file);
             }
+            else
+            {
+                // Nothing was handed to the app, so offer the start screen once it is up.
+                window.Opened += async (_, _) => await window.ShowStartScreenAtLaunchAsync();
+            }
 
             // Ending the session removes its crash snapshot, which is the only thing that
             // distinguishes a shutdown from a crash on the next start.

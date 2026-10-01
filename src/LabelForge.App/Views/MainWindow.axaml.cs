@@ -39,6 +39,23 @@ public partial class MainWindow : Window
         _ = ConfirmCloseAsync(vm);
     }
 
+    /// <summary>
+    /// Shows the start screen as the app opens, when there is nothing else to show: the
+    /// setting is on and no recovered work is on offer, which would be the more important
+    /// thing to decide first. The caller skips it when a file was handed to the app.
+    /// </summary>
+    /// <returns>True when the screen was shown.</returns>
+    public async Task<bool> ShowStartScreenAtLaunchAsync()
+    {
+        if (DataContext is not MainViewModel vm || !vm.Designer.ShowStartScreen || vm.Designer.HasRecoveryOffer)
+        {
+            return false;
+        }
+
+        await DesignerPane.ShowStartScreenAsync(this);
+        return true;
+    }
+
     private async Task ConfirmCloseAsync(MainViewModel vm)
     {
         if (_askingToClose)

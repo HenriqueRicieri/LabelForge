@@ -2193,6 +2193,27 @@ public partial class DesignerViewModel : ViewModelBase
     /// <summary>What the menu item reads, so the answer is visible without opening it.</summary>
     public string AlignTargetName => AlignToLabel ? "to label" : "to selection";
 
+    /// <summary>Whether the start screen opens with the app. Per machine, like the
+    /// snapping preferences.</summary>
+    public bool ShowStartScreen
+    {
+        get => _settings.ShowStartScreen;
+        set
+        {
+            if (_settings.ShowStartScreen == value)
+            {
+                return;
+            }
+
+            _settings = _settings with { ShowStartScreen = value };
+            OnPropertyChanged();
+            if (_settingsStore.Save(_settings) is { } error)
+            {
+                Notify($"Could not save the setting: {error}");
+            }
+        }
+    }
+
     /// <summary>
     /// What a gesture snaps to. Each on by default: a designer that does not snap is the
     /// surprise, and Alt is still the momentary way out of all three without touching a

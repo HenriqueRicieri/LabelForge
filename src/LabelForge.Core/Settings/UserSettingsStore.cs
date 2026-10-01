@@ -24,6 +24,11 @@ public sealed record UserSettings
     public bool SnapToGrid { get; init; } = true;
 
     public bool SnapToObjects { get; init; } = true;
+
+    /// <summary>Show the start screen when the app opens with nothing else to show (no
+    /// file handed to it, no work to recover). On by default; the screen itself has the
+    /// box that turns it off.</summary>
+    public bool ShowStartScreen { get; init; } = true;
 }
 
 /// <summary>

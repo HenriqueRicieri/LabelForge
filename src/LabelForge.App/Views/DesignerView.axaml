@@ -384,6 +384,7 @@
                     <MenuItem Header="_File">
                         <MenuItem Header="_New" Click="OnNewFile" InputGesture="Ctrl+N" />
                         <MenuItem Header="New from _Sample..." Click="OnNewFromSample" />
+                        <MenuItem Name="StartScreenMenu" Header="Start Scr_een..." Click="OnShowStartScreen" />
                         <MenuItem Header="_Open..." Click="OnOpenFile" InputGesture="Ctrl+O" />
                         <MenuItem x:Name="RecentMenu" Header="Open _Recent" IsEnabled="{Binding HasRecentFiles}" />
                         <MenuItem Header="_Import ZPL..." Click="OnImportZpl" />

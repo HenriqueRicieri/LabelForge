@@ -937,6 +937,62 @@ public partial class DesignerView : UserControl
         }
     }
 
+    /// <summary>
+    /// Shows the start screen and does what it was asked. Every choice that replaces the
+    /// label goes through <see cref="ConfirmDiscardAsync"/> like the menu does; closing the
+    /// screen changes nothing.
+    /// </summary>
+    /// <param name="owner">The window to show it over; the shell passes its own at launch.</param>
+    public async Task ShowStartScreenAsync(Window? owner = null)
+    {
+        owner ??= TopLevel.GetTopLevel(this) as Window;
+        if (owner is null || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        var start = new StartWindow
+        {
+            DataContext = new StartScreenViewModel(vm),
+            Width = Math.Max(320, Math.Min(900, owner.ClientSize.Width - 40)),
+            Height = Math.Max(300, Math.Min(600, owner.ClientSize.Height - 40)),
+        };
+        if (await start.ShowDialog<StartChoice?>(owner) is not { } choice)
+        {
+            return;
+        }
+
+        switch (choice.Kind)
+        {
+            case StartChoiceKind.Blank:
+                if (await ConfirmDiscardAsync(owner))
+                {
+                    vm.NewDocumentCommand.Execute(null);
+                }
+
+                break;
+            case StartChoiceKind.Open:
+                OnOpenFile(this, new RoutedEventArgs());
+                break;
+            case StartChoiceKind.Recent when choice.Path is { } path:
+                if (await ConfirmDiscardAsync(owner))
+                {
+                    vm.OpenRecentCommand.Execute(path);
+                }
+
+                break;
+            case StartChoiceKind.Starter when choice.Starter is { } starter:
+                if (await ConfirmDiscardAsync(owner))
+                {
+                    vm.LoadStarter(starter);
+                }
+
+                break;
+        }
+    }
+
+    private async void OnShowStartScreen(object? sender, RoutedEventArgs e) => await ShowStartScreenAsync();
+
     private async void OnNewFile(object? sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm && await ConfirmDiscardAsync())
