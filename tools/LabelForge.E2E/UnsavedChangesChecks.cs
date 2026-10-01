@@ -79,7 +79,10 @@ internal static class UnsavedChangesChecks
         AddText(d, "saved text");
         d.CurrentFilePath = path;
         Press(window, Avalonia.Input.Key.S, RawInputModifiers.Control, PhysicalKey.S, "s");
-        Pump(300);
+
+        // The write is asynchronous; a slow machine (CI) can still hold the file open after
+        // a fixed pump, so wait for the save to land, which is when the label turns clean.
+        PumpUntil(() => !d.IsDirty, 5000);
         check("unsaved: Ctrl+S writes the label",
             File.Exists(path) && File.ReadAllText(path).Contains("saved text"), true);
         check("unsaved: saving clears the mark", window.Title, "saved-check.lfl - LabelForge");
@@ -198,6 +201,15 @@ internal static class UnsavedChangesChecks
     {
         target.KeyPress(key, modifiers, physical, symbol);
         Pump(300);
+    }
+
+    private static void PumpUntil(Func<bool> done, int timeoutMilliseconds)
+    {
+        var timer = Stopwatch.StartNew();
+        while (!done() && timer.ElapsedMilliseconds < timeoutMilliseconds)
+        {
+            Pump(20);
+        }
     }
 
     private static void Pump(int milliseconds)
