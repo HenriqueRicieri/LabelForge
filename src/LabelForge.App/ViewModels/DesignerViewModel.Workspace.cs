@@ -16,11 +16,21 @@ public partial class DesignerViewModel
         + (Document.IsContinuous ? "  |  Continuous" : "")
         + (IsMultiAcross ? $"  |  {Document.LabelsAcross} across" : "");
 
-    public IReadOnlyList<string> WorkspaceMessages => new[]
-    {
-        PrinterWarning, ValidationWarning, PlacementWarning,
-        UnknownFieldWarning, VariableWarning, StatusText,
-    }.Where(message => !string.IsNullOrWhiteSpace(message)).Distinct().ToArray();
+    /// <summary>What the bar under the canvas reports, first one shown. A message a
+    /// command just held (a failed save, an export) comes before the standing warnings,
+    /// which would otherwise hide it for as long as they stand; a render diagnosis or
+    /// a released message goes last, as before.</summary>
+    public IReadOnlyList<string> WorkspaceMessages => (_statusHeld
+        ? new[]
+        {
+            StatusText, PrinterWarning, ValidationWarning, PlacementWarning,
+            UnknownFieldWarning, VariableWarning,
+        }
+        : new[]
+        {
+            PrinterWarning, ValidationWarning, PlacementWarning,
+            UnknownFieldWarning, VariableWarning, StatusText,
+        }).Where(message => !string.IsNullOrWhiteSpace(message)).Distinct().ToArray();
 
     public bool HasWorkspaceMessages => WorkspaceMessages.Count > 0;
     public string WorkspaceStatus => WorkspaceMessages.FirstOrDefault() ?? "Ready";

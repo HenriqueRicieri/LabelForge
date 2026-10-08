@@ -96,6 +96,38 @@ internal static class UnsavedChangesChecks
         check("unsaved: an unmodified label opens New without asking",
             NewWithoutPrompt(window, d), true);
 
+        // A save that fails says so first, ahead of a standing warning, and the message
+        // outlives the render that follows instead of being wiped by it.
+        string readOnly = Path.Combine(dir, "read-only.lfl");
+        File.WriteAllText(readOnly, "previous");
+        File.SetAttributes(readOnly, FileAttributes.ReadOnly);
+        var parked = new TextElement
+        {
+            X = d.Document.WidthDots + 40, Y = 20, Text = "parked", FontHeightDots = 30,
+        };
+        d.Document.Elements.Add(parked);
+        d.NotifyDocumentEdited();
+        Pump(600);
+        check("unsaved: a standing warning is showing", string.IsNullOrEmpty(d.PlacementWarning), false);
+        d.CurrentFilePath = readOnly;
+        Press(window, Avalonia.Input.Key.S, RawInputModifiers.Control, PhysicalKey.S, "s");
+        PumpUntil(() => d.StatusText.StartsWith("Could not save", StringComparison.Ordinal), 5000);
+        check("unsaved: a failed save leads the status bar",
+            d.WorkspaceStatus.StartsWith("Could not save", StringComparison.Ordinal), true);
+        d.WidthMm = 100;
+        d.WidthMm = 120;
+        Press(window, Avalonia.Input.Key.S, RawInputModifiers.Control, PhysicalKey.S, "s");
+        Pump(800);
+        check("unsaved: a failed save survives the render after it",
+            d.WorkspaceStatus.StartsWith("Could not save", StringComparison.Ordinal), true);
+        check("unsaved: a failed save leaves the old file", File.ReadAllText(readOnly), "previous");
+        check("unsaved: a failed save keeps the label marked", d.IsDirty, true);
+        File.SetAttributes(readOnly, FileAttributes.Normal);
+        d.WidthMm = 100;
+        d.Document.Elements.Remove(parked);
+        d.NotifyDocumentEdited();
+        Pump(300);
+
         // The other ways of replacing the label: Open Recent and another label of an
         // imported file. Both have to ask, and Cancel has to leave everything as it was.
         d.OpenLabelFile(path);

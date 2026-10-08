@@ -1026,7 +1026,7 @@ public partial class DesignerViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            StatusText = $"Could not save: {ex.Message}";
+            Notify($"Could not save: {ex.Message}");
             return false;
         }
 
@@ -1034,7 +1034,7 @@ public partial class DesignerViewModel : ViewModelBase
         _discardAccepted = false;
         CurrentFilePath = path;
         UpdateDirty(SerializeDocument());
-        StatusText = $"Saved {Path.GetFileName(path)}";
+        Notify($"Saved {Path.GetFileName(path)}");
         RegisterRecentFile(path);
 
         // The work is safe in its own file now, so the crash snapshot would only be a
@@ -3123,7 +3123,7 @@ public partial class DesignerViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            StatusText = $"Could not open: {ex.Message}";
+            Notify($"Could not open: {ex.Message}");
 
             // A path that no longer opens has no business in a menu of paths to open.
             // Harmless for one that was never in the list.
@@ -3280,6 +3280,34 @@ public partial class DesignerViewModel : ViewModelBase
     {
         StatusText = message;
         _statusHeld = true;
+    }
+
+    /// <summary>True while the render itself is writing the status line, which is the one
+    /// writer whose message is not held.</summary>
+    private bool _renderStatus;
+
+    private void SetRenderStatus(string text)
+    {
+        _renderStatus = true;
+        try
+        {
+            StatusText = text;
+        }
+        finally
+        {
+            _renderStatus = false;
+        }
+    }
+
+    /// <summary>A message set by anything but the render (an export, a print, a failed
+    /// save reported by the view) is held exactly as <see cref="Notify"/> holds it, so a
+    /// render finishing a moment later does not wipe it before anyone reads it.</summary>
+    partial void OnStatusTextChanged(string value)
+    {
+        if (!_renderStatus)
+        {
+            _statusHeld = !string.IsNullOrEmpty(value);
+        }
     }
 
     /// <summary>Re-reads the label's length into the setup bar. On continuous stock the
@@ -3534,12 +3562,12 @@ public partial class DesignerViewModel : ViewModelBase
             // bar at the top already shows: the bottom bar is for what changes (see Notify).
             if (diagnosis.Count > 0)
             {
-                StatusText = string.Join(" | ", diagnosis);
+                SetRenderStatus(string.Join(" | ", diagnosis));
                 _statusHeld = false;
             }
             else if (!_statusHeld)
             {
-                StatusText = string.Empty;
+                SetRenderStatus(string.Empty);
             }
         }
         catch (OperationCanceledException)
@@ -3548,7 +3576,7 @@ public partial class DesignerViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            StatusText = ex.Message;
+            SetRenderStatus(ex.Message);
         }
     }
 
