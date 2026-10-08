@@ -987,11 +987,25 @@ public static class ZplDocumentImport
         };
 
         /// <summary>^BQ carries the error correction level and input mode in front of the
-        /// payload ("MA,text"). Anything else is taken as the payload itself.</summary>
-        private static QrCodeElement BuildQr(string data, int magnification)
+        /// payload ("MA,text"). Anything else is taken as the payload itself.
+        ///
+        /// The model only writes automatic input (A), so a manual-input payload loses its
+        /// character mode switch (N, A, or B and a four-digit count), which is not data.
+        /// Kanji and mixed mode have no equivalent here and are reported.</summary>
+        private QrCodeElement BuildQr(string data, int magnification)
         {
             QrErrorCorrection correction = QrErrorCorrection.Medium;
             string payload = data;
+
+            // Mixed mode opens with D, the code number, the division count and the parity
+            // byte, then a comma: "D03040C,".
+            if (data.Length >= 8 && char.ToUpperInvariant(data[0]) == 'D' && data[7] == ',')
+            {
+                Warn("A QR code (^BQ) in mixed mode was imported as one ordinary symbol; "
+                     + "the split across several symbols is not kept.");
+                data = data[8..];
+                payload = data;
+            }
 
             int comma = data.IndexOf(',');
             if (comma >= 2)
@@ -1004,6 +1018,11 @@ public static class ZplDocumentImport
                     _ => QrErrorCorrection.Medium,
                 };
                 payload = data[(comma + 1)..];
+
+                if (char.ToUpperInvariant(data[1]) == 'M')
+                {
+                    payload = WithoutCharacterMode(payload);
+                }
             }
 
             return new QrCodeElement
@@ -1012,6 +1031,25 @@ public static class ZplDocumentImport
                 Magnification = magnification,
                 ErrorCorrection = correction,
             };
+        }
+
+        private string WithoutCharacterMode(string payload)
+        {
+            if (payload.Length > 0 && char.ToUpperInvariant(payload[0]) is 'N' or 'A')
+            {
+                return payload[1..];
+            }
+
+            if (payload.Length >= 5 && char.ToUpperInvariant(payload[0]) == 'B' &&
+                payload.AsSpan(1, 4).IndexOfAnyExceptInRange('0', '9') < 0)
+            {
+                return payload[5..];
+            }
+
+            Warn("A QR code (^BQ) in manual input uses a character mode the designer does not "
+                 + "write (Kanji or unrecognized), so its data was kept as written and may "
+                 + "encode differently.");
+            return payload;
         }
 
         /// <summary>^GB is a box, and a box whose border fills it is how ZPL draws a

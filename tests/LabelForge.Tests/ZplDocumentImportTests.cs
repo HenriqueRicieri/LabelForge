@@ -338,6 +338,39 @@ public sealed class ZplDocumentImportTests
         Assert.Equal(7, qr.Magnification);
     }
 
+    /// <summary>In manual input mode the payload opens with a character mode (N, A, or B
+    /// and a four-digit count) that is a switch, not data. Kept as data, the regenerated
+    /// symbol (automatic mode) would encode one character more than the original.</summary>
+    [Theory]
+    [InlineData("MM,AAC-42", "AC-42", QrErrorCorrection.Medium)]
+    [InlineData("HM,N0123", "0123", QrErrorCorrection.High)]
+    [InlineData("LM,B0005hello", "hello", QrErrorCorrection.Low)]
+    [InlineData("QA,AAC-42", "AAC-42", QrErrorCorrection.Quartile)]
+    public void QrManualInput_DropsTheCharacterModeSwitch(
+        string data, string expected, QrErrorCorrection correction)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n^FO0,0^BQN,2,4^FD{data}^FS\n^XZ");
+
+        var qr = Assert.IsType<QrCodeElement>(Assert.Single(result.Document.Elements));
+        Assert.Equal(expected, qr.Data);
+        Assert.Equal(correction, qr.ErrorCorrection);
+    }
+
+    /// <summary>Kanji mode and mixed mode have no equivalent in the model, so the import
+    /// keeps the data and says the symbol may not encode the same.</summary>
+    [Theory]
+    [InlineData("MM,KABC")]
+    [InlineData("D03040C,MA,hello")]
+    public void QrModesTheModelCannotHold_AreReported(string data)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n^FO0,0^BQN,2,4^FD{data}^FS\n^XZ");
+
+        Assert.IsType<QrCodeElement>(Assert.Single(result.Document.Elements));
+        Assert.Contains(result.Warnings, w => w.Contains("QR", StringComparison.Ordinal));
+    }
+
     /// <summary>The manual's ^BQ magnification default depends on the printer: 2 at
     /// 200 dpi, 3 at 300 and 6 at 600. An omitted one has to import as what that printer
     /// would draw, or regenerating the label states a different size.</summary>
