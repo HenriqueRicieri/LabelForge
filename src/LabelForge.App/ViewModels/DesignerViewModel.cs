@@ -3499,8 +3499,11 @@ public partial class DesignerViewModel : ViewModelBase
             // what a date variable currently reads. Captured with the document, and
             // _renderedFrom with it, so the work compares against values it owns and only
             // the UI thread ever writes the field.
+            // The render reads a copy whose collections are its own, so an element added,
+            // deleted or reordered meanwhile cannot break its enumeration on the pool
+            // thread. Identity below is still checked against the live document.
             RenderPass? pass = await _renderQueue.RequestAsync(
-                new RenderRequest(document, DateTime.Now, _renderedFrom), cts.Token);
+                new RenderRequest(document.ShallowCopy(), DateTime.Now, _renderedFrom), cts.Token);
 
             // Null means this request never ran: something newer replaced it while it
             // waited its turn, or the document it was for has been swapped out. There is

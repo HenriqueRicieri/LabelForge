@@ -104,7 +104,14 @@ public sealed class LabelDocument
     /// </summary>
     public double CornerRadiusMm { get; set; }
 
-    public IList<Element> Elements { get; init; } = new List<Element>();
+    private IList<Element> _elements = new List<Element>();
+    private IDictionary<string, string> _sampleValues = new Dictionary<string, string>();
+    private IDictionary<string, VariableDefinition> _variables =
+        new Dictionary<string, VariableDefinition>();
+    private IList<int> _verticalGuides = new List<int>();
+    private IList<int> _horizontalGuides = new List<int>();
+
+    public IList<Element> Elements { get => _elements; init => _elements = value; }
 
     /// <summary>Job-level print settings emitted with the label (quantity, darkness,
     /// speed). Part of the document so a label prints the same from any machine.</summary>
@@ -131,14 +138,20 @@ public sealed class LabelDocument
     /// <summary>Preview sample values per template variable name (##NAME## markers).
     /// Preview-only: exported and printed ZPL keeps the literal markers. Variables
     /// without an entry fall back to the default sample.</summary>
-    public IDictionary<string, string> SampleValues { get; init; } =
-        new Dictionary<string, string>();
+    public IDictionary<string, string> SampleValues
+    {
+        get => _sampleValues;
+        init => _sampleValues = value;
+    }
 
     /// <summary>How each template variable is filled, by variable name. Only variables
     /// that are not plain external markers need an entry, so a document without counters
     /// or clocks serializes exactly as it did before they existed.</summary>
-    public IDictionary<string, VariableDefinition> Variables { get; init; } =
-        new Dictionary<string, VariableDefinition>();
+    public IDictionary<string, VariableDefinition> Variables
+    {
+        get => _variables;
+        init => _variables = value;
+    }
 
     /// <summary>
     /// Design grid pitch in millimeters; 0 turns it off, which is how the print settings
@@ -155,10 +168,28 @@ public sealed class LabelDocument
 
     /// <summary>Vertical alignment guides: X positions in dots. Design aids only,
     /// never printed; they ride the undo/save pipeline like any document change.</summary>
-    public IList<int> VerticalGuides { get; init; } = new List<int>();
+    public IList<int> VerticalGuides { get => _verticalGuides; init => _verticalGuides = value; }
 
     /// <summary>Horizontal alignment guides: Y positions in dots.</summary>
-    public IList<int> HorizontalGuides { get; init; } = new List<int>();
+    public IList<int> HorizontalGuides { get => _horizontalGuides; init => _horizontalGuides = value; }
+
+    /// <summary>
+    /// A copy for reading on another thread: every setting as it stands, and the same
+    /// element objects in collections of its own. The preview renders on a pool thread
+    /// while the editor adds, deletes and reorders elements, and a shared list made
+    /// that enumeration throw "Collection was modified". The elements themselves are
+    /// shared; a torn read of one during a drag costs a frame the next render replaces.
+    /// </summary>
+    public LabelDocument ShallowCopy()
+    {
+        var copy = (LabelDocument)MemberwiseClone();
+        copy._elements = new List<Element>(_elements);
+        copy._sampleValues = new Dictionary<string, string>(_sampleValues);
+        copy._variables = new Dictionary<string, VariableDefinition>(_variables);
+        copy._verticalGuides = new List<int>(_verticalGuides);
+        copy._horizontalGuides = new List<int>(_horizontalGuides);
+        return copy;
+    }
 
     [JsonIgnore]
     public int WidthDots => Units.MmToDots(WidthMm, Dpmm);
