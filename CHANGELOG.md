@@ -9,6 +9,31 @@ not yet been published as a release.
 
 ### Editing and workspace
 
+- Turning a field that sits wholly on the label keeps it on the label. A quarter turn
+  near an edge used to put its origin off the label, which leaves it out of the ZPL;
+  a field parked on the pasteboard on purpose stays where it is.
+- Same Width and Same Height work on the drawn axes of a rotated field, and the
+  quiet-zone check and outline turn with a rotated barcode. EAN-13 and UPC-A zones are
+  measured from the bars, so the digit printed outside them no longer counts against
+  the margin.
+- A QR code's outline matches the symbol drawn for every error correction level and
+  data length, including past version 10 and accented text. The outline, the quiet
+  zone and the length of continuous labels read it.
+- Paste Here near an edge moves a copied group back as one instead of stacking it.
+- Recover asks before replacing the open label. Check for Updates asks again about
+  edits made while the update downloaded, and runs one check at a time.
+- A failed save, export or print is shown ahead of standing warnings in the bar under
+  the canvas and is no longer cleared by the next render. Export ZPL and Export PNG
+  report a locked or read-only file instead of closing the app.
+- The strip offering an imported file's other labels closes when another label is
+  opened, so it cannot re-import the old file over it.
+- A label that cannot be opened for the moment (another program holds it, a share is
+  offline) stays in the recent files; only a missing file leaves the list.
+- Photos placed from a phone follow their EXIF orientation instead of landing sideways.
+- The undo history also has a memory budget, keeping at least the last ten steps, so
+  a label carrying a large photo no longer holds hundreds of megabytes of history.
+- On continuous stock, the die-cut height entered before ticking Continuous survives
+  saving and undo, and picking die-cut media shows the media's height.
 - Added Help > About (version, source, licenses) and Help > Check for Updates, which
   looks for newer releases on GitHub Releases in an installed copy and asks before it
   restarts. Setup shows a splash while it installs.
@@ -63,6 +88,20 @@ not yet been published as a release.
 
 ### Labels, data and output
 
+- Export PNG and Export PDF show what the canvas shows: sample values, the counter's
+  first value and a real date, for the elements that print. They no longer draw
+  markers literally or a printer-clock date as its format, and a label the renderer
+  cannot draw is reported as an error instead of an empty file.
+- A label that turns on Reverse all (`^LR`) or Mirror (`^PM`) ends with a
+  settings-only block that turns it back off, so the next job on the printer is not
+  reversed or mirrored. Labels that use neither keep their bytes.
+- An image larger than the 99,999 bytes `^GF` accepts is sent as a `~DG` download
+  recalled by `^XG`, with a warning that the label is now two parts.
+- New warnings for field data longer than the 3,072 bytes `^FD` takes, and for a cut
+  group that a run numbered by the PC cannot send.
+- Negative numbers in the ZPL use an ASCII hyphen whatever the Windows culture.
+- Labels, recovery snapshots, presets, field catalogs, settings and recent files are
+  written to a temporary file first, so a failed write leaves the previous file whole.
 - Added user media presets, corner radius, continuous stock and multi-across layouts.
 - Added PDF417, ellipse, diagonal line, rounded boxes and built-in printer fonts.
 - Expanded editable import, text blocks, reverse fields, serialized data and graphic
@@ -76,6 +115,16 @@ not yet been published as a release.
 
 ### Viewer and rendering
 
+- A graphic recalled as `^XGNAME^FS`, with no magnification, now appears in the
+  preview.
+- A lone `##` in one field no longer pairs with a marker in the next one, and the
+  canvas uses the label's own marker delimiters.
+- Import takes `^BQ`'s default magnification for the printer density, reads QR manual
+  input, a `\` `^GD` lean and a `^FH` on its own line, needs two hex digits per escape,
+  and reports `^FO`/`^FT` justification and a `^BX` without module size. A corrupt
+  graphic is dropped with a warning instead of failing the whole import.
+- The preview renders from a copy of the label's collections, so editing during a
+  render no longer flashes "Collection was modified".
 - Cached the ruler text layouts instead of reformatting each label during paint.
   The canvas checks quiet-zone warnings only for selected symbols; the complete
   warning report remains available. The 70 KB paint budget is unchanged.
@@ -96,6 +145,11 @@ not yet been published as a release.
   retained the documented limit that physical output is unverified.
 
 ### Release preparation
+
+- CI builds the benchmark, runs the third-party notices check on a win-x64 publish and
+  times out a hung build job. A frozen `.lfl` fixture pins the file format, the unit
+  suite runs timing-sensitive tests on their own, and the harness grades recovery,
+  startup-file routing and the `.lfl` association instead of only printing them.
 
 - Added an isolated native QA tool using the production editor/styles to record
   actual display scaling and document/ZPL snapshots. Twelve scale/theme/window
