@@ -2645,7 +2645,7 @@ public partial class DesignerViewModel : ViewModelBase
 
         foreach (Element element in turning)
         {
-            RotationGesture.Rotate90(element);
+            RotationGesture.Rotate90(element, Document);
         }
 
         SelectionProperties?.Refresh();

@@ -223,7 +223,7 @@ public abstract class ElementPropertiesViewModel : ObservableObject
                 FieldRotation.Get(Element),
                 value.Value,
                 v => RotationGesture.Apply(Element, v,
-                    new ElementBoundsCalculator().GetBounds(Element)));
+                    new ElementBoundsCalculator().GetBounds(Element), Document));
 
             // A turn can also move the origin and swap a diagonal's sides. Refresh
             // the position and size controls after the orientation changes.

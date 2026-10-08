@@ -2488,7 +2488,7 @@ public sealed partial class DesignerCanvas : Control
                 Orientation snapped = DegreesToOrientation(nearest);
                 if (FieldRotation.Get(primary) != snapped)
                 {
-                    RotationGesture.Apply(primary, snapped, _rotateStartBounds);
+                    RotationGesture.Apply(primary, snapped, _rotateStartBounds, Document);
                     LiveEdited?.Invoke(this, EventArgs.Empty);
                 }
             }
