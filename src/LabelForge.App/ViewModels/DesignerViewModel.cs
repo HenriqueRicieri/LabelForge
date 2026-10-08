@@ -1446,27 +1446,24 @@ public partial class DesignerViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Renders the current document to PNG bytes (for export).</summary>
+    /// <summary>Renders the current document to PNG bytes (for export): what the canvas
+    /// shows, only what prints. Throws when nothing could be drawn, so an export never
+    /// writes an empty file.</summary>
     public Task<byte[]> RenderPngAsync()
     {
         LabelDocument document = Document;
-        return Task.Run(() => _renderer
-            .Render(new ZplGenerator().Generate(document), document.WidthMm, document.HeightMm, document.Dpmm)
-            .Png);
+        DateTime now = DateTime.Now;
+        return Task.Run(() => Core.Export.LabelImage.Png(_renderer, document, now));
     }
 
     /// <summary>Renders the current document to a PDF page at its physical size.</summary>
     public Task<byte[]> RenderPdfAsync()
     {
         LabelDocument document = Document;
-        return Task.Run(() =>
-        {
-            byte[] png = _renderer
-                .Render(new ZplGenerator().Generate(document), document.WidthMm, document.HeightMm, document.Dpmm)
-                .Png;
-            return Core.Export.PdfExporter.FromPng(
-                png, document.WidthMm, document.HeightMm, document.EffectiveCornerRadiusMm);
-        });
+        DateTime now = DateTime.Now;
+        return Task.Run(() => Core.Export.PdfExporter.FromPng(
+            Core.Export.LabelImage.Png(_renderer, document, now),
+            document.WidthMm, document.HeightMm, document.EffectiveCornerRadiusMm));
     }
 
     /// <summary>Replaces the document (new file or opened .lfl) and resets history.</summary>

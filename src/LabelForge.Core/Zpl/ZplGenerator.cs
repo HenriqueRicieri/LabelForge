@@ -79,6 +79,16 @@ public sealed class ZplGenerator : IElementVisitor
     public string GeneratePreview(LabelDocument document, int offsetDots) =>
         Generate(document, new GenerationContext(), offsetDots, includeOffLabel: true);
 
+    /// <summary>What an image export draws: the preview's fields (markers left for the
+    /// caller to substitute, no job settings, no printer counters or clocks) for only the
+    /// elements that print, with no pasteboard margin. Never send this to a printer.</summary>
+    public string GenerateExportImage(LabelDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        Element[] printable = [.. document.Elements.Where(e => ElementPlacement.IsPrintable(e, document))];
+        return Generate(document, new GenerationContext(), 0, includeOffLabel: true, printable);
+    }
+
     /// <summary>Preview-only render of a subset into a dot-space viewport. The viewport
     /// may lie outside the label; moving layers use their own complete surface before
     /// the canvas clips the composite to the pasteboard.</summary>
