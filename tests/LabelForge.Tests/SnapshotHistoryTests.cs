@@ -99,4 +99,46 @@ public sealed class SnapshotHistoryTests
         Assert.Equal("b", history.Undo());
         Assert.False(history.CanUndo);
     }
+
+    /// <summary>A label carrying a large photo makes every state megabytes long, so the
+    /// count alone can hold hundreds of megabytes. The oldest states go once the total
+    /// passes the budget, down to a floor of recent steps that is always kept.</summary>
+    [Fact]
+    public void Budget_DropsOldestStatesOnceTheirTotalIsTooLarge()
+    {
+        var history = new SnapshotHistory(capacity: 100, maxChars: 25, minStates: 2);
+        foreach (string state in new[] { "aaaaaaaaaa", "bbbbbbbbbb", "cccccccccc", "dddddddddd" })
+        {
+            history.Record(state);
+        }
+
+        Assert.Equal("cccccccccc", history.Undo());
+        Assert.False(history.CanUndo);
+    }
+
+    [Fact]
+    public void Budget_AlwaysKeepsTheMinimumNumberOfSteps()
+    {
+        var history = new SnapshotHistory(capacity: 100, maxChars: 5, minStates: 3);
+        history.Record("aaaaaaaaaa");
+        history.Record("bbbbbbbbbb");
+        history.Record("cccccccccc");
+        history.Record("dddddddddd");
+
+        Assert.Equal("cccccccccc", history.Undo());
+        Assert.Equal("bbbbbbbbbb", history.Undo());
+        Assert.False(history.CanUndo);
+    }
+
+    [Fact]
+    public void Budget_CountsAReplacedStateAtItsNewSize()
+    {
+        var history = new SnapshotHistory(capacity: 100, maxChars: 25, minStates: 1);
+        history.Record("aaaaaaaaaa");
+        history.Record("b");
+        history.ReplaceCurrent("bbbbbbbbbbbbbbbbbbbb");
+
+        Assert.False(history.CanUndo);
+        Assert.Equal("bbbbbbbbbbbbbbbbbbbb", history.Current);
+    }
 }
