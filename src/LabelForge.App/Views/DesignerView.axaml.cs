@@ -1030,6 +1030,28 @@ public partial class DesignerView : UserControl
             return;
         }
 
+        // One at a time: the window stays usable during a download, and a second check
+        // would start a second download of the same release.
+        if (_checkingForUpdates)
+        {
+            return;
+        }
+
+        _checkingForUpdates = true;
+        try
+        {
+            await CheckForUpdatesCoreAsync(owner, vm);
+        }
+        finally
+        {
+            _checkingForUpdates = false;
+        }
+    }
+
+    private bool _checkingForUpdates;
+
+    private async Task CheckForUpdatesCoreAsync(Window owner, DesignerViewModel vm)
+    {
         IAppUpdates updates = vm.Updates;
         if (!updates.IsInstalled)
         {
@@ -1069,6 +1091,10 @@ public partial class DesignerView : UserControl
             return;
         }
 
+        // What the question above was answered about. The download takes a while and the
+        // label stays editable, so anything typed meanwhile is asked about again.
+        string answered = LabelForge.Core.Io.LabelDocumentJson.Serialize(vm.Document);
+
         try
         {
             await updates.DownloadAsync(update, percent => Dispatcher.UIThread.Post(
@@ -1081,12 +1107,28 @@ public partial class DesignerView : UserControl
             return;
         }
 
+        if (LabelForge.Core.Io.LabelDocumentJson.Serialize(vm.Document) != answered &&
+            !await ConfirmDiscardAsync(owner))
+        {
+            vm.StatusText = "Restart cancelled to keep your changes. Check for Updates again when you are ready.";
+            return;
+        }
+
         // The restart ends the process without the window closing, so the session is ended
         // here: the question above was answered, and a snapshot left behind would greet the
         // updated app with an offer to recover work nobody lost.
         vm.AcceptDiscard();
         vm.ShutDown();
-        updates.ApplyAndRestart(update);
+        try
+        {
+            updates.ApplyAndRestart(update);
+        }
+        catch (Exception ex)
+        {
+            // The session is already ended, so the crash snapshot is off from here on.
+            await Tell(owner, "Could not restart into the update",
+                ex.Message + " The label is still open; save it before closing LabelForge.");
+        }
     }
 
     private static Task Tell(Window owner, string heading, string body) =>

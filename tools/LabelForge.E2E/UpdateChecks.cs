@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Interactivity;
@@ -35,11 +35,15 @@ internal static class UpdateChecks
             return Failure is { } failure ? Task.FromException<AppUpdate?>(failure) : Task.FromResult(Next);
         }
 
+        /// <summary>Holds a download open until it is completed, for what happens while
+        /// one is in progress.</summary>
+        public TaskCompletionSource? Gate { get; set; }
+
         public Task DownloadAsync(AppUpdate update, Action<int>? progress, CancellationToken cancellationToken = default)
         {
             Downloads++;
             progress?.Invoke(100);
-            return Task.CompletedTask;
+            return Gate?.Task ?? Task.CompletedTask;
         }
 
         public void ApplyAndRestart(AppUpdate update) => Applies++;
@@ -113,6 +117,35 @@ internal static class UpdateChecks
         check("updates: Cancel keeps the work and does not update",
             fake.Downloads == 0 && fake.Applies == 0 && d.Document.Elements.Count == 1, true);
 
+        // A download takes a while and the window stays usable. Edits made meanwhile are
+        // asked about again before the restart, and a second Check for Updates waits for
+        // the first instead of starting another download.
+        d.NewDocumentCommand.Execute(null);
+        Pump(400);
+        fake.Gate = new TaskCompletionSource();
+        run = view.CheckForUpdatesAsync(window);
+        Pump(300);
+        Answer(window, primary: true);
+        int checksSoFar = fake.Checks;
+        Task again = view.CheckForUpdatesAsync(window);
+        Pump(200);
+        check("updates: a second check waits for the download in progress",
+            again.IsCompleted && fake.Checks == checksSoFar, true);
+        d.Document.Elements.Add(new TextElement { X = 20, Y = 60, Text = "typed meanwhile", FontHeightDots = 30 });
+        d.NotifyDocumentEdited();
+        Pump(300);
+        fake.Gate.SetResult();
+        Pump(300);
+        unsaved = window.OwnedWindows.FirstOrDefault(w => w is UnsavedChangesWindow && w.IsVisible);
+        check("updates: edits made during the download are asked about", unsaved is not null, true);
+        unsaved?.GetLogicalDescendants().OfType<Button>().FirstOrDefault(b => b.Name == "CancelButton")
+            ?.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Pump(300);
+        check("updates: Cancel then keeps them and does not restart",
+            fake.Applies == 0 && d.Document.Elements.Count == 1, true);
+        fake.Gate = null;
+        int downloadsSoFar = fake.Downloads;
+
         // Clean label: it downloads, ends the session and restarts, leaving nothing to recover.
         d.NewDocumentCommand.Execute(null);
         Pump(400);
@@ -120,7 +153,8 @@ internal static class UpdateChecks
         Pump(300);
         Answer(window, primary: true);
         Pump(300);
-        check("updates: Update and restart downloads and applies once", $"{fake.Downloads},{fake.Applies}", "1,1");
+        check("updates: Update and restart downloads and applies once",
+            $"{fake.Downloads - downloadsSoFar},{fake.Applies}", "1,1");
         check("updates: the restart leaves no recovery snapshot",
             Directory.Exists(recovery) ? Directory.GetFiles(recovery, "*.recovery.json").Length : 0, 0);
 
