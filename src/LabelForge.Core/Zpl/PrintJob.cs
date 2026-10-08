@@ -66,6 +66,16 @@ public static class PrintJob
             return new PrintJobResult(single, produced, info.UsesPrinterCounter, warnings);
         }
 
+        // The cut group rides ^PQ, and blocks that each hold different labels carry none,
+        // so the printer never hears about it.
+        if (document.Print.CutAfterLabels > 0)
+        {
+            warnings.Add(
+                $"The cut after every {document.Print.CutAfterLabels} labels is not sent: a run "
+                + "numbered by the PC is one block per label with no ^PQ, which is where the "
+                + "cut group is stated.");
+        }
+
         int builtRows = Math.Min(rows, MaxSoftwareCopies);
         if (builtRows < rows)
         {
