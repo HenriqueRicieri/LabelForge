@@ -15,6 +15,28 @@ public sealed class CorpusSmokeTests
 {
     private static readonly byte[] PngSignature = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
 
+    public static IEnumerable<object[]> CommittedFixtures() =>
+        Directory.EnumerateFiles(TestCorpus.FixturesDirectory(), "*.zpl").Select(p => new object[] { p });
+
+    /// <summary>
+    /// The smoke test below accepts an empty image with a reason, because the private
+    /// corpus holds labels with real errors in them. The committed fixtures do not, and
+    /// they are what CI renders, so for them the bar is a picture with no errors: an
+    /// engine upgrade that degraded every one of them to "empty, with a reason" would
+    /// otherwise pass.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(CommittedFixtures))]
+    public void CommittedFixtures_RenderWithoutErrors(string path)
+    {
+        string zpl = ZplTextFile.ReadFile(path).Text;
+
+        RenderResult result = new BinaryKitsRenderer().Render(zpl, widthMm: 100, heightMm: 150, dpmm: 8);
+
+        Assert.Empty(result.Errors);
+        Assert.True(result.HasImage, $"no image for {Path.GetFileName(path)}");
+    }
+
     public static IEnumerable<object[]> CorpusFiles()
     {
         foreach (var path in TestCorpus.Files())

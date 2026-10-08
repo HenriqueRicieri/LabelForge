@@ -23,10 +23,18 @@ public sealed class PdfExporterTests
         Assert.True(pdf.Length > 1000, "PDF suspiciously small");
         Assert.Equal("%PDF", Encoding.ASCII.GetString(pdf, 0, 4));
 
-        // 100 mm = 283.46 pt; the page dictionary carries the MediaBox in clear text.
+        // 100 mm = 283.46 pt wide and 60 mm = 170.08 pt tall. The page dictionary carries
+        // the MediaBox in clear text; both sides are read, so a page with width and height
+        // swapped fails instead of passing on the "283" it also contains.
         string text = Encoding.ASCII.GetString(pdf);
-        Assert.Contains("MediaBox", text);
-        Assert.Contains("283", text);
+        var mediaBox = System.Text.RegularExpressions.Regex.Match(
+            text, @"/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]");
+        Assert.True(mediaBox.Success, "no MediaBox");
+        double width = double.Parse(mediaBox.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        double height = double.Parse(mediaBox.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+        // The box is written in whole points, so within one of the exact size.
+        Assert.InRange(width, 100 / 25.4 * 72 - 1, 100 / 25.4 * 72 + 1);
+        Assert.InRange(height, 60 / 25.4 * 72 - 1, 60 / 25.4 * 72 + 1);
     }
 
     [Fact]
