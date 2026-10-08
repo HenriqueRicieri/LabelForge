@@ -368,6 +368,35 @@ public sealed class ZplDocumentImportTests
         Assert.Equal(reported, result.Warnings.Any(w => w.Contains("justif", StringComparison.OrdinalIgnoreCase)));
     }
 
+    /// <summary>One impossible graphic is dropped with a warning; the rest of the label
+    /// still imports instead of the whole file failing.</summary>
+    [Theory]
+    [InlineData("^FO0,0^GFA,2000000000,2000000000,1000000,FF^FS")]
+    [InlineData("^FO0,0^GFA,60000000,60000000,6000,FF^FS")]
+    public void ImpossibleGraphic_IsDroppedAndTheLabelStillImports(string graphic)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n{graphic}\n^FO10,10^A0N,30^FDstill here^FS\n^XZ");
+
+        Assert.Equal("still here",
+            Assert.IsType<TextElement>(Assert.Single(result.Document.Elements)).Text);
+        Assert.NotEmpty(result.Warnings);
+    }
+
+    /// <summary>A recall magnified ten times over a large download would come to more dots
+    /// than any label; it is dropped rather than allocated.</summary>
+    [Fact]
+    public void OversizedMagnifiedRecall_IsDropped()
+    {
+        string data = new string('0', 2);
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"~DGR:BIG.GRF,8000000,1000,{data}\n^XA\n^FO0,0^XGR:BIG.GRF,10,10^FS\n"
+            + "^FO10,10^A0N,30^FDstill here^FS\n^XZ");
+
+        Assert.Equal("still here",
+            Assert.IsType<TextElement>(Assert.Single(result.Document.Elements)).Text);
+    }
+
     [Fact]
     public void TemplateMarkers_SurviveVerbatim()
     {

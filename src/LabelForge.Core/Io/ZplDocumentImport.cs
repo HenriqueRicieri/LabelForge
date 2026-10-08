@@ -1207,6 +1207,12 @@ public static class ZplDocumentImport
                 return;
             }
 
+            if (!GraphicField.FitsALabel((long)bitmap.Width * magX, (long)bitmap.Height * magY))
+            {
+                Warn($"Graphic {name} is larger than any label once magnified and was dropped.");
+                return;
+            }
+
             (bool[] black, int width, int height) = Magnify(bitmap, magX, magY);
             Add(new ImageElement
             {

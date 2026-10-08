@@ -31,6 +31,19 @@ public sealed record GraphicBitmap(bool[] Black, int Width, int Height);
 /// </summary>
 public static class GraphicField
 {
+    /// <summary>
+    /// The most dots a decoded graphic may hold: the same ceiling the preview applies to a
+    /// magnified recall. A 4 x 6 inch label at 600 dpi is under 9 million dots, so anything
+    /// past this is a corrupt or hostile header, and refusing it keeps one bad graphic from
+    /// overflowing an allocation and taking the rest of the file down with it.
+    /// </summary>
+    public const long MaxPixels = 64_000_000;
+
+    /// <summary>Whether a graphic of this size stays within <see cref="MaxPixels"/>.</summary>
+    public static bool FitsALabel(long width, long height) =>
+        width > 0 && height > 0 && width <= MaxPixels && height <= MaxPixels &&
+        width * height <= MaxPixels;
+
     /// <summary>Compresses a black mask into the hex payload of a ~DG or ^GF command
     /// (the data only; the caller writes the command and its byte counts).</summary>
     public static string Encode(bool[] black, int width, int height)
@@ -77,7 +90,7 @@ public static class GraphicField
         }
 
         int height = totalBytes / bytesPerRow;
-        if (height <= 0)
+        if (height <= 0 || !FitsALabel((long)bytesPerRow * 8, height))
         {
             return null;
         }
@@ -315,11 +328,20 @@ public static class GraphicField
         {
             try
             {
+                // Inflated no further than the declared size, which is all that is kept
+                // below anyway: a small stream can expand to gigabytes.
                 using var input = new MemoryStream(raw);
                 using var zlib = new ZLibStream(input, CompressionMode.Decompress);
-                using var output = new MemoryStream(totalBytes);
-                zlib.CopyTo(output);
-                raw = output.ToArray();
+                var inflated = new byte[totalBytes];
+                int filled = 0;
+                int read;
+                while (filled < totalBytes &&
+                       (read = zlib.Read(inflated, filled, totalBytes - filled)) > 0)
+                {
+                    filled += read;
+                }
+
+                raw = filled == totalBytes ? inflated : inflated[..filled];
             }
             catch (InvalidDataException)
             {
