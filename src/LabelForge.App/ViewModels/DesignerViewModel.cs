@@ -2644,9 +2644,18 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         Selection.SetMany(Groups.Expand(Document, Selection.Items));
+        RefreshGroupCommands();
         RefreshOutline();
         RecordUndo();
         ScheduleRender();
+    }
+
+    /// <summary>Grouping changes what Group and Ungroup can do without necessarily
+    /// changing the selection, which is what normally tells them to look again.</summary>
+    private void RefreshGroupCommands()
+    {
+        GroupSelectionCommand.NotifyCanExecuteChanged();
+        UngroupSelectionCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand(CanExecute = nameof(CanUngroup))]
@@ -2657,6 +2666,7 @@ public partial class DesignerViewModel : ViewModelBase
             return;
         }
 
+        RefreshGroupCommands();
         RefreshOutline();
         RecordUndo();
         ScheduleRender();

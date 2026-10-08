@@ -32,6 +32,7 @@ internal static class AuditChecks
 
         PreviewHonoursTheLabelsOwnMarkers(d, check);
         PasteAtTheEdgeKeepsTheGroupsLayout(d, check);
+        GroupingRefreshesTheMenu(d, check);
 
         d.AcceptDiscard();
         window.Close();
@@ -88,6 +89,39 @@ internal static class AuditChecks
             string.Join(",", pasted.Zip(pasted.Skip(1), (a, b) => b - a)), "200,200");
         check("audit: paste near the edge keeps every copy on the label",
             pasted.All(x => x >= 0 && x < d.Document.WidthDots), true);
+    }
+
+    /// <summary>Group and Ungroup change what each other can do without changing the
+    /// selection, so the menu items have to be told, or Group stays greyed after an
+    /// Ungroup until something else is clicked.</summary>
+    private static void GroupingRefreshesTheMenu(
+        DesignerViewModel d, Action<string, object?, object?> check)
+    {
+        var document = new LabelDocument { WidthMm = 100, HeightMm = 60, Dpmm = 8 };
+        document.Elements.Add(new TextElement { X = 10, Y = 10, Text = "one", FontHeightDots = 30 });
+        document.Elements.Add(new TextElement { X = 10, Y = 60, Text = "two", FontHeightDots = 30, ZOrder = 1 });
+        d.LoadDocument(document, null);
+        Pump(200);
+        d.Selection.SetMany(d.Document.Elements.ToList());
+        d.GroupSelectionCommand.Execute(null);
+        Pump(100);
+
+        int told = 0;
+        void Count(object? sender, EventArgs e) => told++;
+        d.GroupSelectionCommand.CanExecuteChanged += Count;
+        d.UngroupSelectionCommand.Execute(null);
+        Pump(100);
+        d.GroupSelectionCommand.CanExecuteChanged -= Count;
+
+        check("audit: Ungroup tells Group it can run again", told > 0, true);
+        check("audit: Group can run after Ungroup", d.GroupSelectionCommand.CanExecute(null), true);
+
+        told = 0;
+        d.UngroupSelectionCommand.CanExecuteChanged += Count;
+        d.UndoCommand.Execute(null);
+        Pump(100);
+        d.UngroupSelectionCommand.CanExecuteChanged -= Count;
+        check("audit: undoing an Ungroup tells Ungroup", told > 0, true);
     }
 
     private static void Wait(Task task)
