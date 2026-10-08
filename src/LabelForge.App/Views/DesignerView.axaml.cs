@@ -1165,8 +1165,17 @@ public partial class DesignerView : UserControl
         {
             // Explicit UTF-8 without a BOM: the label declares ^CI28, and three BOM
             // bytes in front of ^XA are bytes a printer has no reason to tolerate.
-            await LabelForge.Core.Io.ZplTextFile.WriteFileAsync(path, vm.GeneratedZpl);
-            vm.StatusText = $"Exported {Path.GetFileName(path)}";
+            // A locked or read-only target is reported, never left to escape this async
+            // void handler, where it would take the app down with it.
+            try
+            {
+                await LabelForge.Core.Io.ZplTextFile.WriteFileAsync(path, vm.GeneratedZpl);
+                vm.StatusText = $"Exported {Path.GetFileName(path)}";
+            }
+            catch (Exception ex)
+            {
+                vm.StatusText = $"Could not export: {ex.Message}";
+            }
         }
     }
 
@@ -1265,9 +1274,16 @@ public partial class DesignerView : UserControl
 
         if (file?.TryGetLocalPath() is { } path)
         {
-            byte[] png = await vm.RenderPngAsync();
-            await File.WriteAllBytesAsync(path, png);
-            vm.StatusText = $"Exported {Path.GetFileName(path)}";
+            try
+            {
+                byte[] png = await vm.RenderPngAsync();
+                await File.WriteAllBytesAsync(path, png);
+                vm.StatusText = $"Exported {Path.GetFileName(path)}";
+            }
+            catch (Exception ex)
+            {
+                vm.StatusText = $"Could not export: {ex.Message}";
+            }
         }
     }
 
