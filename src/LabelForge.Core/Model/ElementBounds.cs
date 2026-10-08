@@ -40,6 +40,25 @@ public sealed class ElementBoundsCalculator : IElementVisitor
     }
 
     /// <summary>
+    /// The drawn box without the digits EAN-13 and UPC-A print outside their guard bars;
+    /// the same as <see cref="GetBounds"/> for everything else. What a quiet zone is
+    /// measured from, since those digits sit inside the zone by the standard.
+    /// </summary>
+    public DotRect GetSymbolBounds(Element element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        if (element is not BarcodeElement barcode)
+        {
+            return GetBounds(element);
+        }
+
+        DotRect local = GetLocalBounds(barcode);
+        (int x, int y) = FieldTypeset.DrawnTopLeft(barcode, local);
+        DotRect drawn = Turn(local, local with { Height = barcode.HeightDots }, barcode.Orientation);
+        return drawn with { X = drawn.X + x, Y = drawn.Y + y };
+    }
+
+    /// <summary>
     /// The barcode's drawn box: the symbol, the interpretation line already under it, and
     /// the digit EAN-13 and UPC-A print outside their guard bars.
     ///
