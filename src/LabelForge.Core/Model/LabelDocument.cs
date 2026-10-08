@@ -27,9 +27,24 @@ public sealed class LabelDocument
     /// The assigned value is kept underneath, so turning continuous stock off restores a
     /// real die-cut height rather than freezing whatever the content happened to measure.
     /// </summary>
+    [JsonIgnore]
     public double HeightMm
     {
         get => IsContinuous ? ContinuousLength.Mm(this) : _heightMm;
+        set => _heightMm = value;
+    }
+
+    /// <summary>
+    /// What the .lfl and every undo snapshot store under "HeightMm": the assigned height,
+    /// never the measured one. Writing the getter above would replace the die-cut height
+    /// with the content's length on the first save or undo of a continuous label, and
+    /// turning continuous off would then restore that instead.
+    /// </summary>
+    [JsonInclude]
+    [JsonPropertyName("HeightMm")]
+    private double StoredHeightMm
+    {
+        get => _heightMm;
         set => _heightMm = value;
     }
 
