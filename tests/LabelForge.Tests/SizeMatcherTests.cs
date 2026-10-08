@@ -27,6 +27,32 @@ public sealed class SizeMatcherTests
         Assert.Equal(40, other.HeightDots);
     }
 
+    /// <summary>A barcode turned a quarter runs its bars down the label, so its drawn
+    /// height is what the module width sets and its drawn width is the bar height. Matching
+    /// the drawn height has to change the module and leave the bars as tall as they were.</summary>
+    [Theory]
+    [InlineData(Orientation.Rotated90)]
+    [InlineData(Orientation.Rotated270)]
+    public void MatchesARotatedFieldOnItsDrawnAxes(Orientation orientation)
+    {
+        var bar = new BarcodeElement
+        {
+            X = 100, Y = 100, Data = "ABC12345", HeightDots = 80, ModuleWidthDots = 2,
+            PrintInterpretationLine = false, Orientation = orientation,
+        };
+        var bounds = new ElementBoundsCalculator();
+        DotRect before = bounds.GetBounds(bar);
+        var reference = Box(50, before.Height * 2);
+
+        SizeMatcher.Match([reference, bar], reference, width: false, height: true);
+
+        DotRect after = bounds.GetBounds(bar);
+        Assert.Equal(80, bar.HeightDots);
+        Assert.Equal(4, bar.ModuleWidthDots);
+        Assert.Equal(before.Width, after.Width);
+        Assert.Equal(before.Height * 2, after.Height);
+    }
+
     [Fact]
     public void MatchesBothSides()
     {
