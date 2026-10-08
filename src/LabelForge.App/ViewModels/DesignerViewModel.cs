@@ -2512,15 +2512,20 @@ public partial class DesignerViewModel : ViewModelBase
             ? 0
             : Document.Elements.Max(e => e.ZOrder) + 1;
 
+        // Clamped as one: the delta itself is limited so every origin lands on the label,
+        // rather than each element clamped on its own, which stacked a group against the
+        // edge it was pasted near.
+        if (clamp)
+        {
+            dx = ClampGroupDelta(clones.Min(e => e.X), clones.Max(e => e.X), dx, Document.WidthDots);
+            dy = ClampGroupDelta(clones.Min(e => e.Y), clones.Max(e => e.Y), dy, Document.HeightDots);
+        }
+
         foreach (Element element in clones)
         {
             element.Id = Guid.NewGuid();
-            element.X = clamp
-                ? Math.Clamp(element.X + dx, 0, Math.Max(Document.WidthDots - 1, 0))
-                : element.X + dx;
-            element.Y = clamp
-                ? Math.Clamp(element.Y + dy, 0, Math.Max(Document.HeightDots - 1, 0))
-                : element.Y + dy;
+            element.X += dx;
+            element.Y += dy;
             element.ZOrder = nextZ++;
             Document.Elements.Add(element);
         }
@@ -2583,6 +2588,20 @@ public partial class DesignerViewModel : ViewModelBase
             CascadeDelta(clones.Min(e => e.Y), clones.Max(e => e.Y), Math.Max(Document.HeightDots - 1, 0)),
             clamp: false);
         return true;
+    }
+
+    /// <summary>The paste offset along one axis, moved the least it takes for origins
+    /// spanning [min, max] to land within [0, size). A group wider than the label keeps
+    /// its first origin at 0.</summary>
+    private static int ClampGroupDelta(int min, int max, int delta, int size)
+    {
+        int limit = Math.Max(size - 1, 0);
+        if (max + delta > limit)
+        {
+            delta = limit - max;
+        }
+
+        return min + delta < 0 ? -min : delta;
     }
 
     /// <summary>The cascade offset along one axis for a group whose origins span

@@ -31,6 +31,7 @@ internal static class AuditChecks
         DesignerViewModel d = vm.Designer;
 
         PreviewHonoursTheLabelsOwnMarkers(d, check);
+        PasteAtTheEdgeKeepsTheGroupsLayout(d, check);
 
         d.AcceptDiscard();
         window.Close();
@@ -59,6 +60,43 @@ internal static class AuditChecks
         check("audit: the canvas substitutes the label's own markers",
             d.WorkspaceMessages.Any(m => m.Contains("digits", StringComparison.OrdinalIgnoreCase)), false);
         check("audit: the canvas draws that barcode", d.Underlay is not null, true);
+    }
+
+    /// <summary>Pasting a copied group near the edge moves it back as one, rather than
+    /// clamping each element on its own and stacking them against the edge.</summary>
+    private static void PasteAtTheEdgeKeepsTheGroupsLayout(
+        DesignerViewModel d, Action<string, object?, object?> check)
+    {
+        var document = new LabelDocument { WidthMm = 100, HeightMm = 60, Dpmm = 8 };
+        for (int i = 0; i < 3; i++)
+        {
+            document.Elements.Add(new TextElement
+            {
+                X = 10 + 200 * i, Y = 20, Text = $"item {i}", FontHeightDots = 30, ZOrder = i,
+            });
+        }
+
+        d.LoadDocument(document, null);
+        Pump(300);
+        d.Selection.SetMany(d.Document.Elements.ToList());
+        Wait(d.CopyCommand.ExecuteAsync(null));
+        Wait(d.PasteAt(d.Document.WidthDots - 50, 300));
+        Pump(300);
+
+        int[] pasted = [.. d.Document.Elements.Skip(3).Select(e => e.X).Order()];
+        check("audit: paste near the edge keeps the copies' spacing",
+            string.Join(",", pasted.Zip(pasted.Skip(1), (a, b) => b - a)), "200,200");
+        check("audit: paste near the edge keeps every copy on the label",
+            pasted.All(x => x >= 0 && x < d.Document.WidthDots), true);
+    }
+
+    private static void Wait(Task task)
+    {
+        var timer = Stopwatch.StartNew();
+        while (!task.IsCompleted && timer.ElapsedMilliseconds < 5000)
+        {
+            Pump(20);
+        }
     }
 
     private static void Pump(int milliseconds)
