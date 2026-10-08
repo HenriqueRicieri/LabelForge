@@ -50,7 +50,6 @@ public partial class DesignerViewModel : ViewModelBase
     private readonly ElementBoundsCalculator _readoutBounds = new();
 
     private readonly IZplRenderer _renderer = new BinaryKitsRenderer();
-    private readonly TemplateSubstitutor _substitutor = new();
 
     /// <summary>One render at a time, and the one waiting is always the newest. Built in
     /// the constructor because it needs an instance method to call.</summary>
@@ -3414,7 +3413,9 @@ public partial class DesignerViewModel : ViewModelBase
         // The preview resolves every marker to something renderable: the user's sample,
         // the counter's first value, or the current date. Exported and printed ZPL keeps
         // external markers literal.
-        previewZpl = _substitutor.Substitute(
+        // With this label's own delimiters, since a system that writes {{NAME}} is as
+        // welcome as the default.
+        previewZpl = new TemplateSubstitutor(document.Markers).Substitute(
             previewZpl, inner => VariableValues.ForPreview(document, inner, now));
 
         // Everything the drawn bitmap depends on. A clock variable makes this differ
