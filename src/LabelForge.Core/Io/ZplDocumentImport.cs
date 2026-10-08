@@ -488,13 +488,28 @@ public static class ZplDocumentImport
                     return;
 
                 case "BX":
+                {
                     _orientation = ToOrientation(command.Arg(0));
-                    _dataMatrixModule = Math.Clamp(command.Int(1, 4), 1, 20);
+
+                    // Zero or nothing hands the size to ^BY's bar height, which the model
+                    // does not carry, so the module this assumes is said out loud.
+                    int module = command.Int(1, 0);
+                    if (module <= 0)
+                    {
+                        Warn("A Data Matrix (^BX) states no module size, so the printer sizes "
+                             + "it from ^BY's bar height. It was imported at 4 dots per module; "
+                             + "check its size.");
+                        module = 4;
+                    }
+
+                    _dataMatrixModule = Math.Clamp(module, 1, 20);
                     return;
+                }
 
                 case "BQ":
                     _orientation = ToOrientation(command.Arg(0));
-                    _qrMagnification = Math.Clamp(command.Int(2, 5), 1, 10);
+                    _qrMagnification = Math.Clamp(
+                        command.Int(2, DefaultQrMagnification(dpmm)), 1, 10);
                     return;
 
                 case "B7":
@@ -960,6 +975,16 @@ public static class ZplDocumentImport
             block.Variables[name] = counter;
             return name;
         }
+
+        /// <summary>The ^BQ magnification a printer uses when the command states none. The
+        /// manual ties it to the printer: 1 at 150 dpi, 2 at 200, 3 at 300, 6 at 600.</summary>
+        private static int DefaultQrMagnification(int dpmm) => dpmm switch
+        {
+            <= 6 => 1,
+            <= 8 => 2,
+            <= 12 => 3,
+            _ => 6,
+        };
 
         /// <summary>^BQ carries the error correction level and input mode in front of the
         /// payload ("MA,text"). Anything else is taken as the payload itself.</summary>

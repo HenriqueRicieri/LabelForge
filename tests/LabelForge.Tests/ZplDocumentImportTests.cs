@@ -338,6 +338,46 @@ public sealed class ZplDocumentImportTests
         Assert.Equal(7, qr.Magnification);
     }
 
+    /// <summary>The manual's ^BQ magnification default depends on the printer: 2 at
+    /// 200 dpi, 3 at 300 and 6 at 600. An omitted one has to import as what that printer
+    /// would draw, or regenerating the label states a different size.</summary>
+    [Theory]
+    [InlineData(8, 2)]
+    [InlineData(12, 3)]
+    [InlineData(24, 6)]
+    public void QrWithoutMagnification_TakesThePrintersDefault(int dpmm, int expected)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA\n^FO0,0^BQN,2^FDQA,hello^FS\n^XZ", dpmm);
+
+        var qr = Assert.IsType<QrCodeElement>(Assert.Single(result.Document.Elements));
+        Assert.Equal(expected, qr.Magnification);
+    }
+
+    /// <summary>^BX without a module size takes the symbol height from ^BY, which the
+    /// model does not carry, so the import says what it assumed.</summary>
+    [Theory]
+    [InlineData("^BXN")]
+    [InlineData("^BXN,0,200")]
+    public void DataMatrixWithoutModuleSize_IsReported(string command)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n^FO0,0{command}^FDhello^FS\n^XZ");
+
+        Assert.IsType<DataMatrixElement>(Assert.Single(result.Document.Elements));
+        Assert.Contains(result.Warnings, w => w.Contains("^BX", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void DataMatrixWithModuleSize_IsNotReported()
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA\n^FO0,0^BXN,6,200^FDhello^FS\n^XZ");
+
+        Assert.Equal(6, Assert.IsType<DataMatrixElement>(Assert.Single(result.Document.Elements)).ModuleSizeDots);
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("^BX", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void MultipleBlocks_AreCountedAndSelectable()
     {
