@@ -241,6 +241,30 @@ public sealed class ZplGenerator : IElementVisitor
         }
 
         _sb.Append("^XZ");
+
+        // ^LR and ^PM stay on in the printer after this label ("until ^LRN", "until ^PMN"),
+        // so the next job, from whatever system, would print reversed or mirrored unless it
+        // happens to state them. A settings-only block turns off what this label turned on,
+        // the kind of block the ZDesigner driver sends; it prints nothing. A label that
+        // turned neither on is left byte for byte as it was.
+        if (!includeOffLabel && context.EmitStateReset &&
+            (document.Print.ReverseAll || document.Print.Mirror))
+        {
+            _sb.Append('\n');
+            Line("^XA");
+            if (document.Print.ReverseAll)
+            {
+                Line("^LRN");
+            }
+
+            if (document.Print.Mirror)
+            {
+                Line("^PMN");
+            }
+
+            _sb.Append("^XZ");
+        }
+
         LastRun = new GenerationInfo(
             _printerCounter, _printerClock, _softwareCounter, _warnings.ToArray());
 

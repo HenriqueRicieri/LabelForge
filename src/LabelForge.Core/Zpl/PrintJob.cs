@@ -100,6 +100,7 @@ public static class PrintJob
                     CopyIndex = row * columns,
                     EmitCopies = false,
                     IncludeGraphicDownloads = row == 0,
+                    EmitStateReset = row == builtRows - 1,
                 }));
             sb.Append('\n');
         }

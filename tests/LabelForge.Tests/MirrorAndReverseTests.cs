@@ -55,7 +55,7 @@ public sealed class MirrorAndReverseTests
         doc.Print.Mirror = true;
 
         Assert.Equal(
-            Header(480, 320) + "^PMY\n^FO0,0^A0N,30^FDA^FS\n^XZ",
+            Header(480, 320) + "^PMY\n^FO0,0^A0N,30^FDA^FS\n^XZ\n^XA\n^PMN\n^XZ",
             new ZplGenerator().Generate(doc));
     }
 
@@ -68,8 +68,60 @@ public sealed class MirrorAndReverseTests
         doc.Print.ReverseAll = true;
 
         Assert.Equal(
-            Header(480, 320) + "^LRY\n^FO0,0^A0N,30^FDA^FS\n^XZ",
+            Header(480, 320) + "^LRY\n^FO0,0^A0N,30^FDA^FS\n^XZ\n^XA\n^LRN\n^XZ",
             new ZplGenerator().Generate(doc));
+    }
+
+    /// <summary>
+    /// Both stay on in the printer after the label, "until ^LRN" and "until ^PMN" in the
+    /// manual's words, so a label that turned one on turns it back off in a settings-only
+    /// block after itself, the kind the ZDesigner driver sends. Otherwise the next job,
+    /// written by something that never mentions either, prints reversed or mirrored.
+    /// Only what was turned on is turned off.
+    /// </summary>
+    [Fact]
+    public void BothAreTurnedOffAfterTheLabel()
+    {
+        LabelDocument doc = Labelled();
+        doc.Print.Mirror = true;
+        doc.Print.ReverseAll = true;
+
+        Assert.EndsWith(
+            "^FO0,0^A0N,30^FDA^FS\n^XZ\n^XA\n^LRN\n^PMN\n^XZ",
+            new ZplGenerator().Generate(doc), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ThePreviewHasNoResetBlock()
+    {
+        LabelDocument doc = Labelled();
+        doc.Print.Mirror = true;
+        doc.Print.ReverseAll = true;
+
+        string preview = new ZplGenerator().GeneratePreview(doc, offsetDots: 0);
+
+        Assert.DoesNotContain("^LRN", preview, StringComparison.Ordinal);
+        Assert.Equal(1, preview.Split("^XA").Length - 1);
+    }
+
+    /// <summary>A run this PC numbers is one block per label; the reset belongs after the
+    /// last of them, once, not between labels that all want the option on.</summary>
+    [Fact]
+    public void ARunOfBlocks_IsResetOnceAtTheEnd()
+    {
+        LabelDocument doc = Doc(new TextElement { X = 0, Y = 0, FontHeightDots = 30, Text = "##N##" });
+        doc.Variables["N"] = new VariableDefinition
+        {
+            Kind = VariableKind.Counter, UsePrinterCounter = false,
+        };
+        doc.Print.Copies = 3;
+        doc.Print.ReverseAll = true;
+
+        string zpl = PrintJob.Build(doc, DateTime.Now).Zpl;
+
+        Assert.Equal(1, zpl.Split("^LRN").Length - 1);
+        Assert.EndsWith("^XA\n^LRN\n^XZ", zpl.TrimEnd(), StringComparison.Ordinal);
+        Assert.Equal(3, zpl.Split("^LRY").Length - 1);
     }
 
     /// <summary>
