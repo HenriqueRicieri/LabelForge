@@ -156,6 +156,24 @@ internal static class UnsavedChangesChecks
             ReferenceEquals(d.SelectedImportedBlock, first) && d.Document.Elements.Count == 2, true);
         check("unsaved: Cancel puts the picker back", ReferenceEquals(picker.SelectedItem, first), true);
 
+        // The strip naming the imported file belongs to that file. Moving on to another
+        // label lets go of it, or picking a block there would re-import the old file over
+        // whatever is open now.
+        d.NewDocumentCommand.Execute(null);
+        Pump(200);
+        check("unsaved: a new label lets go of the imported file",
+            d.HasImportedBlocks || d.ImportedFrom.Length > 0, false);
+        d.ImportZplDocument(TwoLabels, "two-labels.zpl");
+        Pump(200);
+        d.OpenLabelFile(path);
+        Pump(200);
+        check("unsaved: opening a label lets go of the imported file",
+            d.HasImportedBlocks || d.ImportedFrom.Length > 0, false);
+        d.ImportZplDocument(TwoLabels, "two-labels.zpl");
+        Pump(200);
+        check("unsaved: an import still offers its other labels", d.HasImportedBlocks, true);
+        AddText(d, "picker guard");
+
         // The title follows the tab on show.
         vm.SelectedTab = MainViewModel.ViewerTab;
         Pump(200);

@@ -1474,6 +1474,15 @@ public partial class DesignerViewModel : ViewModelBase
     {
         _drawingElement = null;
         CancelInsert();
+
+        // The strip offering an imported file's other labels belongs to that file. Any
+        // other way of replacing the label lets go of it, or picking a block there would
+        // re-import the old file over whatever was opened since.
+        if (!_openingImportedBlock)
+        {
+            CloseImportedFile();
+        }
+
         _restoring = true;
         try
         {
@@ -1879,9 +1888,12 @@ public partial class DesignerViewModel : ViewModelBase
     /// </summary>
     public void ImportZplDocument(string zpl, string sourceName)
     {
+        // Parsed before anything is remembered, so a file that cannot be read leaves the
+        // previous import's strip exactly as it was.
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(zpl, Document.Dpmm);
         _importedZpl = zpl;
         _importedName = sourceName;
-        OpenImportedBlock(ZplDocumentImport.FromZpl(zpl, Document.Dpmm), sourceName);
+        OpenImportedBlock(result, sourceName);
     }
 
     /// <summary>The ZPL an import came from, kept so the file's other labels stay
@@ -1920,9 +1932,19 @@ public partial class DesignerViewModel : ViewModelBase
 
     private bool _switchingBlock;
 
+    private bool _openingImportedBlock;
+
     private void OpenImportedBlock(ZplDocumentImportResult result, string sourceName)
     {
-        LoadDocument(result.Document, path: null);
+        _openingImportedBlock = true;
+        try
+        {
+            LoadDocument(result.Document, path: null);
+        }
+        finally
+        {
+            _openingImportedBlock = false;
+        }
 
         // Rebuilt here rather than only on the first import, because the density can
         // change between one block and the next and the counts come from the parse.
