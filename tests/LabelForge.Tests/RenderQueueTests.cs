@@ -1,4 +1,4 @@
-using LabelForge.Core.Rendering;
+﻿using LabelForge.Core.Rendering;
 
 namespace LabelForge.Tests;
 
@@ -7,6 +7,9 @@ namespace LabelForge.Tests;
 /// held open on a TaskCompletionSource the test releases by hand, so what is asserted is
 /// the ordering and not how fast this machine happens to be.
 /// </summary>
+// The jobs here block pool threads on purpose and wait for the next one to start, which
+// the parallel rendering corpus can starve; one failed under a full run and passed alone.
+[Collection("Render queue")]
 public sealed class RenderQueueTests
 {
     /// <summary>A job that does not finish until the test says so, and counts how many
@@ -222,3 +225,6 @@ public sealed class RenderQueueTests
         Assert.Equal(2, started);
     }
 }
+
+[CollectionDefinition("Render queue", DisableParallelization = true)]
+public sealed class RenderQueueCollection { }

@@ -3409,7 +3409,10 @@ if (mode == "designer")
     var recovered = new MainViewModel(
         new LabelForge.Core.Media.UserMediaStore(presetsPath),
         new LabelForge.Core.Fields.FieldCatalogStore(catalogsPath),
-        new LabelForge.Core.Io.RecoveryStore(recoveryDir, "second-start"));
+        new LabelForge.Core.Io.RecoveryStore(recoveryDir, "second-start"),
+        userSettingsStore: new LabelForge.Core.Settings.UserSettingsStore(
+            Path.Combine(scratchRoot, "second-start-settings.json")),
+        recentFilesPath: Path.Combine(scratchRoot, "second-start-recent.json"));
     Check("recovery: offered on next start", recovered.Designer.HasRecoveryOffer, true);
     Console.WriteLine($"  offer: '{recovered.Designer.RecoveryOffer}'");
     recovered.Designer.RecoverDocumentCommand.Execute(null);
@@ -3425,7 +3428,10 @@ if (mode == "designer")
     var afterCleanExit = new MainViewModel(
         new LabelForge.Core.Media.UserMediaStore(presetsPath),
         new LabelForge.Core.Fields.FieldCatalogStore(catalogsPath),
-        new LabelForge.Core.Io.RecoveryStore(recoveryDir, "third-start"));
+        new LabelForge.Core.Io.RecoveryStore(recoveryDir, "third-start"),
+        userSettingsStore: new LabelForge.Core.Settings.UserSettingsStore(
+            Path.Combine(scratchRoot, "third-start-settings.json")),
+        recentFilesPath: Path.Combine(scratchRoot, "third-start-recent.json"));
     Check("recovery: quiet after a clean exit", !afterCleanExit.Designer.HasRecoveryOffer, true);
 
     // Opening a file the app was started with: a double-clicked label, "Open with", or a

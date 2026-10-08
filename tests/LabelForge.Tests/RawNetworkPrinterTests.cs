@@ -1,10 +1,14 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using LabelForge.Core.Printing;
 
 namespace LabelForge.Tests;
 
+// Connect and read deadlines of a few hundred milliseconds, which the parallel rendering
+// corpus could starve of a worker thread: one of these failed under a full run and
+// passed alone.
+[Collection("Printer status")]
 public sealed class RawNetworkPrinterTests
 {
     [Fact]
