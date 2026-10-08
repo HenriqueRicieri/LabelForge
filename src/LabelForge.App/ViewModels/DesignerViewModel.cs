@@ -1022,7 +1022,7 @@ public partial class DesignerViewModel : ViewModelBase
         string lfl = SerializeDocument();
         try
         {
-            await File.WriteAllTextAsync(path, lfl);
+            await AtomicFile.WriteAllTextAsync(path, lfl);
         }
         catch (Exception ex)
         {

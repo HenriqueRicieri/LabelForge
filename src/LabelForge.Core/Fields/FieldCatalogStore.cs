@@ -112,7 +112,7 @@ public sealed class FieldCatalogStore
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllText(_path, JsonSerializer.Serialize(entries, Options));
+            AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(entries, Options));
             return new FieldCatalogResult(entries, null);
         }
         catch (Exception ex)

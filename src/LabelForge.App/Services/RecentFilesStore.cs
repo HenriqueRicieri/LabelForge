@@ -63,7 +63,7 @@ public static class RecentFilesStore
         {
             string file = storagePath ?? FilePath;
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-            File.WriteAllText(file, JsonSerializer.Serialize(entries));
+            LabelForge.Core.Io.AtomicFile.WriteAllText(file, JsonSerializer.Serialize(entries));
         }
         catch (Exception)
         {
