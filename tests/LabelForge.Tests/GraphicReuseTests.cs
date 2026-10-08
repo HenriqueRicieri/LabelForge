@@ -36,6 +36,53 @@ public sealed class GraphicReuseTests
         return document;
     }
 
+    /// <summary>
+    /// The manual limits ^GF's byte counts to 1-99999 and sets anything larger to the
+    /// limit, so an inline image past it would print cut short while the preview drew it
+    /// whole. ~DG states no such limit, so a large image goes through the download path a
+    /// repeated image already uses, and the label says why.
+    /// </summary>
+    [Fact]
+    public void AnImagePastTheGfLimit_IsDownloadedAndReported()
+    {
+        // 800 dots is 100 bytes a row, times 1000 rows: 100,000 bytes.
+        ImageElement large = Stamp(0, 0);
+        large.Name = "logo";
+        large.WidthDots = 800;
+        large.HeightDots = 1000;
+        var document = new LabelDocument { WidthMm = 110, HeightMm = 130, Dpmm = 8 };
+        document.Elements.Add(large);
+
+        var generator = new ZplGenerator();
+        string zpl = generator.Generate(document);
+
+        Assert.StartsWith("~DGR:LFG0.GRF,100000,100,", zpl, StringComparison.Ordinal);
+        Assert.Contains("^FO0,0^XGR:LFG0.GRF,1,1^FS", zpl, StringComparison.Ordinal);
+        Assert.DoesNotContain("^GFA", zpl, StringComparison.Ordinal);
+        string warning = Assert.Single(generator.LastRun.Warnings);
+        Assert.Contains("\"logo\"", warning, StringComparison.Ordinal);
+        Assert.Contains("100,000", warning, StringComparison.Ordinal);
+        Assert.Contains("~DG", warning, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnImageJustUnderTheGfLimit_StaysInline()
+    {
+        // 100 bytes a row times 999 rows: 99,900 bytes.
+        ImageElement large = Stamp(0, 0);
+        large.WidthDots = 800;
+        large.HeightDots = 999;
+        var document = new LabelDocument { WidthMm = 110, HeightMm = 130, Dpmm = 8 };
+        document.Elements.Add(large);
+
+        var generator = new ZplGenerator();
+        string zpl = generator.Generate(document);
+
+        Assert.Contains("^GFA,99900,99900,100,", zpl, StringComparison.Ordinal);
+        Assert.DoesNotContain("~DG", zpl, StringComparison.Ordinal);
+        Assert.Empty(generator.LastRun.Warnings);
+    }
+
     [Fact]
     public void OneImage_StaysInlineAndTouchesNoPrinterMemory()
     {

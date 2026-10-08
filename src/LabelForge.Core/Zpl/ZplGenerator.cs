@@ -42,12 +42,22 @@ public sealed class ZplGenerator : IElementVisitor
     private bool _printerClock;
     private bool _softwareCounter;
 
-    /// <summary>An image that appears more than once, downloaded once under a name.</summary>
+    /// <summary>An image downloaded once under a name: one that appears more than once, or
+    /// one too large for an inline ^GF.</summary>
     /// <param name="Name">Storage name; short, because Zebra caps it at eight characters.</param>
     /// <param name="Uses">How many elements share these bits.</param>
-    private sealed record SharedGraphic(string Name, int Uses)
+    /// <param name="TooLargeInline">Downloaded because ^GF cannot carry it.</param>
+    private sealed record SharedGraphic(string Name, int Uses, bool TooLargeInline)
     {
         public bool Downloaded { get; set; }
+    }
+
+    private void Warn(string warning)
+    {
+        if (_seenWarnings.Add(warning))
+        {
+            _warnings.Add(warning);
+        }
     }
 
     /// <summary>How the last <see cref="Generate(LabelDocument)"/> produced its dynamic
@@ -277,6 +287,10 @@ public sealed class ZplGenerator : IElementVisitor
     /// stays an inline ^GF, so an ordinary label touches no printer state at all. The
     /// same bits placed again become a single ~DG download recalled by ^XG, which is
     /// what a repeated stamp costs on a real label: the payload once instead of N times.
+    ///
+    /// The one exception is an image past ^GF's limit: the manual takes 1-99999 bytes
+    /// and sets anything larger to the limit, so the printer would cut it short while the
+    /// preview drew it whole. ~DG states no such limit, so it goes down that path too.
     /// </summary>
     /// <param name="columns">How many times the whole element list is emitted. A stamp
     /// placed once on 3-across stock is still three placements on the web, so the download
@@ -285,6 +299,7 @@ public sealed class ZplGenerator : IElementVisitor
     {
         var order = new List<string>();
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var tooLarge = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (Element element in elements)
         {
@@ -299,13 +314,18 @@ public sealed class ZplGenerator : IElementVisitor
             }
 
             counts[key] = seen + Math.Max(columns, 1);
+            if (Imaging.ZplImageEncoder.ByteCount(image.WidthDots, image.HeightDots)
+                > Imaging.ZplImageEncoder.MaxInlineBytes)
+            {
+                tooLarge.Add(key);
+            }
         }
 
         // Named in first-use order so the same document always generates the same ZPL.
         int index = 0;
-        foreach (string key in order.Where(k => counts[k] > 1))
+        foreach (string key in order.Where(k => counts[k] > 1 || tooLarge.Contains(k)))
         {
-            _graphics[key] = new SharedGraphic($"LFG{index++}", counts[key]);
+            _graphics[key] = new SharedGraphic($"LFG{index++}", counts[key], tooLarge.Contains(key));
         }
     }
 
@@ -507,6 +527,19 @@ public sealed class ZplGenerator : IElementVisitor
                         .Append(Imaging.ZplImageEncoder.EncodeDownload(
                             shared.Name, bits, element.WidthDots, element.HeightDots))
                         .Append('\n');
+                }
+
+                if (shared.TooLargeInline)
+                {
+                    // Whoever takes this ZPL into another system has to know the label is
+                    // now two parts, or the download gets left behind.
+                    string name = string.IsNullOrWhiteSpace(element.Name) ? "Image" : element.Name;
+                    int bytes = Imaging.ZplImageEncoder.ByteCount(element.WidthDots, element.HeightDots);
+                    Warn(FormattableString.Invariant(
+                        $"Image \"{name}\" is {bytes:N0} bytes, above the {Imaging.ZplImageEncoder.MaxInlineBytes:N0} ^GF allows. ")
+                        + "It goes as ~DG at the start of the ZPL, sent with the label and kept "
+                        + "in the printer's memory. If your system sends only the part between "
+                        + "^XA and ^XZ, include the ~DG line too.");
                 }
 
                 shared.Downloaded = true;
