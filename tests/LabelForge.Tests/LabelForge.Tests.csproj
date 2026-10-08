@@ -22,6 +22,7 @@
     <!-- Committed, publishable synthetic ZPL corpus. Copied beside the test assembly
          so the corpus smoke tests have real data on a clean clone and on CI. -->
     <None Include="Fixtures\*.zpl" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\*.lfl" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
