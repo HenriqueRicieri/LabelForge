@@ -3175,9 +3175,15 @@ public partial class DesignerViewModel : ViewModelBase
         {
             Notify($"Could not open: {ex.Message}");
 
-            // A path that no longer opens has no business in a menu of paths to open.
-            // Harmless for one that was never in the list.
-            SyncRecentFiles(Services.RecentFilesStore.Remove(path, _recentFilesPath));
+            // A path that is gone has no business in a menu of paths to open. One that is
+            // only busy (held by another program, a share offline for a moment, a newer
+            // format) is still the user's label and stays. Harmless for one that was never
+            // in the list.
+            if (!File.Exists(path))
+            {
+                SyncRecentFiles(Services.RecentFilesStore.Remove(path, _recentFilesPath));
+            }
+
             return false;
         }
     }

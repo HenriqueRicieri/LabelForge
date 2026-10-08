@@ -33,6 +33,7 @@ internal static class AuditChecks
         PreviewHonoursTheLabelsOwnMarkers(d, check);
         PasteAtTheEdgeKeepsTheGroupsLayout(d, check);
         GroupingRefreshesTheMenu(d, check);
+        RecentFilesKeepALabelThatIsOnlyBusy(d, dir, check);
 
         d.AcceptDiscard();
         window.Close();
@@ -122,6 +123,28 @@ internal static class AuditChecks
         Pump(100);
         d.UngroupSelectionCommand.CanExecuteChanged -= Count;
         check("audit: undoing an Ungroup tells Ungroup", told > 0, true);
+    }
+
+    /// <summary>A label that cannot be opened right now (another program holds it, a share
+    /// is offline for a moment) is still a label; only one that is gone leaves the list.</summary>
+    private static void RecentFilesKeepALabelThatIsOnlyBusy(
+        DesignerViewModel d, string dir, Action<string, object?, object?> check)
+    {
+        string path = Path.Combine(dir, "busy.lfl");
+        d.LoadDocument(new LabelDocument { WidthMm = 50, HeightMm = 30, Dpmm = 8 }, null);
+        Wait(d.SaveToAsync(path));
+        check("audit: a saved label is a recent file", d.RecentFiles.Contains(path), true);
+
+        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            check("audit: a busy label does not open", d.OpenLabelFile(path), false);
+        }
+
+        check("audit: a busy label stays in the recent files", d.RecentFiles.Contains(path), true);
+
+        File.Delete(path);
+        d.OpenLabelFile(path);
+        check("audit: a deleted label leaves the recent files", d.RecentFiles.Contains(path), false);
     }
 
     private static void Wait(Task task)
