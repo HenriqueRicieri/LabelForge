@@ -381,14 +381,33 @@ public sealed class ZplGenerator : IElementVisitor
         _softwareCounter |= encoding.UsesSoftwareCounter;
         foreach (string warning in encoding.Warnings)
         {
-            if (_seenWarnings.Add(warning))
-            {
-                _warnings.Add(warning);
-            }
+            Warn(warning);
         }
 
+        WarnIfFieldTooLong(encoding.Zpl);
         return encoding.Zpl;
     }
+
+    /// <summary>The manual gives ^FD a 0 to 3072 byte string. Counted as sent: UTF-8,
+    /// after hex escaping. The preview draws longer data, so only a warning says so.</summary>
+    private void WarnIfFieldTooLong(string field)
+    {
+        int start = field.IndexOf("^FD", StringComparison.Ordinal);
+        if (start < 0)
+        {
+            return;
+        }
+
+        int end = field.EndsWith("^FS", StringComparison.Ordinal) ? field.Length - 3 : field.Length;
+        int bytes = System.Text.Encoding.UTF8.GetByteCount(field.AsSpan(start + 3, end - start - 3));
+        if (bytes > MaxFieldDataBytes)
+        {
+            Warn(FormattableString.Invariant(
+                $"A field holds {bytes:N0} bytes of data, above the {MaxFieldDataBytes:N0} the manual gives ^FD; the printer may not print all of it."));
+        }
+    }
+
+    private const int MaxFieldDataBytes = 3072;
 
     public void Visit(TextElement element)
     {

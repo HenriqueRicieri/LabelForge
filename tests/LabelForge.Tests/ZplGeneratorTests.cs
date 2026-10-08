@@ -293,6 +293,19 @@ public sealed class ZplGeneratorTests
         Assert.Empty(result.Errors);
         Assert.True(result.Png.Length > 0, "kitchen-sink label produced no image");
     }
+    /// <summary>The manual gives ^FD at most 3072 bytes. The preview draws longer data, so
+    /// the generator is the only place that can say a field is past it.</summary>
+    [Theory]
+    [InlineData(3072, false)]
+    [InlineData(3073, true)]
+    public void FieldDataPastTheManualsLimit_IsReported(int length, bool reported)
+    {
+        var generator = new ZplGenerator();
+        generator.Generate(Doc(new QrCodeElement { X = 10, Y = 10, Data = new string('a', length - 3) }));
+
+        Assert.Equal(reported, generator.LastRun.Warnings.Any(w => w.Contains("3,072", StringComparison.Ordinal)));
+    }
+
     /// <summary>
     /// Negative numbers carry an ASCII hyphen whatever the machine's culture. Several
     /// cultures (Swedish, Norwegian, Finnish) format a negative int with U+2212, which no
