@@ -228,19 +228,8 @@ public sealed class ElementBoundsCalculator : IElementVisitor
 
     public void Visit(QrCodeElement element)
     {
-        // Approximate byte-mode capacity at medium error correction for versions 1-10.
-        ReadOnlySpan<int> capacity = [14, 26, 42, 62, 84, 106, 122, 152, 180, 213];
-        int version = 10;
-        for (int i = 0; i < capacity.Length; i++)
-        {
-            if (element.Data.Length <= capacity[i])
-            {
-                version = i + 1;
-                break;
-            }
-        }
-
-        int modules = 17 + 4 * version;
+        // The version the renderer's own encoder picks for this data and level.
+        int modules = QrSymbol.Modules(element.Data, element.ErrorCorrection);
         int side = modules * Math.Max(element.Magnification, 1);
 
         // BinaryKits' QR drawer paints 10 dots below the field origin. A fixed number of
