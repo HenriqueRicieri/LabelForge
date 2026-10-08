@@ -128,6 +128,34 @@ internal static class UnsavedChangesChecks
         d.NotifyDocumentEdited();
         Pump(300);
 
+        // Save in the question itself, the default button: it writes the label and the
+        // action goes ahead. A Save that fails must not go ahead, or the work it was meant
+        // to keep is replaced anyway.
+        string viaPrompt = Path.Combine(dir, "via-prompt.lfl");
+        d.CurrentFilePath = viaPrompt;
+        AddText(d, "saved from the question");
+        Press(window, Avalonia.Input.Key.N, RawInputModifiers.Control, PhysicalKey.N, "n");
+        Pump(200);
+        Click(Prompt(window), "SaveButton");
+        PumpUntil(() => d.Document.Elements.Count == 0, 5000);
+        check("unsaved: Save in the question writes the label",
+            File.Exists(viaPrompt) && File.ReadAllText(viaPrompt).Contains("saved from the question"), true);
+        check("unsaved: Save in the question then goes ahead with New", d.Document.Elements.Count, 0);
+
+        AddText(d, "must survive");
+        File.SetAttributes(readOnly, FileAttributes.ReadOnly);
+        d.CurrentFilePath = readOnly;
+        Press(window, Avalonia.Input.Key.N, RawInputModifiers.Control, PhysicalKey.N, "n");
+        Pump(200);
+        Click(Prompt(window), "SaveButton");
+        PumpUntil(() => d.StatusText.StartsWith("Could not save", StringComparison.Ordinal), 5000);
+        Pump(300);
+        check("unsaved: a Save that fails does not go ahead",
+            d.Document.Elements.OfType<TextElement>().Any(t => t.Text == "must survive"), true);
+        check("unsaved: a Save that fails says why",
+            d.WorkspaceStatus.StartsWith("Could not save", StringComparison.Ordinal), true);
+        File.SetAttributes(readOnly, FileAttributes.Normal);
+
         // The other ways of replacing the label: Open Recent and another label of an
         // imported file. Both have to ask, and Cancel has to leave everything as it was.
         d.OpenLabelFile(path);
