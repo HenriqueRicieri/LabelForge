@@ -410,6 +410,7 @@ public static class ZplDocumentImport
                     _originX = command.Int(0);
                     _originY = command.Int(1);
                     _typeset = false;
+                    WarnOnJustification(command);
                     return;
 
                 case "FT":
@@ -419,6 +420,7 @@ public static class ZplDocumentImport
                     _originX = command.Int(0);
                     _originY = command.Int(1);
                     _typeset = true;
+                    WarnOnJustification(command);
                     return;
 
                 case "FS":
@@ -427,7 +429,10 @@ public static class ZplDocumentImport
 
                 case "FH":
                     _hexEscapes = true;
-                    _hexMarker = command.Parameters.Length > 0 ? command.Parameters[0] : '_';
+                    // A hand-formatted file puts ^FH on a line of its own, and the line
+                    // break is formatting rather than the indicator.
+                    string indicator = command.Parameters.Trim();
+                    _hexMarker = indicator.Length > 0 ? indicator[0] : '_';
                     return;
 
                 case "FR":
@@ -1143,7 +1148,7 @@ public static class ZplDocumentImport
                 // would change the label. The warning is what carries the difference.
                 ThicknessDots = Math.Max(command.Int(2, 1), 1),
                 IsWhite = string.Equals(command.Arg(3), "W", StringComparison.OrdinalIgnoreCase),
-                LeansRight = !string.Equals(command.Arg(4), "L", StringComparison.OrdinalIgnoreCase),
+                LeansRight = command.Arg(4).Trim() is not ("L" or "l" or BackslashLean),
             };
 
             if (diagonal.ThicknessDots < 2)
@@ -1343,7 +1348,9 @@ public static class ZplDocumentImport
                 string text = segment.Text;
                 for (int i = 0; i < text.Length; i++)
                 {
+                    // Exactly two hex digits: TryParse alone also takes " A" or "4 ".
                     if (text[i] == _hexMarker && i + 2 < text.Length &&
+                        char.IsAsciiHexDigit(text[i + 1]) && char.IsAsciiHexDigit(text[i + 2]) &&
                         int.TryParse(text.AsSpan(i + 1, 2), NumberStyles.HexNumber,
                             CultureInfo.InvariantCulture, out int value))
                     {
@@ -1426,6 +1433,23 @@ public static class ZplDocumentImport
             {
                 Warn($"{command.Prefix}{command.Code} asks for {command.Int(2)} replicates of "
                     + "each serial number, which is not modelled and was dropped.");
+            }
+        }
+
+        /// <summary>The manual spells a left-leaning ^GD as L or a backslash.</summary>
+        private const string BackslashLean = "\\";
+
+        /// <summary>^FO and ^FT take a third parameter on newer firmware: 1 right-justifies
+        /// the field on its origin and 2 leaves it to the script. The model only places
+        /// fields by their left edge, so a justified one would import in the wrong place
+        /// without a word.</summary>
+        private void WarnOnJustification(ZplCommand command)
+        {
+            if (command.Int(2, 0) is 1 or 2)
+            {
+                Warn("A field origin (^FO/^FT) asks for right or automatic justification, "
+                     + "which the designer does not model; the field was placed by its left "
+                     + "edge, so check where it prints.");
             }
         }
 

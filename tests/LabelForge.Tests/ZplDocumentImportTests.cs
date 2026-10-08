@@ -316,6 +316,58 @@ public sealed class ZplDocumentImportTests
         Assert.Equal("a^b~c_d", text.Text);
     }
 
+    /// <summary>A hand-formatted file puts ^FH on its own line. The line break is
+    /// formatting, not the indicator, so the default underscore still applies.</summary>
+    [Fact]
+    public void HexIndicator_SkipsTheLineBreakAfterFh()
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA\n^CI28\n^FO0,0^A0N,30^FH\n^FDCaf_C3_A9^FS\n^XZ");
+
+        Assert.Equal("Café", Assert.IsType<TextElement>(Assert.Single(result.Document.Elements)).Text);
+    }
+
+    /// <summary>An escape is the indicator and exactly two hex digits; whitespace in
+    /// either place is text.</summary>
+    [Fact]
+    public void HexEscape_NeedsTwoHexDigits()
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA\n^FO0,0^A0N,30^FH^FDa_ 1b_4 c^FS\n^XZ");
+
+        Assert.Equal("a_ 1b_4 c", Assert.IsType<TextElement>(Assert.Single(result.Document.Elements)).Text);
+    }
+
+    /// <summary>The manual gives ^GD's lean as R or "/" for right and L or "\" for left.</summary>
+    [Theory]
+    [InlineData("L", false)]
+    [InlineData("\\", false)]
+    [InlineData("R", true)]
+    [InlineData("/", true)]
+    public void DiagonalLean_ReadsBothSpellings(string lean, bool leansRight)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n^FO10,10^GD100,100,3,B,{lean}^FS\n^XZ");
+
+        Assert.Equal(leansRight,
+            Assert.IsType<DiagonalLineElement>(Assert.Single(result.Document.Elements)).LeansRight);
+    }
+
+    /// <summary>^FO's third parameter (justification) moves where a right-justified field
+    /// prints, and the model has no such field, so it is reported rather than dropped.</summary>
+    [Theory]
+    [InlineData("^FO800,50,1", true)]
+    [InlineData("^FT800,50,2", true)]
+    [InlineData("^FO800,50,0", false)]
+    [InlineData("^FO800,50", false)]
+    public void FieldJustification_IsReported(string origin, bool reported)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n{origin}^A0N,30^FDtext^FS\n^XZ");
+
+        Assert.Equal(reported, result.Warnings.Any(w => w.Contains("justif", StringComparison.OrdinalIgnoreCase)));
+    }
+
     [Fact]
     public void TemplateMarkers_SurviveVerbatim()
     {
