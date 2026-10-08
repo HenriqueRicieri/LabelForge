@@ -9,6 +9,9 @@ on:
 jobs:
   build-and-test:
     runs-on: windows-latest
+    # The socket tests have deadlines of their own, but a hung runner should not hold
+    # the queue for the six-hour default.
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -27,6 +30,19 @@ jobs:
 
       - name: Test
         run: dotnet test --no-build --configuration Release --verbosity normal
+
+      # Outside the solution, so nothing else would notice an API change breaking it.
+      - name: Build benchmark
+        run: dotnet build tools/LabelForge.Bench --configuration Release
+
+      # The license gate that packaging runs, here too, so a dependency bump that brings
+      # in an unreviewed package fails on the pull request rather than at release time.
+      - name: Check third-party notices
+        shell: pwsh
+        run: |
+          dotnet publish src/LabelForge.App -c Release -r win-x64 --self-contained true -o artifacts/publish/win-x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/check-third-party-notices.ps1 -PublishDirectory artifacts/publish/win-x64
 
       - name: Check native QA bootstrap and storage isolation
         run: dotnet run --project tools/LabelForge.NativeQA --configuration Release -- --self-check
