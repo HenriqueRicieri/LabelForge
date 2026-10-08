@@ -141,7 +141,8 @@ public sealed class ZplGenerator : IElementVisitor
             // setting the operator made on the front panel.
             if (document.Print.LabelTopDots != 0)
             {
-                Line($"^LT{Math.Clamp(document.Print.LabelTopDots, -120, 120)}");
+                Line(FormattableString.Invariant(
+                    $"^LT{Math.Clamp(document.Print.LabelTopDots, -120, 120)}"));
             }
 
             // What the printer does with the label once it is printed. Nothing is
@@ -175,7 +176,8 @@ public sealed class ZplGenerator : IElementVisitor
 
             if (document.Print.DarknessDelta != 0)
             {
-                Line($"^MD{Math.Clamp(document.Print.DarknessDelta, -30, 30)}");
+                Line(FormattableString.Invariant(
+                    $"^MD{Math.Clamp(document.Print.DarknessDelta, -30, 30)}"));
             }
         }
 
@@ -355,10 +357,12 @@ public sealed class ZplGenerator : IElementVisitor
 
         // A plain line emits no ^FB at all, so a label that never asked for a block is
         // byte-for-byte what it always was.
+        // Invariant because line spacing can be negative, and some cultures write a
+        // negative int with U+2212 rather than the hyphen a printer reads as a minus.
         string block = element.IsBlock
-            ? $"^FB{element.BlockWidthDots},{Math.Max(element.BlockMaxLines, 1)},"
-              + $"{element.BlockLineSpacingDots},{Justify(element.Justification)},"
-              + $"{element.BlockHangingIndentDots}"
+            ? string.Create(
+                CultureInfo.InvariantCulture,
+                $"^FB{element.BlockWidthDots},{Math.Max(element.BlockMaxLines, 1)},{element.BlockLineSpacingDots},{Justify(element.Justification)},{element.BlockHangingIndentDots}")
             : string.Empty;
 
         Line($"{Fo(element)}{font}{block}{Field(element.Text)}");
