@@ -2796,6 +2796,10 @@ public partial class DesignerViewModel : ViewModelBase
         Document.WidthMm = value.WidthMm;
         Document.HeightMm = value.HeightMm;
 
+        // Leaving continuous stock above re-read the box from the height stored before
+        // this pick, so it is read again now that the document holds the new one.
+        SyncLabelLength();
+
         // The stock's own die-cut shape comes with it, so the canvas shows the label
         // that will actually come off the roll.
         Document.CornerRadiusMm = value.RadiusMm;

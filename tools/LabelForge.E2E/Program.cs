@@ -576,6 +576,25 @@ else
     Console.WriteLine($"manual edit clears media: {(d.SelectedMedia is null ? "null" : "still set")} (expected null)");
     d.WidthMm = 100;
 
+    // Picking a die-cut stock while the label is continuous: the height box and the setup
+    // summary have to show the stock's height, which is what the document now holds,
+    // rather than the die-cut height stored before the pick.
+    var dieCut = LabelForge.Core.Media.StockCatalog.Search("02D102102400K")[0];
+    d.IsContinuous = true;
+    d.SelectedMedia = dieCut;
+    Check("die-cut pick on a continuous label: height box",
+        FormattableString.Invariant($"{d.HeightMm:0.###}"),
+        FormattableString.Invariant($"{dieCut.HeightMm:0.###}"));
+    Check("die-cut pick on a continuous label: box matches the document",
+        (double)d.HeightMm == d.Document.HeightMm, true);
+    d.UndoCommand.Execute(null);
+    d.UndoCommand.Execute(null);
+    d.SelectedMedia = null;
+
+    // Ticking continuous also pre-ticks the preset form, which is not document state
+    // and so is not undone; put it back for the preset checks below.
+    d.NewMediaContinuous = false;
+
     // User media presets: save the current size under a name, find it in the same
     // picker as the Zebra catalog, apply it, and remove it again.
     d.WidthMm = 50.8m;
