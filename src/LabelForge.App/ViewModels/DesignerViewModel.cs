@@ -1182,7 +1182,10 @@ public partial class DesignerViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            // The snapshot is kept: an unreadable one may still be worth a second look,
+            // and Discard is right there for throwing it away on purpose.
             Notify($"The recovered file could not be read: {ex.Message}");
+            return;
         }
 
         DismissRecovery();

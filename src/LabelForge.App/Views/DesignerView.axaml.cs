@@ -606,6 +606,19 @@ public partial class DesignerView : UserControl
     /// choice, so a pick that the unsaved-changes question cancels puts the picker back
     /// instead of leaving it naming a label that is not on the canvas.
     /// </summary>
+    /// <summary>
+    /// Recovering replaces the label on the canvas, and the offer stays up while the user
+    /// works on something else, so it asks first like New, Open and the rest. The command
+    /// itself stays unguarded for the harness.
+    /// </summary>
+    private async void OnRecoverClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm && await ConfirmDiscardAsync())
+        {
+            vm.RecoverDocumentCommand.Execute(null);
+        }
+    }
+
     private async void OnImportedBlockPicked(object? sender, SelectionChangedEventArgs e)
     {
         if (ViewModel is not { } vm || sender is not ComboBox picker

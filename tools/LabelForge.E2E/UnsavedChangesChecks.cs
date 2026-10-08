@@ -196,6 +196,38 @@ internal static class UnsavedChangesChecks
         next.Designer.AcceptDiscard();
         next.Designer.ShutDown();
         check("unsaved: discarding recovered work leaves nothing", Snapshots(recovery), 0);
+
+        // Recover replaces the label on the canvas, and the offer stays up while the user
+        // works, so clicking it later asks first, like every other way of replacing it.
+        var crashed = NewShell("crashed");
+        crashed.Designer.NewDocumentCommand.Execute(null);
+        AddText(crashed.Designer, "recover me");
+        crashed.Designer.ShutDown();
+        var restarted = NewShell("restarted");
+        var restartedWindow = new MainWindow { DataContext = restarted, Width = 1200, Height = 760 };
+        restartedWindow.Show();
+        Pump(400);
+        restarted.Designer.NewDocumentCommand.Execute(null);
+        AddText(restarted.Designer, "typed since");
+        Button recover = restartedWindow.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "RecoverButton");
+        recover.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Pump(300);
+        check("unsaved: Recover over unsaved work asks first", Prompt(restartedWindow) is not null, true);
+        Click(Prompt(restartedWindow), "CancelButton");
+        check("unsaved: Cancel keeps the work Recover would replace",
+            restarted.Designer.Document.Elements.OfType<TextElement>().Single().Text, "typed since");
+        check("unsaved: Cancel keeps the recovery offer", restarted.Designer.HasRecoveryOffer, true);
+        recover.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Pump(300);
+        Click(Prompt(restartedWindow), "DontSaveButton");
+        Pump(300);
+        check("unsaved: Don't Save then recovers",
+            restarted.Designer.Document.Elements.OfType<TextElement>().Single().Text, "recover me");
+        restarted.Designer.AcceptDiscard();
+        restartedWindow.Close();
+        Pump(300);
+        restarted.Designer.ShutDown();
     }
 
     private static void AddText(DesignerViewModel d, string text)
