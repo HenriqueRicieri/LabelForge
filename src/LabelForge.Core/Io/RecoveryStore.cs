@@ -80,7 +80,9 @@ public sealed class RecoveryStore : IDisposable
         {
             Directory.CreateDirectory(_directory);
             TakeLock();
-            File.WriteAllText(
+            // Atomic: a crash during this write is exactly when the previous snapshot is
+            // needed, and an overwrite in place would have truncated it.
+            AtomicFile.WriteAllText(
                 _snapshotPath,
                 JsonSerializer.Serialize(new Envelope(originalPath, lfl), Options));
             return null;

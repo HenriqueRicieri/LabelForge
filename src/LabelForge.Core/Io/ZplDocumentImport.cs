@@ -410,6 +410,7 @@ public static class ZplDocumentImport
                     _originX = command.Int(0);
                     _originY = command.Int(1);
                     _typeset = false;
+                    WarnOnJustification(command);
                     return;
 
                 case "FT":
@@ -419,6 +420,7 @@ public static class ZplDocumentImport
                     _originX = command.Int(0);
                     _originY = command.Int(1);
                     _typeset = true;
+                    WarnOnJustification(command);
                     return;
 
                 case "FS":
@@ -427,7 +429,10 @@ public static class ZplDocumentImport
 
                 case "FH":
                     _hexEscapes = true;
-                    _hexMarker = command.Parameters.Length > 0 ? command.Parameters[0] : '_';
+                    // A hand-formatted file puts ^FH on a line of its own, and the line
+                    // break is formatting rather than the indicator.
+                    string indicator = command.Parameters.Trim();
+                    _hexMarker = indicator.Length > 0 ? indicator[0] : '_';
                     return;
 
                 case "FR":
@@ -488,13 +493,28 @@ public static class ZplDocumentImport
                     return;
 
                 case "BX":
+                {
                     _orientation = ToOrientation(command.Arg(0));
-                    _dataMatrixModule = Math.Clamp(command.Int(1, 4), 1, 20);
+
+                    // Zero or nothing hands the size to ^BY's bar height, which the model
+                    // does not carry, so the module this assumes is said out loud.
+                    int module = command.Int(1, 0);
+                    if (module <= 0)
+                    {
+                        Warn("A Data Matrix (^BX) states no module size, so the printer sizes "
+                             + "it from ^BY's bar height. It was imported at 4 dots per module; "
+                             + "check its size.");
+                        module = 4;
+                    }
+
+                    _dataMatrixModule = Math.Clamp(module, 1, 20);
                     return;
+                }
 
                 case "BQ":
                     _orientation = ToOrientation(command.Arg(0));
-                    _qrMagnification = Math.Clamp(command.Int(2, 5), 1, 10);
+                    _qrMagnification = Math.Clamp(
+                        command.Int(2, DefaultQrMagnification(dpmm)), 1, 10);
                     return;
 
                 case "B7":
@@ -961,12 +981,36 @@ public static class ZplDocumentImport
             return name;
         }
 
+        /// <summary>The ^BQ magnification a printer uses when the command states none. The
+        /// manual ties it to the printer: 1 at 150 dpi, 2 at 200, 3 at 300, 6 at 600.</summary>
+        private static int DefaultQrMagnification(int dpmm) => dpmm switch
+        {
+            <= 6 => 1,
+            <= 8 => 2,
+            <= 12 => 3,
+            _ => 6,
+        };
+
         /// <summary>^BQ carries the error correction level and input mode in front of the
-        /// payload ("MA,text"). Anything else is taken as the payload itself.</summary>
-        private static QrCodeElement BuildQr(string data, int magnification)
+        /// payload ("MA,text"). Anything else is taken as the payload itself.
+        ///
+        /// The model only writes automatic input (A), so a manual-input payload loses its
+        /// character mode switch (N, A, or B and a four-digit count), which is not data.
+        /// Kanji and mixed mode have no equivalent here and are reported.</summary>
+        private QrCodeElement BuildQr(string data, int magnification)
         {
             QrErrorCorrection correction = QrErrorCorrection.Medium;
             string payload = data;
+
+            // Mixed mode opens with D, the code number, the division count and the parity
+            // byte, then a comma: "D03040C,".
+            if (data.Length >= 8 && char.ToUpperInvariant(data[0]) == 'D' && data[7] == ',')
+            {
+                Warn("A QR code (^BQ) in mixed mode was imported as one ordinary symbol; "
+                     + "the split across several symbols is not kept.");
+                data = data[8..];
+                payload = data;
+            }
 
             int comma = data.IndexOf(',');
             if (comma >= 2)
@@ -979,6 +1023,11 @@ public static class ZplDocumentImport
                     _ => QrErrorCorrection.Medium,
                 };
                 payload = data[(comma + 1)..];
+
+                if (char.ToUpperInvariant(data[1]) == 'M')
+                {
+                    payload = WithoutCharacterMode(payload);
+                }
             }
 
             return new QrCodeElement
@@ -987,6 +1036,25 @@ public static class ZplDocumentImport
                 Magnification = magnification,
                 ErrorCorrection = correction,
             };
+        }
+
+        private string WithoutCharacterMode(string payload)
+        {
+            if (payload.Length > 0 && char.ToUpperInvariant(payload[0]) is 'N' or 'A')
+            {
+                return payload[1..];
+            }
+
+            if (payload.Length >= 5 && char.ToUpperInvariant(payload[0]) == 'B' &&
+                payload.AsSpan(1, 4).IndexOfAnyExceptInRange('0', '9') < 0)
+            {
+                return payload[5..];
+            }
+
+            Warn("A QR code (^BQ) in manual input uses a character mode the designer does not "
+                 + "write (Kanji or unrecognized), so its data was kept as written and may "
+                 + "encode differently.");
+            return payload;
         }
 
         /// <summary>^GB is a box, and a box whose border fills it is how ZPL draws a
@@ -1080,7 +1148,7 @@ public static class ZplDocumentImport
                 // would change the label. The warning is what carries the difference.
                 ThicknessDots = Math.Max(command.Int(2, 1), 1),
                 IsWhite = string.Equals(command.Arg(3), "W", StringComparison.OrdinalIgnoreCase),
-                LeansRight = !string.Equals(command.Arg(4), "L", StringComparison.OrdinalIgnoreCase),
+                LeansRight = command.Arg(4).Trim() is not ("L" or "l" or BackslashLean),
             };
 
             if (diagonal.ThicknessDots < 2)
@@ -1136,6 +1204,12 @@ public static class ZplDocumentImport
             if (bitmap is null)
             {
                 Warn($"Graphic {name} could not be decoded and was dropped.");
+                return;
+            }
+
+            if (!GraphicField.FitsALabel((long)bitmap.Width * magX, (long)bitmap.Height * magY))
+            {
+                Warn($"Graphic {name} is larger than any label once magnified and was dropped.");
                 return;
             }
 
@@ -1280,7 +1354,9 @@ public static class ZplDocumentImport
                 string text = segment.Text;
                 for (int i = 0; i < text.Length; i++)
                 {
+                    // Exactly two hex digits: TryParse alone also takes " A" or "4 ".
                     if (text[i] == _hexMarker && i + 2 < text.Length &&
+                        char.IsAsciiHexDigit(text[i + 1]) && char.IsAsciiHexDigit(text[i + 2]) &&
                         int.TryParse(text.AsSpan(i + 1, 2), NumberStyles.HexNumber,
                             CultureInfo.InvariantCulture, out int value))
                     {
@@ -1363,6 +1439,23 @@ public static class ZplDocumentImport
             {
                 Warn($"{command.Prefix}{command.Code} asks for {command.Int(2)} replicates of "
                     + "each serial number, which is not modelled and was dropped.");
+            }
+        }
+
+        /// <summary>The manual spells a left-leaning ^GD as L or a backslash.</summary>
+        private const string BackslashLean = "\\";
+
+        /// <summary>^FO and ^FT take a third parameter on newer firmware: 1 right-justifies
+        /// the field on its origin and 2 leaves it to the script. The model only places
+        /// fields by their left edge, so a justified one would import in the wrong place
+        /// without a word.</summary>
+        private void WarnOnJustification(ZplCommand command)
+        {
+            if (command.Int(2, 0) is 1 or 2)
+            {
+                Warn("A field origin (^FO/^FT) asks for right or automatic justification, "
+                     + "which the designer does not model; the field was placed by its left "
+                     + "edge, so check where it prints.");
             }
         }
 

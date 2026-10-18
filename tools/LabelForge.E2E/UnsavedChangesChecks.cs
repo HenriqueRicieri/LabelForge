@@ -96,6 +96,66 @@ internal static class UnsavedChangesChecks
         check("unsaved: an unmodified label opens New without asking",
             NewWithoutPrompt(window, d), true);
 
+        // A save that fails says so first, ahead of a standing warning, and the message
+        // outlives the render that follows instead of being wiped by it.
+        string readOnly = Path.Combine(dir, "read-only.lfl");
+        File.WriteAllText(readOnly, "previous");
+        File.SetAttributes(readOnly, FileAttributes.ReadOnly);
+        var parked = new TextElement
+        {
+            X = d.Document.WidthDots + 40, Y = 20, Text = "parked", FontHeightDots = 30,
+        };
+        d.Document.Elements.Add(parked);
+        d.NotifyDocumentEdited();
+        Pump(600);
+        check("unsaved: a standing warning is showing", string.IsNullOrEmpty(d.PlacementWarning), false);
+        d.CurrentFilePath = readOnly;
+        Press(window, Avalonia.Input.Key.S, RawInputModifiers.Control, PhysicalKey.S, "s");
+        PumpUntil(() => d.StatusText.StartsWith("Could not save", StringComparison.Ordinal), 5000);
+        check("unsaved: a failed save leads the status bar",
+            d.WorkspaceStatus.StartsWith("Could not save", StringComparison.Ordinal), true);
+        d.WidthMm = 100;
+        d.WidthMm = 120;
+        Press(window, Avalonia.Input.Key.S, RawInputModifiers.Control, PhysicalKey.S, "s");
+        Pump(800);
+        check("unsaved: a failed save survives the render after it",
+            d.WorkspaceStatus.StartsWith("Could not save", StringComparison.Ordinal), true);
+        check("unsaved: a failed save leaves the old file", File.ReadAllText(readOnly), "previous");
+        check("unsaved: a failed save keeps the label marked", d.IsDirty, true);
+        File.SetAttributes(readOnly, FileAttributes.Normal);
+        d.WidthMm = 100;
+        d.Document.Elements.Remove(parked);
+        d.NotifyDocumentEdited();
+        Pump(300);
+
+        // Save in the question itself, the default button: it writes the label and the
+        // action goes ahead. A Save that fails must not go ahead, or the work it was meant
+        // to keep is replaced anyway.
+        string viaPrompt = Path.Combine(dir, "via-prompt.lfl");
+        d.CurrentFilePath = viaPrompt;
+        AddText(d, "saved from the question");
+        Press(window, Avalonia.Input.Key.N, RawInputModifiers.Control, PhysicalKey.N, "n");
+        Pump(200);
+        Click(Prompt(window), "SaveButton");
+        PumpUntil(() => d.Document.Elements.Count == 0, 5000);
+        check("unsaved: Save in the question writes the label",
+            File.Exists(viaPrompt) && File.ReadAllText(viaPrompt).Contains("saved from the question"), true);
+        check("unsaved: Save in the question then goes ahead with New", d.Document.Elements.Count, 0);
+
+        AddText(d, "must survive");
+        File.SetAttributes(readOnly, FileAttributes.ReadOnly);
+        d.CurrentFilePath = readOnly;
+        Press(window, Avalonia.Input.Key.N, RawInputModifiers.Control, PhysicalKey.N, "n");
+        Pump(200);
+        Click(Prompt(window), "SaveButton");
+        PumpUntil(() => d.StatusText.StartsWith("Could not save", StringComparison.Ordinal), 5000);
+        Pump(300);
+        check("unsaved: a Save that fails does not go ahead",
+            d.Document.Elements.OfType<TextElement>().Any(t => t.Text == "must survive"), true);
+        check("unsaved: a Save that fails says why",
+            d.WorkspaceStatus.StartsWith("Could not save", StringComparison.Ordinal), true);
+        File.SetAttributes(readOnly, FileAttributes.Normal);
+
         // The other ways of replacing the label: Open Recent and another label of an
         // imported file. Both have to ask, and Cancel has to leave everything as it was.
         d.OpenLabelFile(path);
@@ -123,6 +183,24 @@ internal static class UnsavedChangesChecks
         check("unsaved: Cancel keeps the imported label on the canvas",
             ReferenceEquals(d.SelectedImportedBlock, first) && d.Document.Elements.Count == 2, true);
         check("unsaved: Cancel puts the picker back", ReferenceEquals(picker.SelectedItem, first), true);
+
+        // The strip naming the imported file belongs to that file. Moving on to another
+        // label lets go of it, or picking a block there would re-import the old file over
+        // whatever is open now.
+        d.NewDocumentCommand.Execute(null);
+        Pump(200);
+        check("unsaved: a new label lets go of the imported file",
+            d.HasImportedBlocks || d.ImportedFrom.Length > 0, false);
+        d.ImportZplDocument(TwoLabels, "two-labels.zpl");
+        Pump(200);
+        d.OpenLabelFile(path);
+        Pump(200);
+        check("unsaved: opening a label lets go of the imported file",
+            d.HasImportedBlocks || d.ImportedFrom.Length > 0, false);
+        d.ImportZplDocument(TwoLabels, "two-labels.zpl");
+        Pump(200);
+        check("unsaved: an import still offers its other labels", d.HasImportedBlocks, true);
+        AddText(d, "picker guard");
 
         // The title follows the tab on show.
         vm.SelectedTab = MainViewModel.ViewerTab;
@@ -164,6 +242,38 @@ internal static class UnsavedChangesChecks
         next.Designer.AcceptDiscard();
         next.Designer.ShutDown();
         check("unsaved: discarding recovered work leaves nothing", Snapshots(recovery), 0);
+
+        // Recover replaces the label on the canvas, and the offer stays up while the user
+        // works, so clicking it later asks first, like every other way of replacing it.
+        var crashed = NewShell("crashed");
+        crashed.Designer.NewDocumentCommand.Execute(null);
+        AddText(crashed.Designer, "recover me");
+        crashed.Designer.ShutDown();
+        var restarted = NewShell("restarted");
+        var restartedWindow = new MainWindow { DataContext = restarted, Width = 1200, Height = 760 };
+        restartedWindow.Show();
+        Pump(400);
+        restarted.Designer.NewDocumentCommand.Execute(null);
+        AddText(restarted.Designer, "typed since");
+        Button recover = restartedWindow.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "RecoverButton");
+        recover.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Pump(300);
+        check("unsaved: Recover over unsaved work asks first", Prompt(restartedWindow) is not null, true);
+        Click(Prompt(restartedWindow), "CancelButton");
+        check("unsaved: Cancel keeps the work Recover would replace",
+            restarted.Designer.Document.Elements.OfType<TextElement>().Single().Text, "typed since");
+        check("unsaved: Cancel keeps the recovery offer", restarted.Designer.HasRecoveryOffer, true);
+        recover.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Pump(300);
+        Click(Prompt(restartedWindow), "DontSaveButton");
+        Pump(300);
+        check("unsaved: Don't Save then recovers",
+            restarted.Designer.Document.Elements.OfType<TextElement>().Single().Text, "recover me");
+        restarted.Designer.AcceptDiscard();
+        restartedWindow.Close();
+        Pump(300);
+        restarted.Designer.ShutDown();
     }
 
     private static void AddText(DesignerViewModel d, string text)

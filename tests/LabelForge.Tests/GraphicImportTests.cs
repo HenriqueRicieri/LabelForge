@@ -1,4 +1,4 @@
-using LabelForge.Core.Imaging;
+﻿using LabelForge.Core.Imaging;
 using LabelForge.Core.Io;
 using LabelForge.Core.Model;
 using LabelForge.Core.Rendering;
@@ -244,6 +244,23 @@ public sealed class GraphicImportTests
         Assert.Contains("^FO120,60^XGR:LOGO.GRF,1,1^FS", qualified, StringComparison.Ordinal);
         Assert.Contains(Checker, qualified, StringComparison.Ordinal);
         Assert.Contains("^FD##TEXT##^FS", qualified, StringComparison.Ordinal);
+    }
+
+    /// <summary>^XG's magnification arguments are optional, so "^XGLOGO^FS" is a whole
+    /// recall. It has to be qualified like the download it names, or the preview looks the
+    /// graphic up under a different name and draws nothing.</summary>
+    [Fact]
+    public void QualifyGraphicNames_ReachesARecallWithNoArguments()
+    {
+        string bare = $"{Download("LOGO")}\n^XA\n^FO120,60^XGLOGO^FS\n^XZ";
+        string stated = $"{Download("LOGO")}\n^XA\n^FO120,60^XGLOGO,1,1^FS\n^XZ";
+
+        Assert.Contains("^FO120,60^XGR:LOGO.GRF^FS",
+            ZplGraphicScanner.QualifyGraphicNames(bare), StringComparison.Ordinal);
+
+        var renderer = new BinaryKitsRenderer();
+        byte[] expected = renderer.Render(stated, 30, 20, 8).Png;
+        Assert.Equal(expected, renderer.Render(bare, 30, 20, 8).Png);
     }
 
     [Fact]

@@ -105,7 +105,7 @@ public sealed class UserMediaStore
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllText(_path, JsonSerializer.Serialize(entries, Options));
+            AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(entries, Options));
             return new UserMediaResult(entries, null);
         }
         catch (Exception ex)

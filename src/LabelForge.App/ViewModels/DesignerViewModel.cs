@@ -50,7 +50,6 @@ public partial class DesignerViewModel : ViewModelBase
     private readonly ElementBoundsCalculator _readoutBounds = new();
 
     private readonly IZplRenderer _renderer = new BinaryKitsRenderer();
-    private readonly TemplateSubstitutor _substitutor = new();
 
     /// <summary>One render at a time, and the one waiting is always the newest. Built in
     /// the constructor because it needs an instance method to call.</summary>
@@ -1022,11 +1021,11 @@ public partial class DesignerViewModel : ViewModelBase
         string lfl = SerializeDocument();
         try
         {
-            await File.WriteAllTextAsync(path, lfl);
+            await AtomicFile.WriteAllTextAsync(path, lfl);
         }
         catch (Exception ex)
         {
-            StatusText = $"Could not save: {ex.Message}";
+            Notify($"Could not save: {ex.Message}");
             return false;
         }
 
@@ -1034,7 +1033,7 @@ public partial class DesignerViewModel : ViewModelBase
         _discardAccepted = false;
         CurrentFilePath = path;
         UpdateDirty(SerializeDocument());
-        StatusText = $"Saved {Path.GetFileName(path)}";
+        Notify($"Saved {Path.GetFileName(path)}");
         RegisterRecentFile(path);
 
         // The work is safe in its own file now, so the crash snapshot would only be a
@@ -1182,7 +1181,10 @@ public partial class DesignerViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            // The snapshot is kept: an unreadable one may still be worth a second look,
+            // and Discard is right there for throwing it away on purpose.
             Notify($"The recovered file could not be read: {ex.Message}");
+            return;
         }
 
         DismissRecovery();
@@ -1443,27 +1445,24 @@ public partial class DesignerViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Renders the current document to PNG bytes (for export).</summary>
+    /// <summary>Renders the current document to PNG bytes (for export): what the canvas
+    /// shows, only what prints. Throws when nothing could be drawn, so an export never
+    /// writes an empty file.</summary>
     public Task<byte[]> RenderPngAsync()
     {
         LabelDocument document = Document;
-        return Task.Run(() => _renderer
-            .Render(new ZplGenerator().Generate(document), document.WidthMm, document.HeightMm, document.Dpmm)
-            .Png);
+        DateTime now = DateTime.Now;
+        return Task.Run(() => Core.Export.LabelImage.Png(_renderer, document, now));
     }
 
     /// <summary>Renders the current document to a PDF page at its physical size.</summary>
     public Task<byte[]> RenderPdfAsync()
     {
         LabelDocument document = Document;
-        return Task.Run(() =>
-        {
-            byte[] png = _renderer
-                .Render(new ZplGenerator().Generate(document), document.WidthMm, document.HeightMm, document.Dpmm)
-                .Png;
-            return Core.Export.PdfExporter.FromPng(
-                png, document.WidthMm, document.HeightMm, document.EffectiveCornerRadiusMm);
-        });
+        DateTime now = DateTime.Now;
+        return Task.Run(() => Core.Export.PdfExporter.FromPng(
+            Core.Export.LabelImage.Png(_renderer, document, now),
+            document.WidthMm, document.HeightMm, document.EffectiveCornerRadiusMm));
     }
 
     /// <summary>Replaces the document (new file or opened .lfl) and resets history.</summary>
@@ -1471,6 +1470,15 @@ public partial class DesignerViewModel : ViewModelBase
     {
         _drawingElement = null;
         CancelInsert();
+
+        // The strip offering an imported file's other labels belongs to that file. Any
+        // other way of replacing the label lets go of it, or picking a block there would
+        // re-import the old file over whatever was opened since.
+        if (!_openingImportedBlock)
+        {
+            CloseImportedFile();
+        }
+
         _restoring = true;
         try
         {
@@ -1876,9 +1884,12 @@ public partial class DesignerViewModel : ViewModelBase
     /// </summary>
     public void ImportZplDocument(string zpl, string sourceName)
     {
+        // Parsed before anything is remembered, so a file that cannot be read leaves the
+        // previous import's strip exactly as it was.
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(zpl, Document.Dpmm);
         _importedZpl = zpl;
         _importedName = sourceName;
-        OpenImportedBlock(ZplDocumentImport.FromZpl(zpl, Document.Dpmm), sourceName);
+        OpenImportedBlock(result, sourceName);
     }
 
     /// <summary>The ZPL an import came from, kept so the file's other labels stay
@@ -1917,9 +1928,19 @@ public partial class DesignerViewModel : ViewModelBase
 
     private bool _switchingBlock;
 
+    private bool _openingImportedBlock;
+
     private void OpenImportedBlock(ZplDocumentImportResult result, string sourceName)
     {
-        LoadDocument(result.Document, path: null);
+        _openingImportedBlock = true;
+        try
+        {
+            LoadDocument(result.Document, path: null);
+        }
+        finally
+        {
+            _openingImportedBlock = false;
+        }
 
         // Rebuilt here rather than only on the first import, because the density can
         // change between one block and the next and the counts come from the parse.
@@ -2491,15 +2512,20 @@ public partial class DesignerViewModel : ViewModelBase
             ? 0
             : Document.Elements.Max(e => e.ZOrder) + 1;
 
+        // Clamped as one: the delta itself is limited so every origin lands on the label,
+        // rather than each element clamped on its own, which stacked a group against the
+        // edge it was pasted near.
+        if (clamp)
+        {
+            dx = ClampGroupDelta(clones.Min(e => e.X), clones.Max(e => e.X), dx, Document.WidthDots);
+            dy = ClampGroupDelta(clones.Min(e => e.Y), clones.Max(e => e.Y), dy, Document.HeightDots);
+        }
+
         foreach (Element element in clones)
         {
             element.Id = Guid.NewGuid();
-            element.X = clamp
-                ? Math.Clamp(element.X + dx, 0, Math.Max(Document.WidthDots - 1, 0))
-                : element.X + dx;
-            element.Y = clamp
-                ? Math.Clamp(element.Y + dy, 0, Math.Max(Document.HeightDots - 1, 0))
-                : element.Y + dy;
+            element.X += dx;
+            element.Y += dy;
             element.ZOrder = nextZ++;
             Document.Elements.Add(element);
         }
@@ -2564,6 +2590,20 @@ public partial class DesignerViewModel : ViewModelBase
         return true;
     }
 
+    /// <summary>The paste offset along one axis, moved the least it takes for origins
+    /// spanning [min, max] to land within [0, size). A group wider than the label keeps
+    /// its first origin at 0.</summary>
+    private static int ClampGroupDelta(int min, int max, int delta, int size)
+    {
+        int limit = Math.Max(size - 1, 0);
+        if (max + delta > limit)
+        {
+            delta = limit - max;
+        }
+
+        return min + delta < 0 ? -min : delta;
+    }
+
     /// <summary>The cascade offset along one axis for a group whose origins span
     /// [min, max]: +20 while that fits within the label, otherwise wrap the group back
     /// so its first origin restarts at 20. A group whose origins span the whole axis
@@ -2604,9 +2644,18 @@ public partial class DesignerViewModel : ViewModelBase
         }
 
         Selection.SetMany(Groups.Expand(Document, Selection.Items));
+        RefreshGroupCommands();
         RefreshOutline();
         RecordUndo();
         ScheduleRender();
+    }
+
+    /// <summary>Grouping changes what Group and Ungroup can do without necessarily
+    /// changing the selection, which is what normally tells them to look again.</summary>
+    private void RefreshGroupCommands()
+    {
+        GroupSelectionCommand.NotifyCanExecuteChanged();
+        UngroupSelectionCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand(CanExecute = nameof(CanUngroup))]
@@ -2617,6 +2666,7 @@ public partial class DesignerViewModel : ViewModelBase
             return;
         }
 
+        RefreshGroupCommands();
         RefreshOutline();
         RecordUndo();
         ScheduleRender();
@@ -2645,7 +2695,7 @@ public partial class DesignerViewModel : ViewModelBase
 
         foreach (Element element in turning)
         {
-            RotationGesture.Rotate90(element);
+            RotationGesture.Rotate90(element, Document);
         }
 
         SelectionProperties?.Refresh();
@@ -2795,6 +2845,10 @@ public partial class DesignerViewModel : ViewModelBase
 
         Document.WidthMm = value.WidthMm;
         Document.HeightMm = value.HeightMm;
+
+        // Leaving continuous stock above re-read the box from the height stored before
+        // this pick, so it is read again now that the document holds the new one.
+        SyncLabelLength();
 
         // The stock's own die-cut shape comes with it, so the canvas shows the label
         // that will actually come off the roll.
@@ -3119,11 +3173,17 @@ public partial class DesignerViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            StatusText = $"Could not open: {ex.Message}";
+            Notify($"Could not open: {ex.Message}");
 
-            // A path that no longer opens has no business in a menu of paths to open.
-            // Harmless for one that was never in the list.
-            SyncRecentFiles(Services.RecentFilesStore.Remove(path, _recentFilesPath));
+            // A path that is gone has no business in a menu of paths to open. One that is
+            // only busy (held by another program, a share offline for a moment, a newer
+            // format) is still the user's label and stays. Harmless for one that was never
+            // in the list.
+            if (!File.Exists(path))
+            {
+                SyncRecentFiles(Services.RecentFilesStore.Remove(path, _recentFilesPath));
+            }
+
             return false;
         }
     }
@@ -3278,6 +3338,34 @@ public partial class DesignerViewModel : ViewModelBase
         _statusHeld = true;
     }
 
+    /// <summary>True while the render itself is writing the status line, which is the one
+    /// writer whose message is not held.</summary>
+    private bool _renderStatus;
+
+    private void SetRenderStatus(string text)
+    {
+        _renderStatus = true;
+        try
+        {
+            StatusText = text;
+        }
+        finally
+        {
+            _renderStatus = false;
+        }
+    }
+
+    /// <summary>A message set by anything but the render (an export, a print, a failed
+    /// save reported by the view) is held exactly as <see cref="Notify"/> holds it, so a
+    /// render finishing a moment later does not wipe it before anyone reads it.</summary>
+    partial void OnStatusTextChanged(string value)
+    {
+        if (!_renderStatus)
+        {
+            _statusHeld = !string.IsNullOrEmpty(value);
+        }
+    }
+
     /// <summary>Re-reads the label's length into the setup bar. On continuous stock the
     /// height is not something the user typed but something the content decides, so the
     /// box has to follow it; every edit schedules a render, which is the one place that
@@ -3360,7 +3448,9 @@ public partial class DesignerViewModel : ViewModelBase
         // The preview resolves every marker to something renderable: the user's sample,
         // the counter's first value, or the current date. Exported and printed ZPL keeps
         // external markers literal.
-        previewZpl = _substitutor.Substitute(
+        // With this label's own delimiters, since a system that writes {{NAME}} is as
+        // welcome as the default.
+        previewZpl = new TemplateSubstitutor(document.Markers).Substitute(
             previewZpl, inner => VariableValues.ForPreview(document, inner, now));
 
         // Everything the drawn bitmap depends on. A clock variable makes this differ
@@ -3425,8 +3515,11 @@ public partial class DesignerViewModel : ViewModelBase
             // what a date variable currently reads. Captured with the document, and
             // _renderedFrom with it, so the work compares against values it owns and only
             // the UI thread ever writes the field.
+            // The render reads a copy whose collections are its own, so an element added,
+            // deleted or reordered meanwhile cannot break its enumeration on the pool
+            // thread. Identity below is still checked against the live document.
             RenderPass? pass = await _renderQueue.RequestAsync(
-                new RenderRequest(document, DateTime.Now, _renderedFrom), cts.Token);
+                new RenderRequest(document.ShallowCopy(), DateTime.Now, _renderedFrom), cts.Token);
 
             // Null means this request never ran: something newer replaced it while it
             // waited its turn, or the document it was for has been swapped out. There is
@@ -3530,12 +3623,12 @@ public partial class DesignerViewModel : ViewModelBase
             // bar at the top already shows: the bottom bar is for what changes (see Notify).
             if (diagnosis.Count > 0)
             {
-                StatusText = string.Join(" | ", diagnosis);
+                SetRenderStatus(string.Join(" | ", diagnosis));
                 _statusHeld = false;
             }
             else if (!_statusHeld)
             {
-                StatusText = string.Empty;
+                SetRenderStatus(string.Empty);
             }
         }
         catch (OperationCanceledException)
@@ -3544,7 +3637,7 @@ public partial class DesignerViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            StatusText = ex.Message;
+            SetRenderStatus(ex.Message);
         }
     }
 

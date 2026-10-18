@@ -95,12 +95,14 @@ public static partial class ZplGraphicScanner
             string name = NormalizeName(match.Groups["gname"].Value);
             return name.Length == 0
                 ? match.Value
-                : $"{match.Groups["cmd"].Value}R:{name}.GRF,";
+                : $"{match.Groups["cmd"].Value}R:{name}.GRF{match.Groups["end"].Value}";
         });
     }
 
-    /// <summary>The name argument of either graphic command, up to its first comma.</summary>
-    [GeneratedRegex(@"(?<cmd>~DG|\^XG)(?<gname>[^,\^~\r\n]{1,128}),", RegexOptions.IgnoreCase)]
+    /// <summary>The name argument of either graphic command, up to its first comma or, for
+    /// a recall written without its optional magnification ("^XGLOGO^FS"), up to the next
+    /// command. The terminator is kept as it was.</summary>
+    [GeneratedRegex(@"(?<cmd>~DG|\^XG)(?<gname>[^,\^~\r\n]{1,128})(?<end>,|(?=[\^~\r\n])|$)", RegexOptions.IgnoreCase)]
     private static partial Regex GraphicNameReference();
 
     /// <summary>

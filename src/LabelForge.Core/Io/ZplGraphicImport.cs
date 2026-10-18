@@ -107,7 +107,10 @@ public static class ZplGraphicImport
     {
         GraphicBitmap? bitmap = GraphicField.Decode(
             definition.Data, definition.BytesPerRow, definition.TotalBytes);
-        if (bitmap is null)
+        int magX = placement?.MagnificationX ?? 1;
+        int magY = placement?.MagnificationY ?? 1;
+        if (bitmap is null ||
+            !GraphicField.FitsALabel((long)bitmap.Width * magX, (long)bitmap.Height * magY))
         {
             return null;
         }
@@ -116,8 +119,7 @@ public static class ZplGraphicImport
         // printed size here. Storing the small bitmap and letting the generator scale it
         // back up would go through Skia's smooth resampling and come out a slightly
         // different label than the one being imported; replication keeps it identical.
-        GraphicBitmap magnified = GraphicField.Magnify(
-            bitmap, placement?.MagnificationX ?? 1, placement?.MagnificationY ?? 1);
+        GraphicBitmap magnified = GraphicField.Magnify(bitmap, magX, magY);
         bool[] black = magnified.Black;
         int width = magnified.Width;
         int height = magnified.Height;

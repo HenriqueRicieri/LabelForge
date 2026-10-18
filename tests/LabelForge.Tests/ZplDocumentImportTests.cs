@@ -316,6 +316,87 @@ public sealed class ZplDocumentImportTests
         Assert.Equal("a^b~c_d", text.Text);
     }
 
+    /// <summary>A hand-formatted file puts ^FH on its own line. The line break is
+    /// formatting, not the indicator, so the default underscore still applies.</summary>
+    [Fact]
+    public void HexIndicator_SkipsTheLineBreakAfterFh()
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA\n^CI28\n^FO0,0^A0N,30^FH\n^FDCaf_C3_A9^FS\n^XZ");
+
+        Assert.Equal("Café", Assert.IsType<TextElement>(Assert.Single(result.Document.Elements)).Text);
+    }
+
+    /// <summary>An escape is the indicator and exactly two hex digits; whitespace in
+    /// either place is text.</summary>
+    [Fact]
+    public void HexEscape_NeedsTwoHexDigits()
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA\n^FO0,0^A0N,30^FH^FDa_ 1b_4 c^FS\n^XZ");
+
+        Assert.Equal("a_ 1b_4 c", Assert.IsType<TextElement>(Assert.Single(result.Document.Elements)).Text);
+    }
+
+    /// <summary>The manual gives ^GD's lean as R or "/" for right and L or "\" for left.</summary>
+    [Theory]
+    [InlineData("L", false)]
+    [InlineData("\\", false)]
+    [InlineData("R", true)]
+    [InlineData("/", true)]
+    public void DiagonalLean_ReadsBothSpellings(string lean, bool leansRight)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n^FO10,10^GD100,100,3,B,{lean}^FS\n^XZ");
+
+        Assert.Equal(leansRight,
+            Assert.IsType<DiagonalLineElement>(Assert.Single(result.Document.Elements)).LeansRight);
+    }
+
+    /// <summary>^FO's third parameter (justification) moves where a right-justified field
+    /// prints, and the model has no such field, so it is reported rather than dropped.</summary>
+    [Theory]
+    [InlineData("^FO800,50,1", true)]
+    [InlineData("^FT800,50,2", true)]
+    [InlineData("^FO800,50,0", false)]
+    [InlineData("^FO800,50", false)]
+    public void FieldJustification_IsReported(string origin, bool reported)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n{origin}^A0N,30^FDtext^FS\n^XZ");
+
+        Assert.Equal(reported, result.Warnings.Any(w => w.Contains("justif", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    /// <summary>One impossible graphic is dropped with a warning; the rest of the label
+    /// still imports instead of the whole file failing.</summary>
+    [Theory]
+    [InlineData("^FO0,0^GFA,2000000000,2000000000,1000000,FF^FS")]
+    [InlineData("^FO0,0^GFA,60000000,60000000,6000,FF^FS")]
+    public void ImpossibleGraphic_IsDroppedAndTheLabelStillImports(string graphic)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n{graphic}\n^FO10,10^A0N,30^FDstill here^FS\n^XZ");
+
+        Assert.Equal("still here",
+            Assert.IsType<TextElement>(Assert.Single(result.Document.Elements)).Text);
+        Assert.NotEmpty(result.Warnings);
+    }
+
+    /// <summary>A recall magnified ten times over a large download would come to more dots
+    /// than any label; it is dropped rather than allocated.</summary>
+    [Fact]
+    public void OversizedMagnifiedRecall_IsDropped()
+    {
+        string data = new string('0', 2);
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"~DGR:BIG.GRF,8000000,1000,{data}\n^XA\n^FO0,0^XGR:BIG.GRF,10,10^FS\n"
+            + "^FO10,10^A0N,30^FDstill here^FS\n^XZ");
+
+        Assert.Equal("still here",
+            Assert.IsType<TextElement>(Assert.Single(result.Document.Elements)).Text);
+    }
+
     [Fact]
     public void TemplateMarkers_SurviveVerbatim()
     {
@@ -336,6 +417,79 @@ public sealed class ZplDocumentImportTests
         Assert.Equal("https://example.com", qr.Data);
         Assert.Equal(QrErrorCorrection.High, qr.ErrorCorrection);
         Assert.Equal(7, qr.Magnification);
+    }
+
+    /// <summary>In manual input mode the payload opens with a character mode (N, A, or B
+    /// and a four-digit count) that is a switch, not data. Kept as data, the regenerated
+    /// symbol (automatic mode) would encode one character more than the original.</summary>
+    [Theory]
+    [InlineData("MM,AAC-42", "AC-42", QrErrorCorrection.Medium)]
+    [InlineData("HM,N0123", "0123", QrErrorCorrection.High)]
+    [InlineData("LM,B0005hello", "hello", QrErrorCorrection.Low)]
+    [InlineData("QA,AAC-42", "AAC-42", QrErrorCorrection.Quartile)]
+    public void QrManualInput_DropsTheCharacterModeSwitch(
+        string data, string expected, QrErrorCorrection correction)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n^FO0,0^BQN,2,4^FD{data}^FS\n^XZ");
+
+        var qr = Assert.IsType<QrCodeElement>(Assert.Single(result.Document.Elements));
+        Assert.Equal(expected, qr.Data);
+        Assert.Equal(correction, qr.ErrorCorrection);
+    }
+
+    /// <summary>Kanji mode and mixed mode have no equivalent in the model, so the import
+    /// keeps the data and says the symbol may not encode the same.</summary>
+    [Theory]
+    [InlineData("MM,KABC")]
+    [InlineData("D03040C,MA,hello")]
+    public void QrModesTheModelCannotHold_AreReported(string data)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n^FO0,0^BQN,2,4^FD{data}^FS\n^XZ");
+
+        Assert.IsType<QrCodeElement>(Assert.Single(result.Document.Elements));
+        Assert.Contains(result.Warnings, w => w.Contains("QR", StringComparison.Ordinal));
+    }
+
+    /// <summary>The manual's ^BQ magnification default depends on the printer: 2 at
+    /// 200 dpi, 3 at 300 and 6 at 600. An omitted one has to import as what that printer
+    /// would draw, or regenerating the label states a different size.</summary>
+    [Theory]
+    [InlineData(8, 2)]
+    [InlineData(12, 3)]
+    [InlineData(24, 6)]
+    public void QrWithoutMagnification_TakesThePrintersDefault(int dpmm, int expected)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA\n^FO0,0^BQN,2^FDQA,hello^FS\n^XZ", dpmm);
+
+        var qr = Assert.IsType<QrCodeElement>(Assert.Single(result.Document.Elements));
+        Assert.Equal(expected, qr.Magnification);
+    }
+
+    /// <summary>^BX without a module size takes the symbol height from ^BY, which the
+    /// model does not carry, so the import says what it assumed.</summary>
+    [Theory]
+    [InlineData("^BXN")]
+    [InlineData("^BXN,0,200")]
+    public void DataMatrixWithoutModuleSize_IsReported(string command)
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            $"^XA\n^FO0,0{command}^FDhello^FS\n^XZ");
+
+        Assert.IsType<DataMatrixElement>(Assert.Single(result.Document.Elements));
+        Assert.Contains(result.Warnings, w => w.Contains("^BX", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void DataMatrixWithModuleSize_IsNotReported()
+    {
+        ZplDocumentImportResult result = ZplDocumentImport.FromZpl(
+            "^XA\n^FO0,0^BXN,6,200^FDhello^FS\n^XZ");
+
+        Assert.Equal(6, Assert.IsType<DataMatrixElement>(Assert.Single(result.Document.Elements)).ModuleSizeDots);
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("^BX", StringComparison.Ordinal));
     }
 
     [Fact]

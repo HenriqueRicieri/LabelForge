@@ -278,7 +278,9 @@ for the work order, [Changelog](CHANGELOG.md) for changes, and
   option, and embedded in the label as an
   inline `^GF` graphic field, so the saved file and the exported ZPL are self-contained. Place the
   same image twice and it is downloaded once as `~DG` and recalled with `^XG` instead of repeating
-  the payload; a single placement stays inline and leaves the printer's memory alone. Drop one
+  the payload; a single placement stays inline and leaves the printer's memory alone, unless
+  it is larger than the 99,999 bytes `^GF` accepts, in which case it goes as `~DG` too and
+  the designer says so. Drop one
   image file from Explorer onto the label to place it at that point, with one undo step.
 - A ZPL file holding several labels stays open: a strip names the file and lists its
   labels with how much each one holds, so the bare printer-configuration block real files
@@ -359,11 +361,14 @@ for the work order, [Changelog](CHANGELOG.md) for changes, and
   to save. Undoing back to the saved state clears the asterisk.
 - Crash recovery: the open document is snapshotted as you work, and if LabelForge closes
   unexpectedly (or Windows ends the session before the question can be asked) the next
-  start offers the unsaved changes back. It never restores by itself, recovered work stays
+  start offers the unsaved changes back. It never restores by itself, Recover asks before
+  replacing the open label, recovered work stays
   marked as unsaved until it is saved, and a session that closes properly leaves nothing
   behind, so an ordinary shutdown is never mistaken for a crash.
 - Save and open the native `.lfl` project format (with a recent-files menu); export ZPL, PNG, and
-  PDF at exact physical size.
+  PDF at exact physical size. PNG and PDF show the label as the canvas does, with sample
+  values, for the elements that print; the ZPL export keeps the markers. Saves go through a
+  temporary file, so a failed write leaves the previous file whole.
 - Two ZPL exports, because they are not the same bytes: Export ZPL writes the label the
   code pane shows, and Export Print Job writes exactly what a print would send. A run whose
   counter this PC numbers is one block per copy rather than one block and a quantity, and a

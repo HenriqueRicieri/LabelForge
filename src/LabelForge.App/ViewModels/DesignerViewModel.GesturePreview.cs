@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -199,7 +199,7 @@ public partial class DesignerViewModel
     {
         List<Element> elements = LabelDocumentJson.DeserializeElements(state);
         List<Element> measured = LabelDocumentJson.DeserializeElements(state);
-        var substitutor = new TemplateSubstitutor();
+        var substitutor = new TemplateSubstitutor(session.Frozen.Markers);
         string Resolve(string text) => substitutor.Substitute(text,
             inner => VariableValues.ForPreview(session.Frozen, inner, session.Now));
         foreach (Element element in measured)
@@ -227,7 +227,7 @@ public partial class DesignerViewModel
     {
         if (elements.Count == 0) return null;
         string zpl = new ZplGenerator().GeneratePreviewLayer(document, elements, viewport);
-        zpl = new TemplateSubstitutor().Substitute(zpl,
+        zpl = new TemplateSubstitutor(document.Markers).Substitute(zpl,
             inner => VariableValues.ForPreview(document, inner, now));
         RenderResult result = new BinaryKitsRenderer().Render(zpl,
             Units.DotsToMm(viewport.Width, document.Dpmm), Units.DotsToMm(viewport.Height, document.Dpmm),

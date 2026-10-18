@@ -1,4 +1,4 @@
-namespace LabelForge.Core.Model;
+﻿namespace LabelForge.Core.Model;
 
 /// <param name="Code">The symbol whose quiet zone is not clear.</param>
 /// <param name="Intruder">The element sitting in it, or null when the problem is that
@@ -44,7 +44,7 @@ public static class QuietZoneChecker
                 continue;
             }
 
-            DotRect zone = margin.Around(calculator.GetBounds(code));
+            DotRect zone = QuietZone.Area(code, calculator);
 
             // Off the stock is reported once for the symbol, and only sideways when the
             // stock is continuous, where there is no bottom edge to run off.
@@ -78,7 +78,7 @@ public static class QuietZoneChecker
         if (margin.IsEmpty) return false;
 
         var calculator = new ElementBoundsCalculator();
-        DotRect zone = margin.Around(calculator.GetBounds(code));
+        DotRect zone = QuietZone.Area(code, calculator);
         if (IsOffLabel(zone, document)) return true;
 
         foreach (Element other in document.Elements)

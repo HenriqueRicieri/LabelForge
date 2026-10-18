@@ -1,4 +1,4 @@
-using SkiaSharp;
+﻿using SkiaSharp;
 
 namespace LabelForge.Core.Imaging;
 
@@ -9,13 +9,71 @@ namespace LabelForge.Core.Imaging;
 /// </summary>
 public static class ImageRasterizer
 {
-    /// <summary>Pixel size of an encoded image, or null when it cannot be decoded.
-    /// Reads the header only; cheap enough for import-time probing.</summary>
+    /// <summary>Pixel size of an encoded image as it is shown, or null when it cannot be
+    /// decoded. Reads the header only; cheap enough for import-time probing. A photo whose
+    /// EXIF orientation turns it a quarter reports its sides swapped, the way it displays.</summary>
     public static (int Width, int Height)? Probe(byte[] imageData)
     {
         ArgumentNullException.ThrowIfNull(imageData);
         using var codec = SKCodec.Create(new MemoryStream(imageData));
-        return codec is null ? null : (codec.Info.Width, codec.Info.Height);
+        if (codec is null)
+        {
+            return null;
+        }
+
+        return TurnsAQuarter(codec.EncodedOrigin)
+            ? (codec.Info.Height, codec.Info.Width)
+            : (codec.Info.Width, codec.Info.Height);
+    }
+
+    /// <summary>The EXIF orientations that turn the stored pixels a quarter (5 to 8).</summary>
+    private static bool TurnsAQuarter(SKEncodedOrigin origin) => origin is
+        SKEncodedOrigin.LeftTop or SKEncodedOrigin.RightTop or
+        SKEncodedOrigin.RightBottom or SKEncodedOrigin.LeftBottom;
+
+    /// <summary>
+    /// The decoded pixels turned the way the file says to display them. A phone stores a
+    /// portrait photo as landscape pixels plus an EXIF orientation, and the decoder hands
+    /// back the stored pixels, so without this the photo lands on the label sideways.
+    /// Returns the source itself when nothing needs turning; otherwise a new bitmap the
+    /// caller owns.
+    /// </summary>
+    private static SKBitmap Upright(SKBitmap source, SKEncodedOrigin origin)
+    {
+        float w = source.Width;
+        float h = source.Height;
+
+        // Where each stored pixel goes: x' = ScaleX*x + SkewX*y + TransX and
+        // y' = SkewY*x + ScaleY*y + TransY, for the eight EXIF orientations.
+        SKMatrix? turn = origin switch
+        {
+            SKEncodedOrigin.TopRight => new SKMatrix(-1, 0, w, 0, 1, 0, 0, 0, 1),
+            SKEncodedOrigin.BottomRight => new SKMatrix(-1, 0, w, 0, -1, h, 0, 0, 1),
+            SKEncodedOrigin.BottomLeft => new SKMatrix(1, 0, 0, 0, -1, h, 0, 0, 1),
+            SKEncodedOrigin.LeftTop => new SKMatrix(0, 1, 0, 1, 0, 0, 0, 0, 1),
+            SKEncodedOrigin.RightTop => new SKMatrix(0, -1, h, 1, 0, 0, 0, 0, 1),
+            SKEncodedOrigin.RightBottom => new SKMatrix(0, -1, h, -1, 0, w, 0, 0, 1),
+            SKEncodedOrigin.LeftBottom => new SKMatrix(0, 1, 0, -1, 0, w, 0, 0, 1),
+            _ => null,
+        };
+
+        if (turn is not { } matrix)
+        {
+            return source;
+        }
+
+        bool quarter = TurnsAQuarter(origin);
+        var upright = new SKBitmap(new SKImageInfo(
+            quarter ? source.Height : source.Width,
+            quarter ? source.Width : source.Height,
+            source.ColorType,
+            source.AlphaType));
+        using var canvas = new SKCanvas(upright);
+        canvas.Clear(SKColors.Transparent);
+        canvas.SetMatrix(matrix);
+        canvas.DrawBitmap(source, 0, 0);
+        canvas.Flush();
+        return upright;
     }
 
     /// <summary>Grayscale buffer (row-major, 0 = black) at exactly the target size,
@@ -37,11 +95,15 @@ public static class ImageRasterizer
             return null;
         }
 
-        using SKBitmap? source = SKBitmap.Decode(codec);
-        if (source is null)
+        using SKBitmap? decoded = SKBitmap.Decode(codec);
+        if (decoded is null)
         {
             return null;
         }
+
+        SKBitmap upright = Upright(decoded, codec.EncodedOrigin);
+        using SKBitmap? turned = ReferenceEquals(upright, decoded) ? null : upright;
+        SKBitmap source = upright;
 
         var info = new SKImageInfo(targetWidth, targetHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
         using var target = new SKBitmap(info);
