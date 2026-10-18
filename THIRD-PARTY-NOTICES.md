@@ -65,7 +65,7 @@ notices for their native libraries.
 
 | Component | Version | License | Included texts |
 | --- | --- | --- | --- |
-| Microsoft.NETCore.App.Runtime.win-x64 | 10.0.1 | MIT | [DotNet-LICENSE.txt](licenses/DotNet-LICENSE.txt), [DotNet-NOTICES.txt](licenses/DotNet-NOTICES.txt) |
+| Microsoft.NETCore.App.Runtime.win-x64 | 10.0.13 | MIT | [DotNet-LICENSE.txt](licenses/DotNet-LICENSE.txt), [DotNet-NOTICES.txt](licenses/DotNet-NOTICES.txt) |
 | Avalonia | 12.1.0 | MIT | [Avalonia-LICENSE.txt](licenses/Avalonia-LICENSE.txt), [Avalonia-NOTICE.txt](licenses/Avalonia-NOTICE.txt) |
 | Avalonia.Angle.Windows.Natives | 2.1.27548.20260419 | BSD-3-Clause | [ANGLE-LICENSE.txt](licenses/ANGLE-LICENSE.txt) |
 | Avalonia.AvaloniaEdit | 12.0.0 | MIT | [AvaloniaEdit-LICENSE.txt](licenses/AvaloniaEdit-LICENSE.txt) |

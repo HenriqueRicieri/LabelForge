@@ -13,6 +13,14 @@
     <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
 
+  <!-- The runtime a self-contained publish embeds is the one whose notices were reviewed
+       (licenses/manifest.json). Pinned so the build machine's SDK does not pick it: CI's
+       10.0.x SDK and a local one bundle different patches. Bump it here and in the
+       manifest together. Framework-dependent runs (dotnet run, tests) are unaffected. -->
+  <PropertyGroup Condition="'$(SelfContained)' == 'true'">
+    <RuntimeFrameworkVersion>10.0.13</RuntimeFrameworkVersion>
+  </PropertyGroup>
+
   <ItemGroup>
     <Folder Include="Models\" />
     <AvaloniaResource Include="Assets\**" />

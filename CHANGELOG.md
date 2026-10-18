@@ -155,6 +155,9 @@ not yet been published as a release.
 - CI treats warnings as errors, NuGet audit advisories included. The five ImageSharp
   3.1.12 advisories that come with BinaryKits are suppressed one by one in
   `Directory.Build.props`, which records why none of them is reachable from the app.
+- The installer embeds the .NET 10.0.13 runtime, pinned for self-contained publishes so
+  the build machine's SDK cannot swap in a patch whose notices were not reviewed. Its
+  license and notice texts are byte-identical to the 10.0.1 ones they replace.
 
 - Added an isolated native QA tool using the production editor/styles to record
   actual display scaling and document/ZPL snapshots. Twelve scale/theme/window
