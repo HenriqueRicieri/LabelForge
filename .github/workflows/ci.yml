@@ -22,18 +22,20 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # Warnings fail the run, NuGet audit advisories included. The few that were reviewed
+      # and found unreachable are listed, one by one, in Directory.Build.props.
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore -warnaserror
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release
+        run: dotnet build --no-restore --configuration Release -warnaserror
 
       - name: Test
         run: dotnet test --no-build --configuration Release --verbosity normal
 
       # Outside the solution, so nothing else would notice an API change breaking it.
       - name: Build benchmark
-        run: dotnet build tools/LabelForge.Bench --configuration Release
+        run: dotnet build tools/LabelForge.Bench --configuration Release -warnaserror
 
       # The license gate that packaging runs, here too, so a dependency bump that brings
       # in an unreviewed package fails on the pull request rather than at release time.
@@ -82,7 +84,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Build UI harness
-        run: dotnet build tools/LabelForge.E2E --configuration Release
+        run: dotnet build tools/LabelForge.E2E --configuration Release -warnaserror
 
       - name: Run UI regression
         shell: pwsh

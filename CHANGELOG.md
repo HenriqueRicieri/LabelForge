@@ -150,6 +150,9 @@ not yet been published as a release.
   times out a hung build job. A frozen `.lfl` fixture pins the file format, the unit
   suite runs timing-sensitive tests on their own, and the harness grades recovery,
   startup-file routing and the `.lfl` association instead of only printing them.
+- CI treats warnings as errors, NuGet audit advisories included. The five ImageSharp
+  3.1.12 advisories that come with BinaryKits are suppressed one by one in
+  `Directory.Build.props`, which records why none of them is reachable from the app.
 
 - Added an isolated native QA tool using the production editor/styles to record
   actual display scaling and document/ZPL snapshots. Twelve scale/theme/window
