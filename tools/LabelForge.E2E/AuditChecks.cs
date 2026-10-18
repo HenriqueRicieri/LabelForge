@@ -34,6 +34,7 @@ internal static class AuditChecks
         PasteAtTheEdgeKeepsTheGroupsLayout(d, check);
         GroupingRefreshesTheMenu(d, check);
         RecentFilesKeepALabelThatIsOnlyBusy(d, dir, check);
+        OpenedNoticeCarriesTheStandingWarning(d, dir, check);
 
         d.AcceptDiscard();
         window.Close();
@@ -145,6 +146,33 @@ internal static class AuditChecks
         File.Delete(path);
         d.OpenLabelFile(path);
         check("audit: a deleted label leaves the recent files", d.RecentFiles.Contains(path), false);
+    }
+
+    /// <summary>Opening a label is when its standing warnings are news, so the line under
+    /// the canvas carries the first of them beside "Opened ..." rather than behind Details.
+    /// A message a command holds still comes first.</summary>
+    private static void OpenedNoticeCarriesTheStandingWarning(
+        DesignerViewModel d, string dir, Action<string, object?, object?> check)
+    {
+        string path = Path.Combine(dir, "warned.lfl");
+        var document = new LabelDocument { WidthMm = 50, HeightMm = 30, Dpmm = 8 };
+        document.Elements.Add(new TextElement
+        {
+            X = document.WidthDots + 40, Y = 20, Text = "parked", FontHeightDots = 30,
+        });
+        d.LoadDocument(document, null);
+        Wait(d.SaveToAsync(path));
+        d.LoadDocument(new LabelDocument { WidthMm = 50, HeightMm = 30, Dpmm = 8 }, null);
+        Pump(400);
+
+        d.OpenLabelFile(path);
+        Pump(800);
+        check("audit: the reopened label has a standing warning",
+            string.IsNullOrEmpty(d.PlacementWarning), false);
+        check("audit: the status line still says what was opened",
+            d.WorkspaceStatus.StartsWith("Opened warned.lfl", StringComparison.Ordinal), true);
+        check("audit: the status line carries the standing warning",
+            d.WorkspaceStatus.Contains(d.PlacementWarning, StringComparison.Ordinal), true);
     }
 
     private static void Wait(Task task)

@@ -23,7 +23,9 @@ not yet been published as a release.
 - Recover asks before replacing the open label. Check for Updates asks again about
   edits made while the update downloaded, and runs one check at a time.
 - A failed save, export or print is shown ahead of standing warnings in the bar under
-  the canvas and is no longer cleared by the next render. Export ZPL and Export PNG
+  the canvas and is no longer cleared by the next render. Such a message, "Opened ..."
+  included, carries the first standing warning beside it, so a label opened with a
+  problem says so without a trip to Details. Export ZPL and Export PNG
   report a locked or read-only file instead of closing the app.
 - The strip offering an imported file's other labels closes when another label is
   opened, so it cannot re-import the old file over it.
