@@ -5,6 +5,61 @@ namespace LabelForge.Tests;
 
 public sealed class RotationGestureTests
 {
+    private static LabelDocument Label() => new() { WidthMm = 100, HeightMm = 60, Dpmm = 8 };
+
+    private static bool Inside(DotRect b, LabelDocument label) =>
+        b.X >= 0 && b.Y >= 0 && b.X + b.Width <= label.WidthDots && b.Y + b.Height <= label.HeightDots;
+
+    /// <summary>A field turned about its centre near an edge would put its origin off
+    /// the label, and an off-label origin leaves the field out of the printed ZPL. One
+    /// that was wholly on the label is moved the least it takes to stay on it.</summary>
+    [Theory]
+    [InlineData(20, 20)]
+    [InlineData(380, 420)]
+    public void Rotate90_KeepsAFieldThatWasOnTheLabelOnIt(int x, int y)
+    {
+        LabelDocument label = Label();
+        var text = new TextElement
+        {
+            X = x, Y = y, Text = "Rotate near the edge", FontHeightDots = 40, FontWidthDots = 40,
+        };
+        label.Elements.Add(text);
+        Assert.True(Inside(new ElementBoundsCalculator().GetBounds(text), label));
+
+        RotationGesture.Rotate90(text, label);
+
+        Assert.True(Inside(new ElementBoundsCalculator().GetBounds(text), label));
+        Assert.True(ElementPlacement.IsPrintable(text, label));
+    }
+
+    [Fact]
+    public void Rotate90_LeavesAFieldInTheMiddleWhereTheCentreSaysItGoes()
+    {
+        LabelDocument label = Label();
+        var text = new TextElement { X = 200, Y = 200, Text = "Middle", FontHeightDots = 40, FontWidthDots = 40 };
+        var free = new TextElement { X = 200, Y = 200, Text = "Middle", FontHeightDots = 40, FontWidthDots = 40 };
+
+        RotationGesture.Rotate90(text, label);
+        RotationGesture.Rotate90(free);
+
+        Assert.Equal((free.X, free.Y), (text.X, text.Y));
+    }
+
+    /// <summary>A field parked on the pasteboard is off the label on purpose, so a turn
+    /// does not pull it back.</summary>
+    [Fact]
+    public void Rotate90_LeavesAParkedFieldWhereItIs()
+    {
+        LabelDocument label = Label();
+        var parked = new TextElement { X = -300, Y = 20, Text = "Parked", FontHeightDots = 40, FontWidthDots = 40 };
+        var free = new TextElement { X = -300, Y = 20, Text = "Parked", FontHeightDots = 40, FontWidthDots = 40 };
+
+        RotationGesture.Rotate90(parked, label);
+        RotationGesture.Rotate90(free);
+
+        Assert.Equal((free.X, free.Y), (parked.X, parked.Y));
+    }
+
     [Theory]
     [InlineData(FieldAnchor.TopLeft)]
     [InlineData(FieldAnchor.Baseline)]

@@ -33,6 +33,33 @@ public sealed class PrintJobExportTests
     /// quantity, so the run is one block per copy, and the label the ZPL pane shows is
     /// only the first of them.
     /// </summary>
+    /// <summary>A run this machine numbers is one block per label with no ^PQ, so a cut
+    /// group stated for the label cannot reach the printer. The job says so instead of
+    /// the cutter quietly cutting after every label.</summary>
+    [Fact]
+    public void ARunThisMachineNumbers_SaysTheCutGroupIsLost()
+    {
+        LabelDocument document = Counting(copies: 10, printerCounts: false);
+        document.Print.CutAfterLabels = 5;
+
+        PrintJobResult job = PrintJob.Build(document, DateTime.Now);
+
+        Assert.DoesNotContain("^PQ", job.Zpl, StringComparison.Ordinal);
+        Assert.Contains(job.Warnings, w => w.Contains("cut", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ARunThePrinterNumbers_KeepsItsCutGroupWithoutAWarning()
+    {
+        LabelDocument document = Counting(copies: 10, printerCounts: true);
+        document.Print.CutAfterLabels = 5;
+
+        PrintJobResult job = PrintJob.Build(document, DateTime.Now);
+
+        Assert.Contains("^PQ10,5,0,Y", job.Zpl, StringComparison.Ordinal);
+        Assert.DoesNotContain(job.Warnings, w => w.Contains("cut", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public void ARunThisMachineNumbers_ExportsEveryCopy()
     {

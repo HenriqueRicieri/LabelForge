@@ -22,7 +22,9 @@ public static class ElementResizer
     /// much further, so this one is the ellipse's alone.</summary>
     public const int MaxEllipseSideDots = 4095;
 
-    private static readonly ElementBoundsCalculator Bounds = new();
+    /// <summary>A fresh calculator each time: it is a visitor that keeps its answer in a
+    /// field, so one shared instance could hand a caller another thread's result.</summary>
+    private static ElementBoundsCalculator Bounds => new();
 
     public static TextResizeStart CaptureText(TextElement text)
     {

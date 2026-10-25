@@ -11,6 +11,16 @@ public readonly record struct QuietZoneMargin(int Left, int Top, int Right, int 
         bounds.Y - Top,
         bounds.Width + Left + Right,
         bounds.Height + Top + Bottom);
+
+    /// <summary>The same margin on a field turned clockwise by <paramref name="orientation"/>:
+    /// at 90 degrees what was on the left is on top, as the field's own drawing turns.</summary>
+    public QuietZoneMargin Turned(Orientation orientation) => orientation switch
+    {
+        Orientation.Rotated90 => new(Bottom, Left, Top, Right),
+        Orientation.Rotated180 => new(Right, Bottom, Left, Top),
+        Orientation.Rotated270 => new(Top, Right, Bottom, Left),
+        _ => this,
+    };
 }
 
 /// <summary>
@@ -65,7 +75,20 @@ public static class QuietZone
             _ => default,
         };
 
-        return margin;
+        // The margin belongs at the ends of the bars wherever they point. The 2D symbols
+        // ask for the same on every side, so turning them changes nothing.
+        return element is BarcodeElement turned ? margin.Turned(turned.Orientation) : margin;
+    }
+
+    /// <summary>
+    /// The area that has to stay clear: the symbol grown by its margin. Measured from the
+    /// symbol itself, not from the digit EAN-13 and UPC-A print outside their guard bars,
+    /// because the standards place that digit inside the leading quiet zone.
+    /// </summary>
+    public static DotRect Area(Element element, ElementBoundsCalculator bounds)
+    {
+        ArgumentNullException.ThrowIfNull(bounds);
+        return For(element).Around(bounds.GetSymbolBounds(element));
     }
 
     /// <summary>True for the element types a quiet zone means anything for.</summary>

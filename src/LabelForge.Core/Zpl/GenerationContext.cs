@@ -43,6 +43,10 @@ public sealed record GenerationContext
     /// own keeps the download, so what the ZPL pane shows and what a file export writes
     /// are always self-contained.</summary>
     public bool IncludeGraphicDownloads { get; init; } = true;
+
+    /// <summary>Whether a label that turns on ^LR or ^PM turns them back off after itself.
+    /// A run of several blocks resets once, after the last one.</summary>
+    public bool EmitStateReset { get; init; } = true;
 }
 
 /// <summary>

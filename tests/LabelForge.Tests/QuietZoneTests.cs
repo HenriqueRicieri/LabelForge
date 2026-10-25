@@ -104,6 +104,70 @@ public sealed class QuietZoneTests
         Assert.Equal(0, margin.Bottom);
     }
 
+    /// <summary>The quiet zone is at the ends of the bars, and the bars turn with the field:
+    /// at 90 degrees the symbol reads downwards, so the leading margin is on top.</summary>
+    [Theory]
+    [InlineData(Orientation.Normal, 33, 0, 21, 0)]
+    [InlineData(Orientation.Rotated90, 0, 33, 0, 21)]
+    [InlineData(Orientation.Rotated180, 21, 0, 33, 0)]
+    [InlineData(Orientation.Rotated270, 0, 21, 0, 33)]
+    public void LinearMargins_TurnWithTheField(
+        Orientation orientation, int left, int top, int right, int bottom)
+    {
+        var element = new BarcodeElement
+        {
+            Symbology = BarcodeSymbology.Ean13, Data = "123456789012", ModuleWidthDots = 3,
+            Orientation = orientation,
+        };
+
+        Assert.Equal(new QuietZoneMargin(left, top, right, bottom), QuietZone.For(element));
+    }
+
+    /// <summary>A neighbour beside a ladder barcode, where nothing is required, is fine;
+    /// one at the end the bars start from is not.</summary>
+    [Fact]
+    public void ARotatedBarcode_IsCheckedAtTheEndsOfItsBars()
+    {
+        var code = new BarcodeElement
+        {
+            X = 300, Y = 200, Data = "ABC12345", HeightDots = 80, ModuleWidthDots = 2,
+            PrintInterpretationLine = false, Orientation = Orientation.Rotated90,
+        };
+        var document = new LabelDocument { WidthMm = 100, HeightMm = 100, Dpmm = 8 };
+        document.Elements.Add(code);
+        DotRect bars = new ElementBoundsCalculator().GetBounds(code);
+
+        var beside = new BoxElement
+        {
+            X = bars.X + bars.Width + 4, Y = bars.Y, WidthDots = 40, HeightDots = 40,
+        };
+        document.Elements.Add(beside);
+        Assert.False(QuietZoneChecker.IsCrowded(document, code));
+
+        beside.X = bars.X;
+        beside.Y = bars.Y - 44;
+        Assert.True(QuietZoneChecker.IsCrowded(document, code));
+    }
+
+    /// <summary>EAN-13 prints its first digit inside its own leading quiet zone, so the
+    /// zone is measured from the bars, not from that digit.</summary>
+    [Fact]
+    public void AnEanDigitOutsideTheGuardBars_SitsInsideItsQuietZone()
+    {
+        var code = new BarcodeElement
+        {
+            Symbology = BarcodeSymbology.Ean13, X = 24, Y = 100, Data = "123456789012",
+            HeightDots = 80, ModuleWidthDots = 2,
+        };
+        var document = new LabelDocument { WidthMm = 100, HeightMm = 60, Dpmm = 8 };
+        document.Elements.Add(code);
+
+        // 11 modules of 2 dots is 22, and the bars start at 24.
+        Assert.False(QuietZoneChecker.IsCrowded(document, code));
+        code.X = 20;
+        Assert.True(QuietZoneChecker.IsCrowded(document, code));
+    }
+
     [Fact]
     public void TwoDimensionalSymbologies_ReserveTheirMarginOnEverySide()
     {

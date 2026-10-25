@@ -66,6 +66,16 @@ public static class PrintJob
             return new PrintJobResult(single, produced, info.UsesPrinterCounter, warnings);
         }
 
+        // The cut group rides ^PQ, and blocks that each hold different labels carry none,
+        // so the printer never hears about it.
+        if (document.Print.CutAfterLabels > 0)
+        {
+            warnings.Add(
+                $"The cut after every {document.Print.CutAfterLabels} labels is not sent: a run "
+                + "numbered by the PC is one block per label with no ^PQ, which is where the "
+                + "cut group is stated.");
+        }
+
         int builtRows = Math.Min(rows, MaxSoftwareCopies);
         if (builtRows < rows)
         {
@@ -77,7 +87,10 @@ public static class PrintJob
         // A graphic shared across placements is downloaded by the first block only: the
         // whole run is one stream to one printer, and a ~DG stays in memory for the rest
         // of it, so repeating a logo per copy would be paying for it thousands of times.
-        var sb = new StringBuilder(single.Length * builtRows);
+        // Pre-sized, but not by multiplying in int: a block carrying an inline image times
+        // 9999 copies passes int.MaxValue and wraps negative, which threw before anything
+        // was built.
+        var sb = new StringBuilder((int)Math.Min((long)single.Length * builtRows, 1 << 20));
         for (int row = 0; row < builtRows; row++)
         {
             sb.Append(generator.Generate(
@@ -87,6 +100,7 @@ public static class PrintJob
                     CopyIndex = row * columns,
                     EmitCopies = false,
                     IncludeGraphicDownloads = row == 0,
+                    EmitStateReset = row == builtRows - 1,
                 }));
             sb.Append('\n');
         }

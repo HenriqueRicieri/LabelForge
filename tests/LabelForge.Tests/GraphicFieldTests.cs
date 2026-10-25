@@ -161,6 +161,37 @@ public sealed class GraphicFieldTests
         Assert.Equal(hex.Black, decoded.Black);
     }
 
+    /// <summary>A header claiming more than any label holds is a corrupt or hostile file.
+    /// It is refused rather than allocated, or the multiplication overflows and the whole
+    /// import aborts with it.</summary>
+    [Theory]
+    [InlineData(1_000_000, 2_000_000_000)]
+    [InlineData(30_000, 1_000_000_000)]
+    public void Decode_RefusesAGraphicLargerThanAnyLabel(int bytesPerRow, int totalBytes)
+    {
+        Assert.Null(GraphicField.Decode("FF", bytesPerRow, totalBytes));
+    }
+
+    /// <summary>A :Z64: payload expands no further than the size the command declares,
+    /// whatever the compressed stream would inflate to.</summary>
+    [Fact]
+    public void Decode_StopsInflatingAtTheDeclaredSize()
+    {
+        using var compressed = new MemoryStream();
+        using (var zlib = new System.IO.Compression.ZLibStream(
+                   compressed, System.IO.Compression.CompressionMode.Compress, leaveOpen: true))
+        {
+            zlib.Write(new byte[8_000_000]);
+        }
+
+        string payload = $":Z64:{Convert.ToBase64String(compressed.ToArray())}:1234";
+
+        GraphicBitmap? decoded = GraphicField.Decode(payload, bytesPerRow: 1, totalBytes: 4);
+
+        Assert.NotNull(decoded);
+        Assert.Equal(4, decoded.Height);
+    }
+
     [Fact]
     public void Decode_RejectsSizesThatCannotDescribeAGraphic()
     {

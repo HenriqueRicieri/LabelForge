@@ -149,6 +149,23 @@ public sealed class ContinuousMediaTests
         Assert.Equal(document.HeightMm, restored.HeightMm, 3);
     }
 
+    /// <summary>The die-cut height typed before ticking continuous survives the project
+    /// file and every undo snapshot, so turning continuous off afterwards brings it back
+    /// rather than the length the content happened to measure.</summary>
+    [Fact]
+    public void RoundTrip_KeepsTheDieCutHeightUnderneath()
+    {
+        LabelDocument document = Roll(Box(20, 40));
+        double measured = document.HeightMm;
+
+        LabelDocument restored = LabelDocumentJson.Deserialize(
+            LabelDocumentJson.Serialize(document));
+
+        Assert.Equal(measured, restored.HeightMm, 3);
+        restored.IsContinuous = false;
+        Assert.Equal(200, restored.HeightMm, 3);
+    }
+
     /// <summary>An older .lfl has neither field, and has to keep its stored height.</summary>
     [Fact]
     public void AnOlderProjectFile_IsStillDieCut()

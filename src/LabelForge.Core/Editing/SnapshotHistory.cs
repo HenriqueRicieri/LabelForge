@@ -5,21 +5,40 @@ namespace LabelForge.Core.Editing;
 /// documents); the cursor points at the current state. Snapshot undo was chosen
 /// over command-pattern undo because label documents are tiny, it is trivially
 /// testable, and it cannot drift out of sync with the model.
+///
+/// Tiny is not a guarantee, though: an image element carries its source file, so one
+/// placed photo makes every state megabytes long. Besides the step count, the history
+/// therefore holds a size budget, and past it the oldest states go, down to a floor of
+/// recent steps that are always kept.
 /// </summary>
 public sealed class SnapshotHistory
 {
+    /// <summary>About 256 MB of UTF-16 text.</summary>
+    public const long DefaultMaxChars = 128_000_000;
+
+    public const int DefaultMinStates = 10;
+
     private readonly List<string> _states = [];
     private readonly int _capacity;
+    private readonly long _maxChars;
+    private readonly int _minStates;
+    private long _totalChars;
     private int _cursor = -1;
 
-    public SnapshotHistory(int capacity = 100)
+    public SnapshotHistory(
+        int capacity = 100, long maxChars = DefaultMaxChars, int minStates = DefaultMinStates)
     {
         if (capacity < 2)
         {
             throw new ArgumentOutOfRangeException(nameof(capacity), "History needs room for at least two states.");
         }
 
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxChars);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(minStates);
+
         _capacity = capacity;
+        _maxChars = maxChars;
+        _minStates = minStates;
     }
 
     public bool CanUndo => _cursor > 0;
@@ -42,15 +61,11 @@ public sealed class SnapshotHistory
             return;
         }
 
-        _states.RemoveRange(_cursor + 1, _states.Count - _cursor - 1);
+        DropRedoTail();
         _states.Add(state);
-
-        if (_states.Count > _capacity)
-        {
-            _states.RemoveAt(0);
-        }
-
+        _totalChars += state.Length;
         _cursor = _states.Count - 1;
+        Trim();
     }
 
     /// <summary>
@@ -66,15 +81,42 @@ public sealed class SnapshotHistory
             return;
         }
 
-        _states.RemoveRange(_cursor + 1, _states.Count - _cursor - 1);
+        DropRedoTail();
+        _totalChars += state.Length - _states[_cursor].Length;
         _states[_cursor] = state;
+        Trim();
     }
 
     /// <summary>Empties the history (e.g. when a new document is loaded).</summary>
     public void Clear()
     {
         _states.Clear();
+        _totalChars = 0;
         _cursor = -1;
+    }
+
+    private void DropRedoTail()
+    {
+        for (int i = _cursor + 1; i < _states.Count; i++)
+        {
+            _totalChars -= _states[i].Length;
+        }
+
+        _states.RemoveRange(_cursor + 1, _states.Count - _cursor - 1);
+    }
+
+    /// <summary>Drops the oldest states while there are more than the capacity, or while
+    /// they add up to more than the budget and more than the floor of recent steps remain.
+    /// Only ever called with the cursor on the newest state.</summary>
+    private void Trim()
+    {
+        while (_states.Count > _capacity ||
+               (_totalChars > _maxChars && _states.Count > _minStates))
+        {
+            _totalChars -= _states[0].Length;
+            _states.RemoveAt(0);
+            _cursor--;
+        }
     }
 
     /// <summary>Steps back and returns the previous state, or null at the beginning.</summary>

@@ -52,7 +52,7 @@ if (args.Contains("dark"))
 // Media presets, field catalogs and crash snapshots all live per machine. Point every
 // one of them at scratch locations, so a harness run never touches what the person using
 // the app has saved.
-string scratchRoot = args.FirstOrDefault() is "ui-layout" or "recovery-ui" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "transform-gestures" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare" or "viewer-layout" or "cm-units" or "unsaved-changes" or "start-screen" or "updates"
+string scratchRoot = args.FirstOrDefault() is "ui-layout" or "recovery-ui" or "canvas-display" or "menu-options" or "quiet-zone-frames" or "outline-reorder" or "canvas-paint" or "gesture-layers" or "marquee-selection" or "clipboard" or "selection-scale" or "transform-gestures" or "spacing" or "printer-status" or "viewer-size" or "viewer-compare" or "viewer-layout" or "cm-units" or "unsaved-changes" or "start-screen" or "updates" or "audit"
     ? Path.Combine(AppContext.BaseDirectory, args[0] + "-scratch")
     : AppContext.BaseDirectory;
 Directory.CreateDirectory(scratchRoot);
@@ -438,6 +438,14 @@ if (args.FirstOrDefault() == "start-screen")
     window.Close();
     return disagreed.Count == 0 ? 0 : 1;
 }
+if (args.FirstOrDefault() == "audit")
+{
+    AuditChecks.Run(scratchRoot, (label, found, wanted) => Check(label, found, wanted));
+    Console.WriteLine($"{graded} audit checks graded, {disagreed.Count} disagreed");
+    vm.Designer.ShutDown();
+    window.Close();
+    return disagreed.Count == 0 ? 0 : 1;
+}
 if (args.FirstOrDefault() == "unsaved-changes")
 {
     UnsavedChangesChecks.Run(scratchRoot, (label, found, wanted) => Check(label, found, wanted));
@@ -575,6 +583,25 @@ else
     d.WidthMm = 80;
     Console.WriteLine($"manual edit clears media: {(d.SelectedMedia is null ? "null" : "still set")} (expected null)");
     d.WidthMm = 100;
+
+    // Picking a die-cut stock while the label is continuous: the height box and the setup
+    // summary have to show the stock's height, which is what the document now holds,
+    // rather than the die-cut height stored before the pick.
+    var dieCut = LabelForge.Core.Media.StockCatalog.Search("02D102102400K")[0];
+    d.IsContinuous = true;
+    d.SelectedMedia = dieCut;
+    Check("die-cut pick on a continuous label: height box",
+        FormattableString.Invariant($"{d.HeightMm:0.###}"),
+        FormattableString.Invariant($"{dieCut.HeightMm:0.###}"));
+    Check("die-cut pick on a continuous label: box matches the document",
+        (double)d.HeightMm == d.Document.HeightMm, true);
+    d.UndoCommand.Execute(null);
+    d.UndoCommand.Execute(null);
+    d.SelectedMedia = null;
+
+    // Ticking continuous also pre-ticks the preset form, which is not document state
+    // and so is not undone; put it back for the preset checks below.
+    d.NewMediaContinuous = false;
 
     // User media presets: save the current size under a name, find it in the same
     // picker as the Zebra catalog, apply it, and remove it again.
@@ -3366,13 +3393,12 @@ if (mode == "designer")
     d.NotifyDocumentEdited();
     Pump(900);
     string snapshot = Path.Combine(recoveryDir, "e2e.recovery.json");
-    Console.WriteLine(
-        $"snapshot written: {File.Exists(snapshot)}, holds the edit="
-        + $"{File.Exists(snapshot) && File.ReadAllText(snapshot).Contains("unsaved work")} "
-        + "(expected True/True)");
+    Check("recovery: snapshot written", File.Exists(snapshot), true);
+    Check("recovery: snapshot holds the edit",
+        File.Exists(snapshot) && File.ReadAllText(snapshot).Contains("unsaved work"), true);
 
     d.ClearRecovery();
-    Console.WriteLine($"cleared after a real save: {!File.Exists(snapshot)} (expected True)");
+    Check("recovery: cleared after a real save", !File.Exists(snapshot), true);
 
     // What a dead session leaves behind: a snapshot with no lock beside it.
     d.NotifyDocumentEdited();
@@ -3383,15 +3409,16 @@ if (mode == "designer")
     var recovered = new MainViewModel(
         new LabelForge.Core.Media.UserMediaStore(presetsPath),
         new LabelForge.Core.Fields.FieldCatalogStore(catalogsPath),
-        new LabelForge.Core.Io.RecoveryStore(recoveryDir, "second-start"));
-    Console.WriteLine(
-        $"offered on next start: {recovered.Designer.HasRecoveryOffer} (expected True), "
-        + $"'{recovered.Designer.RecoveryOffer}'");
+        new LabelForge.Core.Io.RecoveryStore(recoveryDir, "second-start"),
+        userSettingsStore: new LabelForge.Core.Settings.UserSettingsStore(
+            Path.Combine(scratchRoot, "second-start-settings.json")),
+        recentFilesPath: Path.Combine(scratchRoot, "second-start-recent.json"));
+    Check("recovery: offered on next start", recovered.Designer.HasRecoveryOffer, true);
+    Console.WriteLine($"  offer: '{recovered.Designer.RecoveryOffer}'");
     recovered.Designer.RecoverDocumentCommand.Execute(null);
-    Console.WriteLine(
-        $"recovered: {recovered.Designer.Document.Elements.Count} element(s) "
-        + $"(expected 1), offer gone={!recovered.Designer.HasRecoveryOffer} (expected True), "
-        + $"remnant discarded={!File.Exists(remnant)} (expected True)");
+    Check("recovery: recovered elements", recovered.Designer.Document.Elements.Count, 1);
+    Check("recovery: offer gone after recovering", !recovered.Designer.HasRecoveryOffer, true);
+    Check("recovery: remnant discarded", !File.Exists(remnant), true);
 
     // A session that ends properly leaves nothing, so the next start stays quiet. The label
     // still has the edit above, and ending properly with one means the user was asked and
@@ -3401,9 +3428,11 @@ if (mode == "designer")
     var afterCleanExit = new MainViewModel(
         new LabelForge.Core.Media.UserMediaStore(presetsPath),
         new LabelForge.Core.Fields.FieldCatalogStore(catalogsPath),
-        new LabelForge.Core.Io.RecoveryStore(recoveryDir, "third-start"));
-    Console.WriteLine(
-        $"quiet after a clean exit: {!afterCleanExit.Designer.HasRecoveryOffer} (expected True)");
+        new LabelForge.Core.Io.RecoveryStore(recoveryDir, "third-start"),
+        userSettingsStore: new LabelForge.Core.Settings.UserSettingsStore(
+            Path.Combine(scratchRoot, "third-start-settings.json")),
+        recentFilesPath: Path.Combine(scratchRoot, "third-start-recent.json"));
+    Check("recovery: quiet after a clean exit", !afterCleanExit.Designer.HasRecoveryOffer, true);
 
     // Opening a file the app was started with: a double-clicked label, "Open with", or a
     // file dropped on the executable. The kind decides the tab, because a label is what the
@@ -3422,23 +3451,21 @@ if (mode == "designer")
     vm.OpenStartupFile(new LabelForge.Core.Io.StartupFile(
         startupLabel, LabelForge.Core.Io.StartupFileKind.Label));
     Pump(600);
-    Console.WriteLine(
-        $"startup .lfl: tab={tabs.SelectedIndex} elements={d.Document.Elements.Count} "
-        + $"recent={d.RecentFiles.Contains(startupLabel)} (expected 0 1 True)");
+    Check("startup .lfl: opens on the Designer tab", tabs.SelectedIndex, 0);
+    Check("startup .lfl: elements", d.Document.Elements.Count, 1);
+    Check("startup .lfl: becomes a recent file", d.RecentFiles.Contains(startupLabel), true);
 
     vm.OpenStartupFile(new LabelForge.Core.Io.StartupFile(
         FindGraphicSource(), LabelForge.Core.Io.StartupFileKind.Zpl));
     Pump(600);
-    Console.WriteLine(
-        $"startup .zpl: tab={tabs.SelectedIndex} "
-        + $"loaded={vm.Viewer.ZplText.Contains("^XA")} (expected 1 True)");
+    Check("startup .zpl: opens on the Viewer tab", tabs.SelectedIndex, 1);
+    Check("startup .zpl: loads the file", vm.Viewer.ZplText.Contains("^XA"), true);
 
     vm.OpenStartupFile(new LabelForge.Core.Io.StartupFile(
         @"C:\nowhere\logo.png", LabelForge.Core.Io.StartupFileKind.Unsupported));
     Pump(300);
-    Console.WriteLine(
-        $"startup .png: tab={tabs.SelectedIndex} said={d.StatusText.Contains(".png")} "
-        + "(expected 0 True)");
+    Check("startup .png: back on the Designer tab", tabs.SelectedIndex, 0);
+    Check("startup .png: says the type is not supported", d.StatusText.Contains(".png"), true);
 
     // Labelary compare mode, against the offline engine standing in for the service, so
     // the harness never sends a label anywhere. Comparing a renderer with itself is the
@@ -3482,15 +3509,14 @@ if (mode == "designer")
             $@"HKEY_CURRENT_USER\{scratchClasses}\{LabelForge.App.Services.FileAssociation.ProgId}\shell\open\command",
             null,
             null) as string;
-        Console.WriteLine(
-            $"association: .lfl -> {handler ?? "none"}, command quotes the path="
-            + $"{verb == "\"C:\\Program Files\\LabelForge\\LabelForge.App.exe\" \"%1\""} "
-            + "(expected LabelForge.Label, True)");
+        Check("association: .lfl handler", handler ?? "none", "LabelForge.Label");
+        Check("association: command quotes the path",
+            verb == "\"C:\\Program Files\\LabelForge\\LabelForge.App.exe\" \"%1\"", true);
 
         association.Unregister();
         bool gone = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(scratchClasses) is not { } left
             || left.GetSubKeyNames().Length == 0;
-        Console.WriteLine($"association removed on uninstall: {gone} (expected True)");
+        Check("association: removed on uninstall", gone, true);
         Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\LabelForge.E2E", false);
     }
 
@@ -3608,6 +3634,7 @@ if (mode == "designer")
     UnsavedChangesChecks.Run(scratchRoot, (label, found, wanted) => Check(label, found, wanted));
     StartScreenChecks.Run(scratchRoot, (label, found, wanted) => Check(label, found, wanted));
     UpdateChecks.Run(scratchRoot, (label, found, wanted) => Check(label, found, wanted));
+    AuditChecks.Run(scratchRoot, (label, found, wanted) => Check(label, found, wanted));
 }
 
 Capture($"{mode}.png");

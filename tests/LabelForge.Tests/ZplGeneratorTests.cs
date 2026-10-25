@@ -1,3 +1,4 @@
+﻿using System.Globalization;
 using LabelForge.Core.Model;
 using LabelForge.Core.Rendering;
 using LabelForge.Core.Zpl;
@@ -291,5 +292,50 @@ public sealed class ZplGeneratorTests
 
         Assert.Empty(result.Errors);
         Assert.True(result.Png.Length > 0, "kitchen-sink label produced no image");
+    }
+    /// <summary>The manual gives ^FD at most 3072 bytes. The preview draws longer data, so
+    /// the generator is the only place that can say a field is past it.</summary>
+    [Theory]
+    [InlineData(3072, false)]
+    [InlineData(3073, true)]
+    public void FieldDataPastTheManualsLimit_IsReported(int length, bool reported)
+    {
+        var generator = new ZplGenerator();
+        generator.Generate(Doc(new QrCodeElement { X = 10, Y = 10, Data = new string('a', length - 3) }));
+
+        Assert.Equal(reported, generator.LastRun.Warnings.Any(w => w.Contains("3,072", StringComparison.Ordinal)));
+    }
+
+    /// <summary>
+    /// Negative numbers carry an ASCII hyphen whatever the machine's culture. Several
+    /// cultures (Swedish, Norwegian, Finnish) format a negative int with U+2212, which no
+    /// printer reads as a minus sign.
+    /// </summary>
+    [Fact]
+    public void NegativeNumbers_UseAnAsciiMinusInEveryCulture()
+    {
+        CultureInfo previous = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo("sv-SE");
+            LabelDocument doc = Doc(new TextElement
+            {
+                X = 10, Y = 20, FontHeightDots = 30, Text = "Block",
+                BlockWidthDots = 300, BlockMaxLines = 2, BlockLineSpacingDots = -4,
+            });
+            doc.Print.DarknessDelta = -10;
+            doc.Print.LabelTopDots = -5;
+
+            string zpl = new ZplGenerator().Generate(doc);
+
+            Assert.DoesNotContain('\u2212', zpl);
+            Assert.Contains("^MD-10", zpl);
+            Assert.Contains("^LT-5", zpl);
+            Assert.Contains("^FB300,2,-4,", zpl);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
     }
 }

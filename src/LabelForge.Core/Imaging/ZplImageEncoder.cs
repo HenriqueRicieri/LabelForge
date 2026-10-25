@@ -8,6 +8,17 @@ namespace LabelForge.Core.Imaging;
 /// </summary>
 public static class ZplImageEncoder
 {
+    /// <summary>The largest byte count ^GF takes: the manual gives 1 to 99999 for its
+    /// counts and sets anything larger to the limit. ~DG states no such limit.</summary>
+    public const int MaxInlineBytes = 99_999;
+
+    /// <summary>The bytes a graphic of this size declares: whole bytes per row, times
+    /// the rows. Saturates rather than overflowing for absurd sizes.</summary>
+    public static int ByteCount(int width, int height) =>
+        width <= 0 || height <= 0
+            ? 0
+            : (int)Math.Min((long)((width + 7) / 8) * height, int.MaxValue);
+
     /// <summary>Encodes a row-major black mask (true = black) as a complete ^GFA
     /// command, without a field origin (the caller prepends ^FO).</summary>
     public static string EncodeGfa(bool[] black, int width, int height)

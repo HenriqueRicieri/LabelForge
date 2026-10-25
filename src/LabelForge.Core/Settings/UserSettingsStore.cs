@@ -87,7 +87,7 @@ public sealed class UserSettingsStore
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllText(_path, JsonSerializer.Serialize(settings, Options));
+            AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(settings, Options));
             return null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

@@ -1,0 +1,34 @@
+<Project>
+
+  <!--
+    SixLabors.ImageSharp 3.1.12 arrives through BinaryKits.Zpl.Label 3.3.1 (already the latest
+    BinaryKits), and these five advisories are fixed only from ImageSharp 4.1.2 on, a major
+    version whose build requires a Six Labors license key. None of them is reachable from
+    LabelForge, which is why they are suppressed one by one instead of muting the audit:
+
+    - The only ImageSharp code the app runs is BinaryKits.Zpl.Viewer's ^GF and ~DG analyzers,
+      which call ImageSharpImageConverter.ConvertImage(byte[], int). That overload builds an
+      Rgba32 image from the field's bits and encodes it as PNG. It decodes nothing.
+    - Image.Load, where the ICC and TIFF parsing lives, is reached only from the
+      ConvertImage(byte[]) overload and from ZplDownloadGraphics/ZplDownloadObjects.Render,
+      BinaryKits' own image-to-ZPL writers. LabelForge never calls them: our image import
+      decodes with SkiaSharp and encodes ^GF/~DG itself (Core/Imaging).
+    - Histogram equalization and the TIFF CCITT encoders are never called by anything.
+
+    Any other advisory still fails the build. Remove an entry once BinaryKits ships with a
+    patched ImageSharp, or if LabelForge starts calling one of the paths above.
+  -->
+  <ItemGroup>
+    <!-- ICC CLUT parsing allocates from unvalidated dimensions (decode only). -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-gwg2-r3hj-4w44" />
+    <!-- HistogramEqualization uses an unchecked histogram index (processor never called). -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j3p4-wp97-rph4" />
+    <!-- TIFF CCITT T4 encoder overflow (TIFF never encoded). -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j9gm-c75j-xc9q" />
+    <!-- BigTIFF IFD count loop (decode only). -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-wmxv-xphr-5c9g" />
+    <!-- TIFF CCITT T6 encoder overflow (TIFF never encoded). -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-jjfr-hcj7-qf5w" />
+  </ItemGroup>
+
+</Project>

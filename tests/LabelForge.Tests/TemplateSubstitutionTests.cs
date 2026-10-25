@@ -17,6 +17,30 @@ public sealed class TemplateSubstitutionTests
         Assert.Equal($"^FD{TemplateSubstitutor.DefaultSampleValue}^FS", result);
     }
 
+    /// <summary>A lone delimiter in one field is text, not the start of a marker that ends
+    /// in the next field: pairing across a ZPL command swallowed the commands between them.</summary>
+    [Fact]
+    public void Substitute_DoesNotPairDelimitersAcrossCommands()
+    {
+        var sut = new TemplateSubstitutor();
+        string result = sut.Substitute("^FO1,1^FDTotal ##^FS\n^FO1,40^FD##NAME##^FS");
+        Assert.Equal(
+            $"^FO1,1^FDTotal ##^FS\n^FO1,40^FD{TemplateSubstitutor.DefaultSampleValue}^FS", result);
+    }
+
+    [Fact]
+    public void Scan_LeavesAnUnterminatedMarkerLiteralAtTheEndOfItsLine()
+    {
+        TemplateSegment[] segments =
+            [.. TemplateScanner.Scan("^FD##@F(X)#^FS\n^FD##A##^FS", "##", "##")];
+
+        Assert.Equal(
+            [TemplateSegmentKind.Literal, TemplateSegmentKind.Variable, TemplateSegmentKind.Literal],
+            segments.Select(s => s.Kind));
+        Assert.Equal("^FD##@F(X)#^FS\n^FD", segments[0].Text);
+        Assert.Equal("A", segments[1].Inner);
+    }
+
     [Fact]
     public void Substitute_RemovesInternalDirectives()
     {

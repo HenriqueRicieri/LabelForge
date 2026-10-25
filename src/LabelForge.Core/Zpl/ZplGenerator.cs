@@ -42,12 +42,22 @@ public sealed class ZplGenerator : IElementVisitor
     private bool _printerClock;
     private bool _softwareCounter;
 
-    /// <summary>An image that appears more than once, downloaded once under a name.</summary>
+    /// <summary>An image downloaded once under a name: one that appears more than once, or
+    /// one too large for an inline ^GF.</summary>
     /// <param name="Name">Storage name; short, because Zebra caps it at eight characters.</param>
     /// <param name="Uses">How many elements share these bits.</param>
-    private sealed record SharedGraphic(string Name, int Uses)
+    /// <param name="TooLargeInline">Downloaded because ^GF cannot carry it.</param>
+    private sealed record SharedGraphic(string Name, int Uses, bool TooLargeInline)
     {
         public bool Downloaded { get; set; }
+    }
+
+    private void Warn(string warning)
+    {
+        if (_seenWarnings.Add(warning))
+        {
+            _warnings.Add(warning);
+        }
     }
 
     /// <summary>How the last <see cref="Generate(LabelDocument)"/> produced its dynamic
@@ -68,6 +78,16 @@ public sealed class ZplGenerator : IElementVisitor
     /// on the generated string so the viewer's raw-ZPL path shares that code.</summary>
     public string GeneratePreview(LabelDocument document, int offsetDots) =>
         Generate(document, new GenerationContext(), offsetDots, includeOffLabel: true);
+
+    /// <summary>What an image export draws: the preview's fields (markers left for the
+    /// caller to substitute, no job settings, no printer counters or clocks) for only the
+    /// elements that print, with no pasteboard margin. Never send this to a printer.</summary>
+    public string GenerateExportImage(LabelDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        Element[] printable = [.. document.Elements.Where(e => ElementPlacement.IsPrintable(e, document))];
+        return Generate(document, new GenerationContext(), 0, includeOffLabel: true, printable);
+    }
 
     /// <summary>Preview-only render of a subset into a dot-space viewport. The viewport
     /// may lie outside the label; moving layers use their own complete surface before
@@ -141,7 +161,8 @@ public sealed class ZplGenerator : IElementVisitor
             // setting the operator made on the front panel.
             if (document.Print.LabelTopDots != 0)
             {
-                Line($"^LT{Math.Clamp(document.Print.LabelTopDots, -120, 120)}");
+                Line(FormattableString.Invariant(
+                    $"^LT{Math.Clamp(document.Print.LabelTopDots, -120, 120)}"));
             }
 
             // What the printer does with the label once it is printed. Nothing is
@@ -175,7 +196,8 @@ public sealed class ZplGenerator : IElementVisitor
 
             if (document.Print.DarknessDelta != 0)
             {
-                Line($"^MD{Math.Clamp(document.Print.DarknessDelta, -30, 30)}");
+                Line(FormattableString.Invariant(
+                    $"^MD{Math.Clamp(document.Print.DarknessDelta, -30, 30)}"));
             }
         }
 
@@ -239,6 +261,30 @@ public sealed class ZplGenerator : IElementVisitor
         }
 
         _sb.Append("^XZ");
+
+        // ^LR and ^PM stay on in the printer after this label ("until ^LRN", "until ^PMN"),
+        // so the next job, from whatever system, would print reversed or mirrored unless it
+        // happens to state them. A settings-only block turns off what this label turned on,
+        // the kind of block the ZDesigner driver sends; it prints nothing. A label that
+        // turned neither on is left byte for byte as it was.
+        if (!includeOffLabel && context.EmitStateReset &&
+            (document.Print.ReverseAll || document.Print.Mirror))
+        {
+            _sb.Append('\n');
+            Line("^XA");
+            if (document.Print.ReverseAll)
+            {
+                Line("^LRN");
+            }
+
+            if (document.Print.Mirror)
+            {
+                Line("^PMN");
+            }
+
+            _sb.Append("^XZ");
+        }
+
         LastRun = new GenerationInfo(
             _printerCounter, _printerClock, _softwareCounter, _warnings.ToArray());
 
@@ -251,6 +297,10 @@ public sealed class ZplGenerator : IElementVisitor
     /// stays an inline ^GF, so an ordinary label touches no printer state at all. The
     /// same bits placed again become a single ~DG download recalled by ^XG, which is
     /// what a repeated stamp costs on a real label: the payload once instead of N times.
+    ///
+    /// The one exception is an image past ^GF's limit: the manual takes 1-99999 bytes
+    /// and sets anything larger to the limit, so the printer would cut it short while the
+    /// preview drew it whole. ~DG states no such limit, so it goes down that path too.
     /// </summary>
     /// <param name="columns">How many times the whole element list is emitted. A stamp
     /// placed once on 3-across stock is still three placements on the web, so the download
@@ -259,6 +309,7 @@ public sealed class ZplGenerator : IElementVisitor
     {
         var order = new List<string>();
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var tooLarge = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (Element element in elements)
         {
@@ -273,13 +324,18 @@ public sealed class ZplGenerator : IElementVisitor
             }
 
             counts[key] = seen + Math.Max(columns, 1);
+            if (Imaging.ZplImageEncoder.ByteCount(image.WidthDots, image.HeightDots)
+                > Imaging.ZplImageEncoder.MaxInlineBytes)
+            {
+                tooLarge.Add(key);
+            }
         }
 
         // Named in first-use order so the same document always generates the same ZPL.
         int index = 0;
-        foreach (string key in order.Where(k => counts[k] > 1))
+        foreach (string key in order.Where(k => counts[k] > 1 || tooLarge.Contains(k)))
         {
-            _graphics[key] = new SharedGraphic($"LFG{index++}", counts[key]);
+            _graphics[key] = new SharedGraphic($"LFG{index++}", counts[key], tooLarge.Contains(key));
         }
     }
 
@@ -335,14 +391,33 @@ public sealed class ZplGenerator : IElementVisitor
         _softwareCounter |= encoding.UsesSoftwareCounter;
         foreach (string warning in encoding.Warnings)
         {
-            if (_seenWarnings.Add(warning))
-            {
-                _warnings.Add(warning);
-            }
+            Warn(warning);
         }
 
+        WarnIfFieldTooLong(encoding.Zpl);
         return encoding.Zpl;
     }
+
+    /// <summary>The manual gives ^FD a 0 to 3072 byte string. Counted as sent: UTF-8,
+    /// after hex escaping. The preview draws longer data, so only a warning says so.</summary>
+    private void WarnIfFieldTooLong(string field)
+    {
+        int start = field.IndexOf("^FD", StringComparison.Ordinal);
+        if (start < 0)
+        {
+            return;
+        }
+
+        int end = field.EndsWith("^FS", StringComparison.Ordinal) ? field.Length - 3 : field.Length;
+        int bytes = System.Text.Encoding.UTF8.GetByteCount(field.AsSpan(start + 3, end - start - 3));
+        if (bytes > MaxFieldDataBytes)
+        {
+            Warn(FormattableString.Invariant(
+                $"A field holds {bytes:N0} bytes of data, above the {MaxFieldDataBytes:N0} the manual gives ^FD; the printer may not print all of it."));
+        }
+    }
+
+    private const int MaxFieldDataBytes = 3072;
 
     public void Visit(TextElement element)
     {
@@ -355,10 +430,12 @@ public sealed class ZplGenerator : IElementVisitor
 
         // A plain line emits no ^FB at all, so a label that never asked for a block is
         // byte-for-byte what it always was.
+        // Invariant because line spacing can be negative, and some cultures write a
+        // negative int with U+2212 rather than the hyphen a printer reads as a minus.
         string block = element.IsBlock
-            ? $"^FB{element.BlockWidthDots},{Math.Max(element.BlockMaxLines, 1)},"
-              + $"{element.BlockLineSpacingDots},{Justify(element.Justification)},"
-              + $"{element.BlockHangingIndentDots}"
+            ? string.Create(
+                CultureInfo.InvariantCulture,
+                $"^FB{element.BlockWidthDots},{Math.Max(element.BlockMaxLines, 1)},{element.BlockLineSpacingDots},{Justify(element.Justification)},{element.BlockHangingIndentDots}")
             : string.Empty;
 
         Line($"{Fo(element)}{font}{block}{Field(element.Text)}");
@@ -479,6 +556,19 @@ public sealed class ZplGenerator : IElementVisitor
                         .Append(Imaging.ZplImageEncoder.EncodeDownload(
                             shared.Name, bits, element.WidthDots, element.HeightDots))
                         .Append('\n');
+                }
+
+                if (shared.TooLargeInline)
+                {
+                    // Whoever takes this ZPL into another system has to know the label is
+                    // now two parts, or the download gets left behind.
+                    string name = string.IsNullOrWhiteSpace(element.Name) ? "Image" : element.Name;
+                    int bytes = Imaging.ZplImageEncoder.ByteCount(element.WidthDots, element.HeightDots);
+                    Warn(FormattableString.Invariant(
+                        $"Image \"{name}\" is {bytes:N0} bytes, above the {Imaging.ZplImageEncoder.MaxInlineBytes:N0} ^GF allows. ")
+                        + "It goes as ~DG at the start of the ZPL, sent with the label and kept "
+                        + "in the printer's memory. If your system sends only the part between "
+                        + "^XA and ^XZ, include the ~DG line too.");
                 }
 
                 shared.Downloaded = true;

@@ -27,6 +27,9 @@ public readonly record struct TemplateSegment(TemplateSegmentKind Kind, string T
 /// </summary>
 public static class TemplateScanner
 {
+    private static readonly System.Buffers.SearchValues<char> MarkerBreaks =
+        System.Buffers.SearchValues.Create("^~\r\n");
+
     /// <summary>Splits text using a document's own delimiters.</summary>
     public static IEnumerable<TemplateSegment> Scan(string text, Model.MarkerSyntax syntax)
     {
@@ -41,9 +44,10 @@ public static class TemplateScanner
         if (string.IsNullOrEmpty(close)) throw new ArgumentException("Delimiter required.", nameof(close));
 
         int i = 0;
-        while (i < text.Length)
+        int searchFrom = 0;
+        while (searchFrom < text.Length)
         {
-            int start = text.IndexOf(open, i, StringComparison.Ordinal);
+            int start = text.IndexOf(open, searchFrom, StringComparison.Ordinal);
             if (start < 0)
             {
                 break;
@@ -54,6 +58,16 @@ public static class TemplateScanner
             if (end < 0)
             {
                 break;
+            }
+
+            // A marker never spans a ZPL command or a line. Without this, a lone
+            // delimiter in one field ("Total ##") paired with the opening of a marker in
+            // the next one, and everything between them, commands included, was taken
+            // for one marker. That delimiter stays text and the search moves on.
+            if (text.AsSpan(contentStart, end - contentStart).IndexOfAny(MarkerBreaks) >= 0)
+            {
+                searchFrom = start + 1;
+                continue;
             }
 
             if (start > i)
@@ -69,6 +83,7 @@ public static class TemplateScanner
                 text[start..stop],
                 inner);
             i = stop;
+            searchFrom = stop;
         }
 
         if (i < text.Length)

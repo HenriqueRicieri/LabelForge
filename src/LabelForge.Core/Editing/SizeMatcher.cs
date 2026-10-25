@@ -54,7 +54,12 @@ public static class SizeMatcher
                 continue;
             }
 
-            ElementResizer.Resize(element, wantWidth, wantHeight);
+            // The resizer works in the field's own axes, so a field turned a quarter gets
+            // the drawn sizes swapped, exactly as the canvas handles and SelectionScale do.
+            bool turned = FieldRotation.Applies(element) &&
+                element.Orientation is Orientation.Rotated90 or Orientation.Rotated270;
+            ElementResizer.Resize(
+                element, turned ? wantHeight : wantWidth, turned ? wantWidth : wantHeight);
 
             DotRect after = bounds.GetBounds(element);
             if (after.Width == before.Width && after.Height == before.Height)

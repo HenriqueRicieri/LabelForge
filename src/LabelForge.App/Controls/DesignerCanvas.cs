@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
@@ -924,7 +924,7 @@ public sealed partial class DesignerCanvas : Control
                     continue;
                 }
 
-                DotRect zone = margin.Around(_bounds.GetBounds(element));
+                DotRect zone = QuietZone.Area(element, _bounds);
                 bool crowded = QuietZoneChecker.IsCrowded(doc, element);
                 context.DrawRectangle(null, crowded ? QuietZoneWarnPen : QuietZonePen, new Rect(
                     origin.X + zone.X * scale,
@@ -2488,7 +2488,7 @@ public sealed partial class DesignerCanvas : Control
                 Orientation snapped = DegreesToOrientation(nearest);
                 if (FieldRotation.Get(primary) != snapped)
                 {
-                    RotationGesture.Apply(primary, snapped, _rotateStartBounds);
+                    RotationGesture.Apply(primary, snapped, _rotateStartBounds, Document);
                     LiveEdited?.Invoke(this, EventArgs.Empty);
                 }
             }

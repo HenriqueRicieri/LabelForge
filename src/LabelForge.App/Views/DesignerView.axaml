@@ -582,8 +582,8 @@
             <DockPanel>
                 <Button DockPanel.Dock="Right" Content="Discard" Margin="6,0,0,0"
                         Command="{Binding DismissRecoveryCommand}" />
-                <Button DockPanel.Dock="Right" Content="Recover"
-                        Command="{Binding RecoverDocumentCommand}" />
+                <Button Name="RecoverButton" DockPanel.Dock="Right" Content="Recover"
+                        Click="OnRecoverClicked" />
                 <TextBlock Text="{Binding RecoveryOffer}" VerticalAlignment="Center"
                            Foreground="{DynamicResource AppRecoveryForeground}" TextWrapping="Wrap" />
             </DockPanel>
