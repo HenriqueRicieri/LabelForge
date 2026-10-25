@@ -1,9 +1,11 @@
 # Windows release candidate validation
 
-Updated 2026-09-29. Candidate version: `0.4.0`. Native workflow evidence was
+Updated 2026-10-25. Candidate version: `0.4.0`. Native workflow evidence was
 collected on `450b1df`; recovery contrast was validated on `d63901b`. The latest
-unsigned candidate is built from `b24f79b`, including the later Auto-width font
-correction. The previously installed candidate was built from
+unsigned candidate is built from `a774020`, the merge of the October audit fixes,
+and is the installed copy: it passed an in-place repair, a file comparison of the
+installed app and an installed-app smoke test (see below). An earlier installed
+candidate was built from
 [`cbacfd4`](https://github.com/HenriqueRicieri/LabelForge/commit/cbacfd4e043298bd224ac24c496e150412386cf9).
 It includes text resize, user-data and paint corrections, guide gesture/precision
 fixes and the runtime/native notice inventories added by `eec7557`.
@@ -328,6 +330,43 @@ only the test, not app source or package contents.
 ## Latest candidate files
 
 The unsigned `0.4.0` candidate from
+[`a774020`](https://github.com/HenriqueRicieri/LabelForge/commit/a77402064a824c0f1a15ef56c08deb0debbdde99)
+is in `artifacts/releases/candidate-0.4.0-a774020`. It is the merge of the
+October audit fixes and pins the self-contained publish to the .NET 10.0.13
+runtime. The publish had zero warnings/errors and reports product version
+`0.4.0+a77402064a824c0f1a15ef56c08deb0debbdde99`. The pinned vpk 1.2.0 input
+check and the runtime/native notice guard passed (28 runtime packages, 2 fonts,
+277 native inventory entries). ZIP and nupkg passed CRC (267 and 270 entries).
+Each archive contained 263 published files with exactly matching bytes; the
+packer excluded `createdump.exe` and four PDBs, as before. Setup embeds the exact
+nupkg. Its [source CI](https://github.com/HenriqueRicieri/LabelForge/actions/runs/40226945300)
+passed all nine jobs.
+
+| File | SHA-256 |
+| --- | --- |
+| LabelForge-win-Setup.exe | `637cfc1b5000ee792000e1a1f659de2176ffc14392ea5cea610450aa41d219dc` |
+| LabelForge-win-Portable.zip | `849c05634b85a0609c73c88b11332f82b349f6fb636342259073236983280cd1` |
+| LabelForge-0.4.0-full.nupkg | `642d3b25d1bd5cbf1262d1b5b37c2dd8dcc9d600487ed0d9f83ff05a34d641ed` |
+
+Installed-app check, 2026-10-25, on Windows build 26200. User data was backed up
+first. Setup, run from the candidate folder, detected the existing 0.4.0
+installation (then `0.4.0+d68096e`) and completed Repair. The installed
+executable reports `0.4.0+a774020`, and all 264 installed `current/` files match
+the ZIP byte for byte. A copy of the frozen `format-v1.lfl` fixture opened from
+Windows through the `.lfl` association in the installed app, maximized on the
+primary monitor. File > Export ZPL wrote 384 bytes identical to `ZplGenerator`
+output for the fixture at the same source; File > Save As wrote a label whose
+model and ZPL equal the fixture's. The ZPL viewer opened the exported file with
+no errors. A normal close left no recovery snapshot, and the recent-files and
+settings stores matched the backup after the test entries were removed.
+
+Still open, unchanged by this check: clean-profile installation, uninstall of this
+package and exact Rust helper provenance, all deferred while use is internal.
+Versioned upgrade was waived, not validated. Nothing has been published.
+
+## Earlier uninstalled candidate files
+
+The unsigned `0.4.0` candidate from
 [`b24f79b`](https://github.com/HenriqueRicieri/LabelForge/commit/b24f79b481caad546d2f68d3104bd0ae562692e7)
 is in `artifacts/releases/candidate-0.4.0-b24f79b`. It includes the production
 Auto-width fix from `6276448`. The self-contained win-x64 publish had zero
@@ -346,8 +385,8 @@ passed all nine jobs.
 | LabelForge-win-Portable.zip | `608caaf240b206576cf2dc69aa0b2985dfe51d503091791a5d576b413302a1fd` |
 | LabelForge-0.4.0-full.nupkg | `416354bde45b4b02fccf8b0c7cac8fbe3087088a8f3daef013eb0db56f31fea5` |
 
-This package has not been installed. Native installer evidence below remains
-from `cbacfd4`. An installed-app check of this exact package, clean-profile
+This package was never installed; `a774020` above supersedes it. Native installer
+evidence below is from `cbacfd4`. An installed-app check of this exact package, clean-profile
 installation and exact Rust helper provenance are deferred while use is
 internal; revisit them before external distribution. Versioned upgrade was
 waived, not validated. Nothing has been published.

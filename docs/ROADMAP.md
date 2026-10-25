@@ -157,7 +157,14 @@ nupkg check passed; hashes are in the [release validation record](RELEASE-VALIDA
 Its [source CI passed all nine jobs](https://github.com/HenriqueRicieri/LabelForge/actions/runs/36571200858).
 It has not been installed. The installed `cbacfd4` candidate remains intact.
 
-The installed `cbacfd4` candidate is sufficient for current internal use.
+On 2026-10-25 the October audit fixes merged as `a774020` and a new unsigned
+package was built from it. It passed the integrity and notice checks, an in-place
+repair of the installed copy, a byte comparison of all 264 installed files and an
+installed-app smoke test (association launch, ZPL export identical to the
+generator, Save As, offline viewer, clean close). It is now the installed copy;
+details are in the [release validation record](RELEASE-VALIDATION.md).
+
+The installed `a774020` candidate is sufficient for current internal use.
 Before distributing a new installer externally, smoke-test that exact package
 on an installed app and clean profile, and assess the documented Rust helper
 provenance gap. Publishing the release is a separate decision. The update feed is
